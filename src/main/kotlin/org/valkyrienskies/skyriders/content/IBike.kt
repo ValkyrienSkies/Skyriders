@@ -28,8 +28,4 @@ interface IBike {
 
     fun tick()
     fun physTick()
-
-    fun getModel(): IOpenModel {
-        return OpenModelHelper.getData(ResourceLocation.fromNamespaceAndPath("skyriders", "models/bikes/" + id))
-    }
 }

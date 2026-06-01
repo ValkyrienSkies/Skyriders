@@ -12,6 +12,9 @@ class DebugBike(override val bodyId: BodyId,
                 override val level: Level
 ) : IBike {
 
+    override val id: String
+        get() = "debug_bike"
+
     override fun getSeatOffset(): Double {
         TODO("Not yet implemented")
     }
