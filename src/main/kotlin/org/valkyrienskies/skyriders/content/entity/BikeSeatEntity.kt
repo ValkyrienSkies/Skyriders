@@ -47,7 +47,6 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             }
             return
         }
-        passengers.forEach(::positionBikePassenger)
         updateBikeInputFromPassenger()
     }
 
@@ -84,12 +83,6 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
         moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yawFromForward(forward), xRot)
         return true
-    }
-
-    private fun positionBikePassenger(passenger: Entity) {
-        passenger.setPos(position())
-        passenger.yRot = yRot
-        passenger.yHeadRot = yRot
     }
 
     private fun updateBikeInputFromPassenger() {
