@@ -26,7 +26,7 @@ class DebugBike(override val bodyId: BodyId,
         get() = "debug_bike"
 
     override fun getSeatOffset(): Double {
-        return 0.55
+        return 0.35
     }
 
     override fun getKinematics(): BodyKinematics {

@@ -56,6 +56,7 @@ object SkyridersMod {
         MinecraftForge.EVENT_BUS.addListener { event: RegisterCommandsEvent -> SkyridersCommands.register(event) }
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
+            modEventBus.addListener(SkyridersModClient::registerKeyMappings)
         }
     }
 

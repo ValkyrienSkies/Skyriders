@@ -25,6 +25,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     var bodyId: BodyId
         get() = entityData.get(BODY_ID)
         set(value) = entityData.set(BODY_ID, value)
+    private var lastBikeYaw: Float? = null
 
     init {
         blocksBuilding = false
@@ -40,6 +41,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             return
         }
 
+        val previousYaw = yRot
         if (!updateSeatPose()) {
             if (!level().isClientSide) {
                 passengers.forEach(Entity::stopRiding)
@@ -47,6 +49,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             }
             return
         }
+        rotatePassengersByBikeYawDelta(previousYaw)
         updateBikeInputFromPassenger()
     }
 
@@ -85,6 +88,18 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         return true
     }
 
+    private fun rotatePassengersByBikeYawDelta(fallbackPreviousYaw: Float) {
+        val previousYaw = lastBikeYaw ?: fallbackPreviousYaw
+        val deltaYaw = yRot - previousYaw
+        lastBikeYaw = yRot
+        if (!deltaYaw.isFinite() || kotlin.math.abs(deltaYaw) < 1.0e-4f) return
+
+        passengers.forEach { passenger ->
+            passenger.yRot += deltaYaw
+            passenger.yHeadRot += deltaYaw
+        }
+    }
+
     private fun updateBikeInputFromPassenger() {
         if (level().isClientSide) return
 
@@ -94,7 +109,8 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
                 steer = passenger.xxa.toDouble(),
                 throttle = passenger.zza.toDouble(),
                 brake = if (passenger.zza < 0.0f) -passenger.zza.toDouble() else 0.0,
-                jump = it.jump
+                jump = it.jump,
+                pitch = it.pitch
             )
         }
     }
@@ -109,7 +125,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     companion object {
         private const val BODY_ID_TAG = "BodyId"
-        private const val DEFAULT_SEAT_OFFSET = 0.55
+        private const val DEFAULT_SEAT_OFFSET = 0.35
         private val BODY_ID: EntityDataAccessor<Long> =
             SynchedEntityData.defineId(BikeSeatEntity::class.java, EntityDataSerializers.LONG)
     }

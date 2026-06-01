@@ -310,7 +310,7 @@ object BikePhysicsSolver {
         config: BikePhysicsConfig
     ) {
         val pitchTorque = Vector3d(right)
-            .mul(-input.throttle.coerceIn(-1.0, 1.0) * config.airbornePitchControlStrength)
+            .mul(-input.pitch.coerceIn(-1.0, 1.0) * config.airbornePitchControlStrength)
         val rollTorque = Vector3d(forward)
             .mul(-input.steer.coerceIn(-1.0, 1.0) * config.airborneRollControlStrength)
         val brakeDamping = Vector3d(body.kinematics.angularVelocity)

@@ -31,5 +31,5 @@ object BikeClientMountTransforms {
         return Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
     }
 
-    private const val DEFAULT_SEAT_OFFSET = 0.55
+    private const val DEFAULT_SEAT_OFFSET = 0.35
 }

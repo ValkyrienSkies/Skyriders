@@ -31,10 +31,21 @@ object SkyridersNetwork {
             BikeInputPacket::decode,
             BikeInputPacket::handle
         )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeDismountPacket::class.java,
+            BikeDismountPacket::encode,
+            BikeDismountPacket::decode,
+            BikeDismountPacket::handle
+        )
     }
 
     fun sendBikeInput(input: BikeInput) {
         CHANNEL.sendToServer(BikeInputPacket(input))
+    }
+
+    fun sendBikeDismount() {
+        CHANNEL.sendToServer(BikeDismountPacket())
     }
 
     data class BikeInputPacket(val input: BikeInput) {
@@ -43,6 +54,7 @@ object SkyridersNetwork {
             buf.writeDouble(input.throttle)
             buf.writeDouble(input.brake)
             buf.writeDouble(input.jump)
+            buf.writeDouble(input.pitch)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -66,12 +78,39 @@ object SkyridersNetwork {
                         steer = buf.readDouble(),
                         throttle = buf.readDouble(),
                         brake = buf.readDouble(),
-                        jump = buf.readDouble()
+                        jump = buf.readDouble(),
+                        pitch = buf.readDouble()
                     ).clamped()
                 )
             }
 
             fun handle(packet: BikeInputPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    class BikeDismountPacket {
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                val player = context.sender ?: return@enqueueWork
+                if (player.vehicle is BikeSeatEntity) {
+                    player.stopRiding()
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeDismountPacket, buf: FriendlyByteBuf) {
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeDismountPacket {
+                return BikeDismountPacket()
+            }
+
+            fun handle(packet: BikeDismountPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }
