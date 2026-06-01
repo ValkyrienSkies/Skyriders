@@ -76,6 +76,13 @@ object BikeClientMountTransforms {
     }
 
     @JvmStatic
+    fun getBikeMountedBodyRenderYaw(seat: BikeSeatEntity?): Float? {
+        val transform = getBikeRenderTransform(seat) ?: return null
+        val bikeYaw = getBikeYaw(transform)
+        return if (bikeYaw.isFinite()) bikeYaw else null
+    }
+
+    @JvmStatic
     fun getMountedBikeWheelTopSpeed(entity: Entity?): Double {
         val seat = entity?.vehicle as? BikeSeatEntity ?: return DEFAULT_WHEEL_TOP_SPEED
         val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)

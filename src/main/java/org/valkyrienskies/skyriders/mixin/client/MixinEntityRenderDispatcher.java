@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -51,8 +52,9 @@ public abstract class MixinEntityRenderDispatcher {
         final Vec3 vanillaPosition = entity.getPosition(partialTicks);
         final Vec3 renderOffset = renderer.getRenderOffset(entity, partialTicks);
         final Vector3d bikePosition = BikeClientMountTransforms.getBikeMountedEntityRenderPosition(seat, entity);
-        final Float bikeYaw = BikeClientMountTransforms.getBikeMountedEntityRenderYaw(seat, rotationYaw);
-        if (bikePosition == null || bikeYaw == null) {
+        final Float lookYaw = BikeClientMountTransforms.getBikeMountedEntityRenderYaw(seat, rotationYaw);
+        final Float bodyYaw = BikeClientMountTransforms.getBikeMountedBodyRenderYaw(seat);
+        if (bikePosition == null || lookYaw == null || bodyYaw == null) {
             original.call(renderer, entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
@@ -65,7 +67,7 @@ public abstract class MixinEntityRenderDispatcher {
             bikePosition.z + z - vanillaPosition.z
         );
         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
-        original.call(renderer, entity, bikeYaw, partialTicks, poseStack, buffer, packedLight);
+        skyriders$renderWithBikeBodyYaw(renderer, entity, lookYaw, bodyYaw, partialTicks, poseStack, buffer, packedLight, original);
     }
 
     private BikeSeatEntity skyriders$getBikeSeat(final Entity entity) {
@@ -73,5 +75,41 @@ public abstract class MixinEntityRenderDispatcher {
             return bikeSeat;
         }
         return entity.getVehicle() instanceof BikeSeatEntity bikeSeat ? bikeSeat : null;
+    }
+
+    private <T extends Entity> void skyriders$renderWithBikeBodyYaw(
+        final EntityRenderer<T> renderer,
+        final T entity,
+        final float lookYaw,
+        final float bodyYaw,
+        final float partialTicks,
+        final PoseStack poseStack,
+        final MultiBufferSource buffer,
+        final int packedLight,
+        final Operation<Void> original
+    ) {
+        if (!(entity instanceof LivingEntity livingEntity)) {
+            original.call(renderer, entity, lookYaw, partialTicks, poseStack, buffer, packedLight);
+            return;
+        }
+
+        final float previousBodyYaw = livingEntity.yBodyRot;
+        final float previousBodyYawOld = livingEntity.yBodyRotO;
+        final float previousHeadYaw = livingEntity.yHeadRot;
+        final float previousHeadYawOld = livingEntity.yHeadRotO;
+
+        livingEntity.yBodyRot = bodyYaw;
+        livingEntity.yBodyRotO = bodyYaw;
+        livingEntity.yHeadRot = lookYaw;
+        livingEntity.yHeadRotO = lookYaw;
+
+        try {
+            original.call(renderer, entity, lookYaw, partialTicks, poseStack, buffer, packedLight);
+        } finally {
+            livingEntity.yBodyRot = previousBodyYaw;
+            livingEntity.yBodyRotO = previousBodyYawOld;
+            livingEntity.yHeadRot = previousHeadYaw;
+            livingEntity.yHeadRotO = previousHeadYawOld;
+        }
     }
 }
