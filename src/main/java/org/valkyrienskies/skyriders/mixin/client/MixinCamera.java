@@ -13,8 +13,11 @@ import org.joml.Vector3dc;
 import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform;
 import org.valkyrienskies.skyriders.client.BikeClientMountTransforms;
 
@@ -29,6 +32,19 @@ public abstract class MixinCamera {
     @Shadow @Final private Vector3f forwards;
     @Shadow @Final private Vector3f up;
     @Shadow @Final private Vector3f left;
+    @Unique private boolean skyriders$bikeInitialPositionApplied;
+
+    @Inject(method = "setup", at = @At("HEAD"))
+    private void skyriders$resetBikeCameraState(
+        final net.minecraft.world.level.BlockGetter level,
+        final Entity entity,
+        final boolean detached,
+        final boolean mirror,
+        final float partialTick,
+        final CallbackInfo ci
+    ) {
+        this.skyriders$bikeInitialPositionApplied = false;
+    }
 
     @WrapOperation(
         method = "setup",
@@ -86,10 +102,11 @@ public abstract class MixinCamera {
         final Operation<Void> original
     ) {
         final BodyTransform transform = BikeClientMountTransforms.getMountedBikeRenderTransform(this.entity);
-        if (transform == null) {
+        if (transform == null || this.skyriders$bikeInitialPositionApplied) {
             original.call(camera, x, y, z);
             return;
         }
+        this.skyriders$bikeInitialPositionApplied = true;
 
         final double seatOffset = BikeClientMountTransforms.getMountedBikeSeatOffset(this.entity);
         final double eyeHeight = Mth.lerp(1.0F, this.eyeHeightOld, this.eyeHeight);

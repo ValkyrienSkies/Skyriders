@@ -35,8 +35,9 @@ object BikePhysicsSolver {
         val up = transformDirection(body, LOCAL_UP, LOCAL_UP)
         val forwardSpeed = safeDot(body.kinematics.velocity, forward)
 
-        val frontContact = sampleWheelContact(body, physLevel, config.frontWheelLocalPos, config, false)
-        val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, config, false)
+        val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        val frontContact = sampleWheelContact(body, physLevel, config.frontWheelLocalPos, contactUp, config, false)
+        val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, config, false)
         val contacts = listOf(frontContact, rearContact)
         val grounded = frontContact.grounded || rearContact.grounded
 
@@ -80,15 +81,17 @@ object BikePhysicsSolver {
         body: PhysVsBody,
         physLevel: PhysLevel,
         wheelLocalPos: Vector3d,
+        contactUp: Vector3d,
         config: BikePhysicsConfig,
         steerable: Boolean
     ): WheelContact {
         val transform = body.kinematics.transform
-        val suspensionDirWorld = transformDirection(body, LOCAL_UP, WORLD_UP)
+        val suspensionDirWorld = safeNormalize(contactUp, WORLD_UP)
         val castDirection = safeNormalize(Vector3d(suspensionDirWorld).negate(), WORLD_UP)
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
-        val forward = transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
-        val right = transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
+        val bodyForward = transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
+        val forward = projectOntoPlane(bodyForward, suspensionDirWorld, bodyForward)
+        val right = safeNormalize(Vector3d(suspensionDirWorld).cross(forward), transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT))
         val samples = listOf(
             wheelLocalPos,
             Vector3d(wheelLocalPos).fma(-config.wheelWidth * 0.5, LOCAL_RIGHT),
@@ -420,6 +423,11 @@ object BikePhysicsSolver {
 
     private fun transformDirection(body: PhysVsBody, direction: Vector3d, fallback: Vector3d): Vector3d {
         return safeNormalize(body.kinematics.rotation.transform(Vector3d(direction)), fallback)
+    }
+
+    private fun projectOntoPlane(vector: Vector3dc, normal: Vector3dc, fallback: Vector3dc): Vector3d {
+        val projected = Vector3d(vector).sub(Vector3d(normal).mul(safeDot(vector, normal)))
+        return safeNormalize(projected, fallback)
     }
 
     private fun smoothstep(edge0: Double, edge1: Double, value: Double): Double {

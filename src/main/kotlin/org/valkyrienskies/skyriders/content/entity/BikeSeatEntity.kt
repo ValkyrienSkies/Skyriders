@@ -7,6 +7,7 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
@@ -14,6 +15,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3dc
+import org.valkyrienskies.core.api.bodies.ClientVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.dimensionId
@@ -49,7 +51,11 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             }
             return
         }
-        rotatePassengersByBikeYawDelta(previousYaw)
+        if (level().isClientSide) {
+            rotatePassengersByBikeYawDelta(previousYaw)
+        } else {
+            lastBikeYaw = yRot
+        }
         updateBikeInputFromPassenger()
     }
 
@@ -80,8 +86,9 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     private fun updateSeatPose(): Boolean {
         val body = level().shipWorld?.allBodies?.getById(bodyId) ?: return false
         val seatOffset = BikeManager.getBike(body.dimension, bodyId)?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
-        val seatWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
-        val forward = body.kinematics.rotation.transform(Vector3d(0.0, 0.0, 1.0))
+        val transform = if (level().isClientSide && body is ClientVsBody) body.renderTransform else body.kinematics.transform
+        val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
         if (!isFinite(seatWorld) || !isFinite(forward)) return false
 
         moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yawFromForward(forward), xRot)
@@ -90,7 +97,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     private fun rotatePassengersByBikeYawDelta(fallbackPreviousYaw: Float) {
         val previousYaw = lastBikeYaw ?: fallbackPreviousYaw
-        val deltaYaw = yRot - previousYaw
+        val deltaYaw = Mth.wrapDegrees(yRot - previousYaw)
         lastBikeYaw = yRot
         if (!deltaYaw.isFinite() || kotlin.math.abs(deltaYaw) < 1.0e-4f) return
 
