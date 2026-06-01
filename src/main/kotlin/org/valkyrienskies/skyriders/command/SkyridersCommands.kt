@@ -12,6 +12,7 @@ import net.minecraft.commands.arguments.coordinates.Vec3Argument
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.phys.Vec3
 import net.minecraftforge.event.RegisterCommandsEvent
 import org.joml.Vector3d
@@ -20,6 +21,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
+import kotlin.math.atan2
 
 object SkyridersCommands {
     fun register(event: RegisterCommandsEvent) {
@@ -79,6 +81,15 @@ object SkyridersCommands {
                             argument("bodyId", LongArgumentType.longArg())
                                 .executes { ctx ->
                                     removeBike(ctx.source, LongArgumentType.getLong(ctx, "bodyId"))
+                                }
+                        )
+                )
+                .then(
+                    literal("ride")
+                        .then(
+                            argument("bodyId", LongArgumentType.longArg())
+                                .executes { ctx ->
+                                    rideBike(ctx.source, LongArgumentType.getLong(ctx, "bodyId"))
                                 }
                         )
                 )
@@ -221,6 +232,47 @@ object SkyridersCommands {
         }
 
         source.sendSuccess({ Component.literal("Removed ${bike.id} with VS body $bodyId") }, true)
+        return 1
+    }
+
+    private fun rideBike(source: CommandSourceStack, bodyId: BodyId): Int {
+        val level = source.level as? ServerLevel
+            ?: run {
+                source.sendFailure(Component.literal("Bikes can only be ridden on the server."))
+                return 0
+            }
+        val player = source.player as? ServerPlayer
+            ?: run {
+                source.sendFailure(Component.literal("Only players can ride bikes."))
+                return 0
+            }
+        val bike = BikeManager.getBike(level.dimensionId, bodyId)
+            ?: run {
+                source.sendFailure(Component.literal("No bike with VS body id $bodyId in this dimension."))
+                return 0
+            }
+
+        val transform = try {
+            bike.getTransform()
+        } catch (ex: IllegalStateException) {
+            source.sendFailure(Component.literal(ex.message ?: "Bike body is missing."))
+            return 0
+        }
+        val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, bike.getSeatOffset(), 0.0))
+        val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
+        val yaw = Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
+
+        val seat = SkyridersMod.BIKE_SEAT_ENTITY.get().create(level)
+            ?: run {
+                source.sendFailure(Component.literal("Could not create bike seat entity."))
+                return 0
+            }
+        seat.bodyId = bodyId
+        seat.moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yaw, 0.0f)
+
+        level.addFreshEntity(seat)
+        player.startRiding(seat, true)
+        source.sendSuccess({ Component.literal("Mounted bike $bodyId") }, false)
         return 1
     }
 }

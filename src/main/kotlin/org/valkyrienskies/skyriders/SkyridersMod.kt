@@ -2,6 +2,8 @@ package org.valkyrienskies.skyriders
 
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.Item
+import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.level.block.Block
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
@@ -16,6 +18,8 @@ import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
 @Mod("skyriders")
@@ -30,6 +34,13 @@ object SkyridersMod {
     private val BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID)
 
     // Put RegistryObjects here:
+    val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
+        EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
+            .sized(0.05f, 0.05f)
+            .clientTrackingRange(10)
+            .updateInterval(1)
+            .build("$MOD_ID:bike_seat")
+    }
 
     // end of RegistryObjects
 
@@ -52,6 +63,7 @@ object SkyridersMod {
     @OptIn(VsBeta::class)
     fun init (event: FMLCommonSetupEvent) {
         event.enqueueWork {
+            SkyridersNetwork.register()
             vsApi.physTickEvent.on { physTickEvent ->
                 BikeManager.physTick(physTickEvent.world, physTickEvent.delta)
             }

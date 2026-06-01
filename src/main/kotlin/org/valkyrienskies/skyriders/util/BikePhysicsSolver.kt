@@ -37,10 +37,11 @@ object BikePhysicsSolver {
 
         val frontContact = sampleWheelContact(body, physLevel, config.frontWheelLocalPos, config, false)
         val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, config, false)
+        val contacts = listOf(frontContact, rearContact)
         val grounded = frontContact.grounded || rearContact.grounded
 
         if (grounded) {
-            smoothGroundNormal(state, listOf(frontContact, rearContact), dt, config)
+            smoothGroundNormal(state, contacts, dt, config)
         }
         val terrainUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
 
@@ -49,16 +50,17 @@ object BikePhysicsSolver {
         applyTireForces(body, frontContact, config)
         applyTireForces(body, rearContact, config)
         applyDriveAndBrakes(body, frontContact, rearContact, input, config)
-        applyPendingJumpRelease(body, state, dt)
 
         val targetLean = computeTargetLean(forwardSpeed, input.steer, config)
         if (grounded) {
-            applyJumpChargeAndRelease(body, forward, terrainUp, input, config, state, dt)
+            applyJumpChargeAndRelease(body, contacts, forward, terrainUp, input, config, state, dt)
+            applyPendingJumpRelease(body, contacts, state, dt)
             applyStepAssist(body, physLevel, frontContact, forward, terrainUp, input, config)
             applyBalanceController(body, forward, up, terrainUp, targetLean, config, forwardSpeed)
             applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
             applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
         } else {
+            applyPendingJumpRelease(body, contacts, state, dt)
             applyAirborneControl(body, forward, right, input, config)
         }
         if (!grounded) {
@@ -108,6 +110,7 @@ object BikePhysicsSolver {
             val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
             return WheelContact(
                 grounded = false,
+                hitBody = null,
                 contactPointWorld = wheelMountWorld,
                 contactNormalWorld = WORLD_UP,
                 suspensionDirWorld = suspensionDirWorld,
@@ -130,6 +133,7 @@ object BikePhysicsSolver {
 
         return WheelContact(
             grounded = true,
+            hitBody = result.hitBody,
             contactPointWorld = contactPoint,
             contactNormalWorld = safeNormalize(result.hitNormal, suspensionDirWorld),
             suspensionDirWorld = suspensionDirWorld,
@@ -151,8 +155,9 @@ object BikePhysicsSolver {
         val dampingForceMag = -suspensionVelocity * config.suspensionDamping
         val totalForceMag = max(0.0, springForceMag + dampingForceMag)
 
-        safeApplyWorldForce(
+        applyContactForce(
             body,
+            contact,
             Vector3d(contact.suspensionDirWorld).mul(totalForceMag),
             contact.contactPointWorld
         )
@@ -169,8 +174,9 @@ object BikePhysicsSolver {
         val maxLateralForce = contact.normalForceEstimate * config.frictionCoefficient * config.lateralGrip
         val lateralForceMag = -gripFactor * maxLateralForce
 
-        safeApplyWorldForce(
+        applyContactForce(
             body,
+            contact,
             Vector3d(contact.wheelRightWorld).mul(lateralForceMag),
             contact.contactPointWorld
         )
@@ -185,7 +191,7 @@ object BikePhysicsSolver {
     ) {
         if (rear.grounded && input.throttle != 0.0) {
             val forceMag = input.throttle.coerceIn(-1.0, 1.0) * config.longitudinalGrip * rear.normalForceEstimate
-            safeApplyWorldForce(body, Vector3d(rear.wheelForwardWorld).mul(forceMag), rear.contactPointWorld)
+            applyContactForce(body, rear, Vector3d(rear.wheelForwardWorld).mul(forceMag), rear.contactPointWorld)
         }
 
         applyBrake(body, front, input.brake * 0.65, config)
@@ -198,7 +204,7 @@ object BikePhysicsSolver {
         val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val maxBrakeForce = contact.normalForceEstimate * config.frictionCoefficient * config.longitudinalGrip
         val forceMag = (-forwardVel * brakeInput * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
-        safeApplyWorldForce(body, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+        applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
     }
 
     private fun computeTargetLean(forwardSpeed: Double, steerInput: Double, config: BikePhysicsConfig): Double {
@@ -293,7 +299,7 @@ object BikePhysicsSolver {
         val liftForce = Vector3d(terrainUp).mul(config.stepAssistStrength * assistAmount)
         val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.25 * assistAmount)
 
-        safeApplyWorldForce(body, liftForce.add(forwardForce), frontContact.contactPointWorld)
+        applyContactForce(body, frontContact, liftForce.add(forwardForce), frontContact.contactPointWorld)
     }
 
     private fun applyAirborneControl(
@@ -315,6 +321,7 @@ object BikePhysicsSolver {
 
     private fun applyJumpChargeAndRelease(
         body: PhysVsBody,
+        contacts: List<WheelContact>,
         forward: Vector3d,
         terrainUp: Vector3d,
         input: BikeInput,
@@ -349,10 +356,16 @@ object BikePhysicsSolver {
         state.wasJumpHeld = jumpHeld
     }
 
-    private fun applyPendingJumpRelease(body: PhysVsBody, state: BikeRuntimeState, dt: Double) {
+    private fun applyPendingJumpRelease(
+        body: PhysVsBody,
+        contacts: List<WheelContact>,
+        state: BikeRuntimeState,
+        dt: Double
+    ) {
         if (state.jumpReleaseTimeRemaining <= 0.0) return
 
-            safeApplyWorldForce(body, state.jumpReleaseForce, body.kinematics.position)
+        safeApplyWorldForce(body, state.jumpReleaseForce, body.kinematics.position)
+        applyGroundReactionForSharedForce(body, contacts, state.jumpReleaseForce)
         state.jumpReleaseTimeRemaining = max(0.0, state.jumpReleaseTimeRemaining - dt)
         if (state.jumpReleaseTimeRemaining <= 0.0) {
             state.jumpReleaseForce.zero()
@@ -421,6 +434,34 @@ object BikePhysicsSolver {
 
     private fun slerpDirection(from: Vector3d, to: Vector3d, alpha: Double): Vector3d {
         return safeNormalize(Vector3d(from).lerp(to, alpha.coerceIn(0.0, 1.0)), to)
+    }
+
+    private fun applyContactForce(body: PhysVsBody, contact: WheelContact, force: Vector3dc, pos: Vector3dc) {
+        safeApplyWorldForce(body, force, pos)
+
+        val hitBody = contact.hitBody ?: return
+        if (hitBody.id == body.id || hitBody.isStatic) return
+
+        safeApplyWorldForce(hitBody, Vector3d(force).negate(), pos)
+    }
+
+    private fun applyGroundReactionForSharedForce(
+        body: PhysVsBody,
+        contacts: List<WheelContact>,
+        force: Vector3dc
+    ) {
+        val dynamicContacts = contacts
+            .filter { contact -> contact.grounded }
+            .filter { contact ->
+                val hitBody = contact.hitBody
+                hitBody != null && hitBody.id != body.id && !hitBody.isStatic
+            }
+        if (dynamicContacts.isEmpty()) return
+
+        val sharedReaction = Vector3d(force).negate().div(dynamicContacts.size.toDouble())
+        dynamicContacts.forEach { contact ->
+            safeApplyWorldForce(contact.hitBody!!, sharedReaction, contact.contactPointWorld)
+        }
     }
 
     private fun safeApplyWorldForce(body: PhysVsBody, force: Vector3dc, pos: Vector3dc) {
