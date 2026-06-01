@@ -24,6 +24,12 @@ object SkyridersModClient {
         GLFW.GLFW_KEY_X,
         "key.categories.skyriders"
     )
+    private val bikeBrakeKey = KeyMapping(
+        "key.skyriders.bike_brake",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_LEFT_ALT,
+        "key.categories.skyriders"
+    )
 
     @JvmStatic
     fun clientInit(event: FMLClientSetupEvent) {
@@ -36,6 +42,7 @@ object SkyridersModClient {
     @JvmStatic
     fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
         event.register(bikeDismountKey)
+        event.register(bikeBrakeKey)
     }
 
     object ClientEvents {
@@ -61,10 +68,11 @@ object SkyridersModClient {
             val input = BikeInput(
                 steer = if (left == right) 0.0 else if (left) 1.0 else -1.0,
                 throttle = if (forward == backward) 0.0 else if (forward) 1.0 else -1.0,
-                brake = if (backward) 1.0 else 0.0,
+                brake = if (bikeBrakeKey.isDown) 1.0 else 0.0,
                 jump = if (options.keyJump.isDown) 1.0 else 0.0,
                 pitch = if (leanForward == leanBack) 0.0 else if (leanForward) 1.0 else -1.0
             )
+            player.isShiftKeyDown = false
 
             if (input != lastSentInput) {
                 SkyridersNetwork.sendBikeInput(input)

@@ -17,7 +17,7 @@ import kotlin.math.atan2
 object BikeClientMountTransforms {
     @JvmStatic
     fun getMountedBikeRenderTransform(entity: Entity?): BodyTransform? {
-        val seat = entity?.vehicle as? BikeSeatEntity ?: return null
+        val seat = getBikeSeat(entity) ?: return null
         return getBikeRenderTransform(seat)
     }
 
@@ -30,7 +30,7 @@ object BikeClientMountTransforms {
 
     @JvmStatic
     fun getMountedBikeSpeed(entity: Entity?): Double {
-        val seat = entity?.vehicle as? BikeSeatEntity ?: return 0.0
+        val seat = getBikeSeat(entity) ?: return 0.0
         val body = seat.level().shipWorld?.allBodies?.getById(seat.bodyId) as? ClientVsBody ?: return 0.0
         val velocity = body.kinematics.velocity
         return if (isFinite(velocity)) velocity.length() else 0.0
@@ -38,7 +38,7 @@ object BikeClientMountTransforms {
 
     @JvmStatic
     fun getMountedBikeSeatOffset(entity: Entity?): Double {
-        val seat = entity?.vehicle as? BikeSeatEntity ?: return DEFAULT_SEAT_OFFSET
+        val seat = getBikeSeat(entity) ?: return DEFAULT_SEAT_OFFSET
         val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
         return bike?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
     }
@@ -106,7 +106,7 @@ object BikeClientMountTransforms {
 
     @JvmStatic
     fun getMountedBikeWheelTopSpeed(entity: Entity?): Double {
-        val seat = entity?.vehicle as? BikeSeatEntity ?: return DEFAULT_WHEEL_TOP_SPEED
+        val seat = getBikeSeat(entity) ?: return DEFAULT_WHEEL_TOP_SPEED
         val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
         val topSpeed = bike?.config?.wheelTopSpeed ?: DEFAULT_WHEEL_TOP_SPEED
         return if (topSpeed.isFinite() && topSpeed > 0.0) topSpeed else DEFAULT_WHEEL_TOP_SPEED
@@ -120,8 +120,15 @@ object BikeClientMountTransforms {
 
     @JvmStatic
     fun getMountedBikeSeatYaw(entity: Entity?, fallbackYaw: Float): Float {
-        val seat = entity?.vehicle as? BikeSeatEntity ?: return fallbackYaw
+        val seat = getBikeSeat(entity) ?: return fallbackYaw
         return seat.yRot
+    }
+
+    private fun getBikeSeat(entity: Entity?): BikeSeatEntity? {
+        return when (entity) {
+            is BikeSeatEntity -> entity
+            else -> entity?.vehicle as? BikeSeatEntity
+        }
     }
 
     private fun isFinite(vector: Vector3dc): Boolean {
