@@ -1,0 +1,36 @@
+package org.valkyrienskies.skyriders.content
+
+import net.minecraft.nbt.CompoundTag
+import org.valkyrienskies.core.api.bodies.properties.BodyId
+
+data class BikeSaveRecord(
+    val bodyId: BodyId,
+    val bikeType: String,
+    val visualLeanRad: Double = 0.0,
+    val frontWheelSpin: Double = 0.0,
+    val rearWheelSpin: Double = 0.0
+) {
+    fun save(): CompoundTag = CompoundTag().apply {
+        putLong(BODY_ID_KEY, bodyId)
+        putString(BIKE_TYPE_KEY, bikeType)
+        putDouble(VISUAL_LEAN_KEY, visualLeanRad)
+        putDouble(FRONT_WHEEL_SPIN_KEY, frontWheelSpin)
+        putDouble(REAR_WHEEL_SPIN_KEY, rearWheelSpin)
+    }
+
+    companion object {
+        private const val BODY_ID_KEY = "body_id"
+        private const val BIKE_TYPE_KEY = "bike_type"
+        private const val VISUAL_LEAN_KEY = "visual_lean"
+        private const val FRONT_WHEEL_SPIN_KEY = "front_wheel_spin"
+        private const val REAR_WHEEL_SPIN_KEY = "rear_wheel_spin"
+
+        fun load(tag: CompoundTag): BikeSaveRecord = BikeSaveRecord(
+            bodyId = tag.getLong(BODY_ID_KEY),
+            bikeType = tag.getString(BIKE_TYPE_KEY),
+            visualLeanRad = tag.getDouble(VISUAL_LEAN_KEY),
+            frontWheelSpin = tag.getDouble(FRONT_WHEEL_SPIN_KEY),
+            rearWheelSpin = tag.getDouble(REAR_WHEEL_SPIN_KEY)
+        )
+    }
+}

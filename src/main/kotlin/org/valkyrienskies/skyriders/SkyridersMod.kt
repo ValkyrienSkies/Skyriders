@@ -10,8 +10,10 @@ import net.minecraftforge.fml.loading.FMLEnvironment
 import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
+import org.valkyrienskies.core.api.VsBeta
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
+import org.valkyrienskies.skyriders.content.BikeManager
 
 @Mod("skyriders")
 object SkyridersMod {
@@ -31,6 +33,11 @@ object SkyridersMod {
     init {
         val modEventBus = FMLJavaModLoadingContext.get().modEventBus
 
+        BLOCKS.register(modEventBus)
+        ITEMS.register(modEventBus)
+        ENTITIES.register(modEventBus)
+        BLOCK_ENTITIES.register(modEventBus)
+
         modEventBus.addListener(::init)
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
@@ -38,7 +45,13 @@ object SkyridersMod {
     }
 
     @JvmStatic
+    @OptIn(VsBeta::class)
     fun init (event: FMLCommonSetupEvent) {
+        event.enqueueWork {
+            vsApi.physTickEvent.on { physTickEvent ->
+                BikeManager.physTick(physTickEvent.world, physTickEvent.delta)
+            }
+        }
     }
 
     // Helper function, taken from VS2.

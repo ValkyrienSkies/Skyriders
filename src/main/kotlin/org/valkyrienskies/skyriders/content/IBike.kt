@@ -1,13 +1,12 @@
 package org.valkyrienskies.skyriders.content
 
-import com.mrcrayfish.framework.client.model.IOpenModel
-import com.mrcrayfish.framework.client.model.OpenModelHelper
-import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
+import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.bodies.properties.BodyKinematics
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform
+import org.valkyrienskies.core.api.world.PhysLevel
 
 interface IBike {
     val id: String
@@ -16,6 +15,8 @@ interface IBike {
 
     val boundingBox: AABB
     val level: Level
+    val config: BikePhysicsConfig
+    val state: BikeRuntimeState
 
     fun getSeatOffset(): Double
 
@@ -27,5 +28,13 @@ interface IBike {
     fun getTilt(): Double
 
     fun tick()
-    fun physTick()
+    fun physTick(physLevel: PhysLevel, body: PhysVsBody, dt: Double)
+
+    fun toSaveRecord(): BikeSaveRecord = BikeSaveRecord(
+        bodyId = bodyId,
+        bikeType = id,
+        visualLeanRad = state.visualLeanRad,
+        frontWheelSpin = state.frontWheelSpin,
+        rearWheelSpin = state.rearWheelSpin
+    )
 }

@@ -1,0 +1,73 @@
+package org.valkyrienskies.skyriders.content
+
+import org.joml.Vector3d
+
+data class BikePhysicsConfig(
+    val mass: Double,
+    val frontWheelLocalPos: Vector3d,
+    val rearWheelLocalPos: Vector3d,
+    val wheelRadius: Double,
+    val wheelWidth: Double,
+    val suspensionRestLength: Double,
+    val suspensionTravel: Double,
+    val suspensionStrength: Double,
+    val suspensionDamping: Double,
+    val lateralGrip: Double,
+    val longitudinalGrip: Double,
+    val frictionCoefficient: Double,
+    val slipSharpness: Double,
+    val maxSteerLowSpeedRad: Double,
+    val maxSteerHighSpeedRad: Double,
+    val steeringLowSpeedEnd: Double,
+    val steeringHighSpeedStart: Double,
+    val maxLeanAngleRad: Double,
+    val minLeanSpeed: Double,
+    val fullLeanSpeed: Double,
+    val balanceStrength: Double,
+    val balanceDamping: Double,
+    val uprightAssistStartSpeed: Double,
+    val uprightAssistEndSpeed: Double,
+    val lowSpeedYawAssist: Double,
+    val maxStepHeight: Double,
+    val groundNormalSmoothingTime: Double,
+    val maxPitchAngleRad: Double,
+    val maxRollAngleRad: Double,
+    val maxAngularVelocity: Double,
+    val antiFlipStrength: Double
+) {
+    companion object {
+        val DEBUG_MOTORCYCLE = BikePhysicsConfig(
+            mass = 250.0,
+            frontWheelLocalPos = Vector3d(0.0, -0.4, 1.2),
+            rearWheelLocalPos = Vector3d(0.0, -0.4, -1.2),
+            wheelRadius = 0.35,
+            wheelWidth = 0.25,
+            suspensionRestLength = 0.45,
+            suspensionTravel = 0.45,
+            suspensionStrength = 45000.0,
+            suspensionDamping = 4500.0,
+            lateralGrip = 1.0,
+            longitudinalGrip = 1.0,
+            frictionCoefficient = 1.2,
+            slipSharpness = 3.0,
+            maxSteerLowSpeedRad = Math.toRadians(35.0),
+            maxSteerHighSpeedRad = Math.toRadians(8.0),
+            steeringLowSpeedEnd = 3.0,
+            steeringHighSpeedStart = 20.0,
+            maxLeanAngleRad = Math.toRadians(38.0),
+            minLeanSpeed = 3.0,
+            fullLeanSpeed = 18.0,
+            balanceStrength = 8000.0,
+            balanceDamping = 1200.0,
+            uprightAssistStartSpeed = 2.0,
+            uprightAssistEndSpeed = 8.0,
+            lowSpeedYawAssist = 1500.0,
+            maxStepHeight = 0.75,
+            groundNormalSmoothingTime = 0.08,
+            maxPitchAngleRad = Math.toRadians(55.0),
+            maxRollAngleRad = Math.toRadians(65.0),
+            maxAngularVelocity = 8.0,
+            antiFlipStrength = 4000.0
+        )
+    }
+}
