@@ -49,12 +49,20 @@ object BikePhysicsSolver {
 
         val targetLean = computeTargetLean(forwardSpeed, input.steer, config)
         if (grounded) {
+            applyJumpChargeAndRelease(body, forward, terrainUp, input, config, state, dt)
             applyStepAssist(body, physLevel, frontContact, forward, terrainUp, input, config)
             applyBalanceController(body, forward, up, terrainUp, targetLean, config, forwardSpeed)
             applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
             applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
         } else {
             applyAirborneControl(body, forward, right, input, config)
+        }
+        if (!grounded) {
+            val jumpHeld = input.jump > 0.0
+            if (!jumpHeld) {
+                state.jumpCharge = 0.0
+            }
+            state.wasJumpHeld = jumpHeld
         }
         dampExtremeAngularVelocity(body, config)
         updateVisualState(state, targetLean, forwardSpeed, config, dt, grounded)
@@ -297,6 +305,41 @@ object BikePhysicsSolver {
             .mul(-input.brake.coerceIn(0.0, 1.0) * config.airborneBrakeDamping)
 
         body.applyWorldTorque(pitchTorque.add(rollTorque).add(brakeDamping))
+    }
+
+    private fun applyJumpChargeAndRelease(
+        body: PhysVsBody,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        input: BikeInput,
+        config: BikePhysicsConfig,
+        state: BikeRuntimeState,
+        dt: Double
+    ) {
+        val jumpInput = input.jump.coerceIn(0.0, 1.0)
+        val jumpHeld = jumpInput > 0.0
+
+        if (jumpHeld) {
+            state.jumpCharge = (state.jumpCharge + jumpInput * config.jumpChargeRate * dt).coerceIn(0.0, 1.0)
+            val compressionForce = Vector3d(terrainUp)
+                .mul(-config.jumpCompressionForce * state.jumpCharge)
+            body.applyWorldForce(compressionForce, body.kinematics.position)
+        } else if (state.wasJumpHeld && state.jumpCharge > 0.05) {
+            val terrainForward = Vector3d(forward).sub(Vector3d(terrainUp).mul(forward.dot(terrainUp)))
+            if (terrainForward.lengthSquared() > 1.0e-6) {
+                terrainForward.normalize()
+            } else {
+                terrainForward.set(forward)
+            }
+
+            val charge = state.jumpCharge
+            val launchForce = Vector3d(terrainUp).mul(config.jumpReleaseForce * charge)
+                .fma(config.jumpForwardBoostForce * charge, terrainForward)
+            body.applyWorldForce(launchForce, body.kinematics.position)
+            state.jumpCharge = 0.0
+        }
+
+        state.wasJumpHeld = jumpHeld
     }
 
     private fun dampExtremeAngularVelocity(body: PhysVsBody, config: BikePhysicsConfig) {

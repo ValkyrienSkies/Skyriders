@@ -56,6 +56,7 @@ object SkyridersCommands {
                                 .then(inputSetter("steer", -1.0, 1.0) { input, value -> input.copy(steer = value) })
                                 .then(inputSetter("throttle", -1.0, 1.0) { input, value -> input.copy(throttle = value) })
                                 .then(inputSetter("brake", 0.0, 1.0) { input, value -> input.copy(brake = value) })
+                                .then(inputSetter("jump", 0.0, 1.0) { input, value -> input.copy(jump = value) })
                                 .then(
                                     literal("reset")
                                         .executes { ctx ->
@@ -169,7 +170,7 @@ object SkyridersCommands {
             }
 
         source.sendSuccess(
-            { Component.literal("Set $label for bike $bodyId: steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}") },
+            { Component.literal("Set $label for bike $bodyId: steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}") },
             false
         )
         return 1
@@ -194,7 +195,7 @@ object SkyridersCommands {
 
         val message = bikes.joinToString(separator = "\n") { bike ->
             val input = BikeManager.getInput(level.dimensionId, bike.bodyId)
-            "${bike.bodyId}: ${bike.id} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}]"
+            "${bike.bodyId}: ${bike.id} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}]"
         }
         source.sendSuccess({ Component.literal(message) }, false)
         return bikes.size

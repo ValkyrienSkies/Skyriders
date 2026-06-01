@@ -7,5 +7,7 @@ data class BikeRuntimeState(
     var visualLeanRad: Double = 0.0,
     var frontWheelSpin: Double = 0.0,
     var rearWheelSpin: Double = 0.0,
-    var lastGrounded: Boolean = false
+    var lastGrounded: Boolean = false,
+    var jumpCharge: Double = 0.0,
+    var wasJumpHeld: Boolean = false
 )
