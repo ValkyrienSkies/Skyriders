@@ -62,15 +62,30 @@ object BikePhysicsSolver {
         steerable: Boolean
     ): WheelContact {
         val transform = body.kinematics.transform
-        val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
         val suspensionDirWorld = transformDirection(body, LOCAL_UP)
         val castDirection = Vector3d(suspensionDirWorld).negate().normalize()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
-        val result = physLevel.rayCast(wheelMountWorld, castDirection, maxLength, body.id)
         val forward = transformDirection(body, LOCAL_FORWARD)
         val right = transformDirection(body, LOCAL_RIGHT)
+        val samples = listOf(
+            wheelLocalPos,
+            Vector3d(wheelLocalPos).fma(-config.wheelWidth * 0.5, LOCAL_RIGHT),
+            Vector3d(wheelLocalPos).fma(config.wheelWidth * 0.5, LOCAL_RIGHT)
+        )
+        val bestHit = samples
+            .asSequence()
+            .map { sampleLocalPos ->
+                val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(sampleLocalPos))
+                WheelRayHit(
+                    mountWorld = wheelMountWorld,
+                    result = physLevel.rayCast(wheelMountWorld, castDirection, maxLength, body.id)
+                )
+            }
+            .filter { hit -> hit.result != null && hit.result.hitBody.id != body.id }
+            .minByOrNull { hit -> hit.result!!.distance }
 
-        if (result == null || result.hitBody.id == body.id) {
+        if (bestHit == null) {
+            val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
             return WheelContact(
                 grounded = false,
                 contactPointWorld = wheelMountWorld,
@@ -85,8 +100,9 @@ object BikePhysicsSolver {
             )
         }
 
+        val result = bestHit.result!!
         val hitDistance = result.distance
-        val contactPoint = Vector3d(wheelMountWorld).fma(hitDistance, castDirection)
+        val contactPoint = Vector3d(bestHit.mountWorld).fma(hitDistance, castDirection)
         val springLength = hitDistance - config.wheelRadius
         val compressionMeters = config.suspensionRestLength - springLength
         val compression = (compressionMeters / config.suspensionTravel).coerceIn(0.0, 1.0)
@@ -278,4 +294,9 @@ object BikePhysicsSolver {
     private fun slerpDirection(from: Vector3d, to: Vector3d, alpha: Double): Vector3d {
         return Vector3d(from).lerp(to, alpha.coerceIn(0.0, 1.0)).normalize()
     }
+
+    private data class WheelRayHit(
+        val mountWorld: Vector3d,
+        val result: org.valkyrienskies.core.api.physics.RayCastResult?
+    )
 }
