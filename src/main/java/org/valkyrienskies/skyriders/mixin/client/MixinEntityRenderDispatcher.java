@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -98,10 +99,12 @@ public abstract class MixinEntityRenderDispatcher {
         final float previousHeadYaw = livingEntity.yHeadRot;
         final float previousHeadYawOld = livingEntity.yHeadRotO;
 
+        final float clampedHeadYaw = bodyYaw + Mth.clamp(Mth.wrapDegrees(lookYaw - bodyYaw), -MAX_RENDER_HEAD_YAW, MAX_RENDER_HEAD_YAW);
+
         livingEntity.yBodyRot = bodyYaw;
         livingEntity.yBodyRotO = bodyYaw;
-        livingEntity.yHeadRot = lookYaw;
-        livingEntity.yHeadRotO = lookYaw;
+        livingEntity.yHeadRot = clampedHeadYaw;
+        livingEntity.yHeadRotO = clampedHeadYaw;
 
         try {
             original.call(renderer, entity, lookYaw, partialTicks, poseStack, buffer, packedLight);
@@ -112,4 +115,6 @@ public abstract class MixinEntityRenderDispatcher {
             livingEntity.yHeadRotO = previousHeadYawOld;
         }
     }
+
+    private static final float MAX_RENDER_HEAD_YAW = 85.0F;
 }
