@@ -5,7 +5,6 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.level.block.Block
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
 import net.minecraftforge.fml.loading.FMLEnvironment
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.event.RegisterCommandsEvent
@@ -17,6 +16,7 @@ import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeManager
+import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
 @Mod("skyriders")
 object SkyridersMod {
@@ -34,7 +34,7 @@ object SkyridersMod {
     // end of RegistryObjects
 
     init {
-        val modEventBus = FMLJavaModLoadingContext.get().modEventBus
+        val modEventBus = MOD_BUS
 
         BLOCKS.register(modEventBus)
         ITEMS.register(modEventBus)
