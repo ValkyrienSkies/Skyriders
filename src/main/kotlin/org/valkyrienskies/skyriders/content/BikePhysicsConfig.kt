@@ -85,11 +85,11 @@ data class BikePhysicsConfig(
             airbornePitchControlStrength = 1800.0,
             airborneRollControlStrength = 1600.0,
             airborneBrakeDamping = 450.0,
-            jumpChargeRate = 1.6,
-            jumpCompressionForce = 25000.0,
-            jumpReleaseForce = 65000.0,
-            jumpForwardBoostForce = 12000.0,
-            jumpReleaseDuration = 0.10
+            jumpChargeRate = 1.45,
+            jumpCompressionForce = 20000.0,
+            jumpReleaseForce = 32000.0,
+            jumpForwardBoostForce = 6500.0,
+            jumpReleaseDuration = 0.06
         )
     }
 }
