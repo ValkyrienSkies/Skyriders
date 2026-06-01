@@ -96,18 +96,13 @@ object BikePhysicsSolver {
         config: BikePhysicsConfig,
         dt: Double
     ): WheelContact {
-        val transform = body.kinematics.transform
         val suspensionDirWorld = safeNormalize(contactUp, WORLD_UP)
         val castDirection = safeNormalize(Vector3d(suspensionDirWorld).negate(), WORLD_UP)
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
         val bodyForward = transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val forward = projectOntoPlane(bodyForward, suspensionDirWorld, bodyForward)
         val right = safeNormalize(Vector3d(suspensionDirWorld).cross(forward), transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT))
-        val samples = listOf(
-            wheelLocalPos,
-            Vector3d(wheelLocalPos).fma(-config.wheelWidth * 0.5, LOCAL_RIGHT),
-            Vector3d(wheelLocalPos).fma(config.wheelWidth * 0.5, LOCAL_RIGHT)
-        )
+        val samples = listOf(-config.wheelWidth * 0.5, 0.0, config.wheelWidth * 0.5)
         val sweepOffset = Vector3d(body.kinematics.velocity)
             .sub(Vector3d(suspensionDirWorld).mul(safeDot(body.kinematics.velocity, suspensionDirWorld)))
             .mul(dt.coerceIn(0.0, 0.1))
@@ -123,8 +118,8 @@ object BikePhysicsSolver {
         }
         val bestHit = samples
             .asSequence()
-            .flatMap { sampleLocalPos ->
-                val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(sampleLocalPos))
+            .flatMap { lateralOffset ->
+                val wheelMountWorld = wheelMountWorld(body, wheelLocalPos, lateralOffset, forward, right, suspensionDirWorld)
                 sweepSamples.asSequence().map { sweep -> Vector3d(wheelMountWorld).add(sweep) }
             }
             .map { sampleLocalPos ->
@@ -137,7 +132,7 @@ object BikePhysicsSolver {
             .minByOrNull { hit -> hit.result!!.distance }
 
         if (bestHit == null) {
-            val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
+            val wheelMountWorld = wheelMountWorld(body, wheelLocalPos, 0.0, forward, right, suspensionDirWorld)
             return WheelContact(
                 grounded = false,
                 hitBody = null,
@@ -174,6 +169,20 @@ object BikePhysicsSolver {
             wheelRightWorld = right,
             wheelVelocityWorld = velocityAtWorldPoint(body, contactPoint)
         )
+    }
+
+    private fun wheelMountWorld(
+        body: PhysVsBody,
+        wheelLocalPos: Vector3d,
+        lateralOffset: Double,
+        forward: Vector3d,
+        right: Vector3d,
+        terrainUp: Vector3d
+    ): Vector3d {
+        return Vector3d(body.kinematics.position)
+            .fma(wheelLocalPos.z, forward)
+            .fma(wheelLocalPos.x + lateralOffset, right)
+            .fma(wheelLocalPos.y, terrainUp)
     }
 
     private fun applySuspension(body: PhysVsBody, contact: WheelContact, config: BikePhysicsConfig) {
@@ -342,9 +351,9 @@ object BikePhysicsSolver {
         if (blockedAbove != null && blockedAbove.hitBody.id != body.id) return
 
         val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
-        val assistAmount = (0.35 + speedIntoStep * 0.08).coerceIn(0.35, 1.0)
+        val assistAmount = (1.0 - smoothstep(8.0, 18.0, speedIntoStep)).coerceIn(0.25, 1.0)
         val liftForce = Vector3d(terrainUp).mul(config.stepAssistStrength * assistAmount)
-        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.25 * assistAmount)
+        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.04 * assistAmount)
 
         applyContactForce(body, frontContact, liftForce.add(forwardForce), frontContact.contactPointWorld)
     }
