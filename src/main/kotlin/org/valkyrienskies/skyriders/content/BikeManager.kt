@@ -124,7 +124,14 @@ object BikeManager {
                     scaling = Vector3d(1.0),
                     positionInModel = Vector3d()
                 ),
-                collisionShape = vsCore.newBoxBodyShape(config.collisionBoxSize),
+                collisionShape = vsCore.newCompoundBodyShape(
+                    listOf(
+                        vsCore.newCompoundBodyShapeChild(
+                            shape = vsCore.newBoxBodyShape(config.collisionBoxSize),
+                            position = config.collisionBoxOffset
+                        )
+                    )
+                ),
                 staticFrictionCoefficient = 0.2,
                 dynamicFrictionCoefficient = 0.2,
                 restitutionCoefficient = 0.05
@@ -133,7 +140,11 @@ object BikeManager {
         val bike = DebugBike(
             bodyId = body.id,
             boundingBox = AABB.ofSize(
-                Vec3(position.x(), position.y(), position.z()),
+                Vec3(
+                    position.x() + config.collisionBoxOffset.x,
+                    position.y() + config.collisionBoxOffset.y,
+                    position.z() + config.collisionBoxOffset.z
+                ),
                 config.collisionBoxSize.x,
                 config.collisionBoxSize.y,
                 config.collisionBoxSize.z

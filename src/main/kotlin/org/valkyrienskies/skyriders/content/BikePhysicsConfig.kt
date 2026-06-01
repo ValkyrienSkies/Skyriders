@@ -5,6 +5,7 @@ import org.joml.Vector3d
 data class BikePhysicsConfig(
     val mass: Double,
     val collisionBoxSize: Vector3d,
+    val collisionBoxOffset: Vector3d,
     val frontWheelLocalPos: Vector3d,
     val rearWheelLocalPos: Vector3d,
     val wheelRadius: Double,
@@ -39,7 +40,8 @@ data class BikePhysicsConfig(
     companion object {
         val DEBUG_MOTORCYCLE = BikePhysicsConfig(
             mass = 250.0,
-            collisionBoxSize = Vector3d(0.55, 0.85, 1.8),
+            collisionBoxSize = Vector3d(0.45, 0.55, 1.2),
+            collisionBoxOffset = Vector3d(0.0, 0.25, -0.1),
             frontWheelLocalPos = Vector3d(0.0, -0.25, 0.8),
             rearWheelLocalPos = Vector3d(0.0, -0.25, -0.8),
             wheelRadius = 0.35,
