@@ -74,7 +74,7 @@ object BikePhysicsSolver {
             applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
             applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
         } else {
-            applyAirborneControl(body, forward, right, input, config)
+            applyAirborneControl(body, forward, right, up, input, config)
         }
         if (!grounded) {
             val jumpHeld = input.jump > 0.0
@@ -377,17 +377,18 @@ object BikePhysicsSolver {
         body: PhysVsBody,
         forward: Vector3d,
         right: Vector3d,
+        up: Vector3d,
         input: BikeInput,
         config: BikePhysicsConfig
     ) {
         val pitchTorque = Vector3d(right)
             .mul(-input.pitch.coerceIn(-1.0, 1.0) * config.airbornePitchControlStrength)
-        val rollTorque = Vector3d(forward)
+        val yawTorque = Vector3d(up)
             .mul(-input.steer.coerceIn(-1.0, 1.0) * config.airborneRollControlStrength)
         val brakeDamping = Vector3d(body.kinematics.angularVelocity)
             .mul(-input.brake.coerceIn(0.0, 1.0) * config.airborneBrakeDamping)
 
-        safeApplyWorldTorque(body, pitchTorque.add(rollTorque).add(brakeDamping))
+        safeApplyWorldTorque(body, pitchTorque.add(yawTorque).add(brakeDamping))
     }
 
     private fun applyJumpChargeAndRelease(
