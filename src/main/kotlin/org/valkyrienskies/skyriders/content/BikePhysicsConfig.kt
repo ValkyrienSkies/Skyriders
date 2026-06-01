@@ -31,11 +31,15 @@ data class BikePhysicsConfig(
     val uprightAssistEndSpeed: Double,
     val lowSpeedYawAssist: Double,
     val maxStepHeight: Double,
+    val stepAssistStrength: Double,
     val groundNormalSmoothingTime: Double,
     val maxPitchAngleRad: Double,
     val maxRollAngleRad: Double,
     val maxAngularVelocity: Double,
-    val antiFlipStrength: Double
+    val antiFlipStrength: Double,
+    val airbornePitchControlStrength: Double,
+    val airborneRollControlStrength: Double,
+    val airborneBrakeDamping: Double
 ) {
     companion object {
         val DEBUG_MOTORCYCLE = BikePhysicsConfig(
@@ -67,11 +71,15 @@ data class BikePhysicsConfig(
             uprightAssistEndSpeed = 8.0,
             lowSpeedYawAssist = 1500.0,
             maxStepHeight = 0.75,
+            stepAssistStrength = 7000.0,
             groundNormalSmoothingTime = 0.08,
             maxPitchAngleRad = Math.toRadians(55.0),
             maxRollAngleRad = Math.toRadians(65.0),
             maxAngularVelocity = 8.0,
-            antiFlipStrength = 4000.0
+            antiFlipStrength = 4000.0,
+            airbornePitchControlStrength = 1800.0,
+            airborneRollControlStrength = 1600.0,
+            airborneBrakeDamping = 450.0
         )
     }
 }

@@ -36,7 +36,10 @@ object BikePhysicsSolver {
         val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, config, false)
         val grounded = frontContact.grounded || rearContact.grounded
 
-        smoothGroundNormal(state, listOf(frontContact, rearContact), dt, config)
+        if (grounded) {
+            smoothGroundNormal(state, listOf(frontContact, rearContact), dt, config)
+        }
+        val terrainUp = Vector3d(state.smoothedGroundNormal).normalize()
 
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
@@ -45,9 +48,14 @@ object BikePhysicsSolver {
         applyDriveAndBrakes(body, frontContact, rearContact, input, config)
 
         val targetLean = computeTargetLean(forwardSpeed, input.steer, config)
-        applyBalanceController(body, forward, up, targetLean, config, forwardSpeed)
-        applyLowSpeedAssist(body, input, forwardSpeed, config)
-        applyAntiFlipAssist(body, forward, right, up, config)
+        if (grounded) {
+            applyStepAssist(body, physLevel, frontContact, forward, terrainUp, input, config)
+            applyBalanceController(body, forward, up, terrainUp, targetLean, config, forwardSpeed)
+            applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
+            applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
+        } else {
+            applyAirborneControl(body, forward, right, input, config)
+        }
         dampExtremeAngularVelocity(body, config)
         updateVisualState(state, targetLean, forwardSpeed, config, dt, grounded)
 
@@ -188,13 +196,14 @@ object BikePhysicsSolver {
         body: PhysVsBody,
         forward: Vector3d,
         currentUp: Vector3d,
+        terrainUp: Vector3d,
         targetLeanRad: Double,
         config: BikePhysicsConfig,
         forwardSpeed: Double
     ) {
-        val leanedUp = Vector3d(WORLD_UP).rotateAxis(targetLeanRad, forward.x, forward.y, forward.z).normalize()
+        val leanedUp = Vector3d(terrainUp).rotateAxis(targetLeanRad, forward.x, forward.y, forward.z).normalize()
         val uprightAssist = 1.0 - smoothstep(config.uprightAssistStartSpeed, config.uprightAssistEndSpeed, abs(forwardSpeed))
-        val desiredUp = slerpDirection(leanedUp, WORLD_UP, uprightAssist)
+        val desiredUp = slerpDirection(leanedUp, terrainUp, uprightAssist)
         val errorAxis = Vector3d(currentUp).cross(desiredUp)
         val torque = errorAxis.mul(config.balanceStrength)
             .sub(Vector3d(body.kinematics.angularVelocity).mul(config.balanceDamping))
@@ -202,11 +211,17 @@ object BikePhysicsSolver {
         body.applyWorldTorque(torque)
     }
 
-    private fun applyLowSpeedAssist(body: PhysVsBody, input: BikeInput, speed: Double, config: BikePhysicsConfig) {
+    private fun applyLowSpeedAssist(
+        body: PhysVsBody,
+        input: BikeInput,
+        speed: Double,
+        terrainUp: Vector3d,
+        config: BikePhysicsConfig
+    ) {
         val lowSpeedAmount = 1.0 - smoothstep(3.0, 10.0, abs(speed))
         val yawTorque = input.steer.coerceIn(-1.0, 1.0) * config.lowSpeedYawAssist * lowSpeedAmount
         if (yawTorque != 0.0) {
-            body.applyWorldTorque(Vector3d(0.0, yawTorque, 0.0))
+            body.applyWorldTorque(Vector3d(terrainUp).mul(yawTorque))
         }
     }
 
@@ -215,21 +230,73 @@ object BikePhysicsSolver {
         forward: Vector3d,
         right: Vector3d,
         up: Vector3d,
+        terrainUp: Vector3d,
         config: BikePhysicsConfig
     ) {
-        val pitchError = forward.y.coerceIn(-1.0, 1.0)
+        val pitchError = forward.dot(terrainUp).coerceIn(-1.0, 1.0)
         if (abs(pitchError) > kotlin.math.sin(config.maxPitchAngleRad)) {
             body.applyWorldTorque(Vector3d(right).mul(-pitchError * config.antiFlipStrength))
         }
 
-        val rollError = right.y.coerceIn(-1.0, 1.0)
+        val rollError = right.dot(terrainUp).coerceIn(-1.0, 1.0)
         if (abs(rollError) > kotlin.math.sin(config.maxRollAngleRad)) {
             body.applyWorldTorque(Vector3d(forward).mul(rollError * config.antiFlipStrength))
         }
 
-        if (up.dot(WORLD_UP) < 0.0) {
+        if (up.dot(terrainUp) < 0.0) {
             body.applyWorldTorque(Vector3d(forward).mul(config.antiFlipStrength))
         }
+    }
+
+    private fun applyStepAssist(
+        body: PhysVsBody,
+        physLevel: PhysLevel,
+        frontContact: WheelContact,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        input: BikeInput,
+        config: BikePhysicsConfig
+    ) {
+        if (!frontContact.grounded || input.throttle <= 0.0) return
+
+        val terrainForward = Vector3d(forward).sub(Vector3d(terrainUp).mul(forward.dot(terrainUp)))
+        if (terrainForward.lengthSquared() < 1.0e-6) return
+        terrainForward.normalize()
+
+        val probeLength = config.wheelRadius + 0.35
+        val lowProbeStart = Vector3d(frontContact.contactPointWorld)
+            .fma(config.wheelRadius * 0.55, terrainUp)
+            .fma(0.08, terrainForward)
+        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
+        if (obstacle.hitBody.id == body.id) return
+
+        val highProbeStart = Vector3d(lowProbeStart).fma(config.maxStepHeight, terrainUp)
+        val blockedAbove = physLevel.rayCast(highProbeStart, terrainForward, probeLength, body.id)
+        if (blockedAbove != null && blockedAbove.hitBody.id != body.id) return
+
+        val speedIntoStep = max(0.0, body.kinematics.velocity.dot(terrainForward))
+        val assistAmount = (0.35 + speedIntoStep * 0.08).coerceIn(0.35, 1.0)
+        val liftForce = Vector3d(terrainUp).mul(config.stepAssistStrength * assistAmount)
+        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.25 * assistAmount)
+
+        body.applyWorldForce(liftForce.add(forwardForce), frontContact.contactPointWorld)
+    }
+
+    private fun applyAirborneControl(
+        body: PhysVsBody,
+        forward: Vector3d,
+        right: Vector3d,
+        input: BikeInput,
+        config: BikePhysicsConfig
+    ) {
+        val pitchTorque = Vector3d(right)
+            .mul(-input.throttle.coerceIn(-1.0, 1.0) * config.airbornePitchControlStrength)
+        val rollTorque = Vector3d(forward)
+            .mul(-input.steer.coerceIn(-1.0, 1.0) * config.airborneRollControlStrength)
+        val brakeDamping = Vector3d(body.kinematics.angularVelocity)
+            .mul(-input.brake.coerceIn(0.0, 1.0) * config.airborneBrakeDamping)
+
+        body.applyWorldTorque(pitchTorque.add(rollTorque).add(brakeDamping))
     }
 
     private fun dampExtremeAngularVelocity(body: PhysVsBody, config: BikePhysicsConfig) {
