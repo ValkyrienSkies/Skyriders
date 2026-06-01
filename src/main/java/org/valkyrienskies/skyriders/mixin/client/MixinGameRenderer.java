@@ -1,5 +1,9 @@
 package org.valkyrienskies.skyriders.mixin.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
@@ -10,10 +14,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.valkyrienskies.skyriders.client.BikeClientMountTransforms;
+import org.valkyrienskies.skyriders.mixinduck.BikeCameraDuck;
 
 @Mixin(GameRenderer.class)
 public abstract class MixinGameRenderer {
     @Shadow @Final private Minecraft minecraft;
+    @Shadow @Final private Camera mainCamera;
 
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void skyriders$addBikeSpeedFov(
@@ -37,5 +43,24 @@ public abstract class MixinGameRenderer {
     private double skyriders$smoothstep(final double edge0, final double edge1, final double value) {
         final double t = Math.max(0.0, Math.min(1.0, (value - edge0) / (edge1 - edge0)));
         return t * t * (3.0 - 2.0 * t);
+    }
+
+    @WrapOperation(
+        method = "renderLevel",
+        at = @At(
+            value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/vertex/PoseStack;mulPose(Lorg/joml/Quaternionf;)V",
+            ordinal = 0
+        )
+    )
+    private void skyriders$applyBikeCameraRoll(
+        final PoseStack poseStack,
+        final org.joml.Quaternionf quaternion,
+        final Operation<Void> original
+    ) {
+        if (BikeClientMountTransforms.getMountedBikeRenderTransform(this.minecraft.getCameraEntity()) != null) {
+            poseStack.mulPose(Axis.ZP.rotationDegrees(((BikeCameraDuck) this.mainCamera).skyriders$getZRot()));
+        }
+        original.call(poseStack, quaternion);
     }
 }

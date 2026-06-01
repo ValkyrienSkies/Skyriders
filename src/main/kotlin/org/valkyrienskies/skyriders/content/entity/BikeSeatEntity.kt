@@ -7,7 +7,6 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
-import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
@@ -27,7 +26,6 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     var bodyId: BodyId
         get() = entityData.get(BODY_ID)
         set(value) = entityData.set(BODY_ID, value)
-    private var lastBikeYaw: Float? = null
 
     init {
         blocksBuilding = false
@@ -43,18 +41,12 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             return
         }
 
-        val previousYaw = yRot
         if (!updateSeatPose()) {
             if (!level().isClientSide) {
                 passengers.forEach(Entity::stopRiding)
                 kill()
             }
             return
-        }
-        if (level().isClientSide) {
-            rotatePassengersByBikeYawDelta(previousYaw)
-        } else {
-            lastBikeYaw = yRot
         }
         updateBikeInputFromPassenger()
     }
@@ -93,18 +85,6 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
         moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yawFromForward(forward), xRot)
         return true
-    }
-
-    private fun rotatePassengersByBikeYawDelta(fallbackPreviousYaw: Float) {
-        val previousYaw = lastBikeYaw ?: fallbackPreviousYaw
-        val deltaYaw = Mth.wrapDegrees(yRot - previousYaw)
-        lastBikeYaw = yRot
-        if (!deltaYaw.isFinite() || kotlin.math.abs(deltaYaw) < 1.0e-4f) return
-
-        passengers.forEach { passenger ->
-            passenger.yRot += deltaYaw
-            passenger.yHeadRot += deltaYaw
-        }
     }
 
     private fun updateBikeInputFromPassenger() {
