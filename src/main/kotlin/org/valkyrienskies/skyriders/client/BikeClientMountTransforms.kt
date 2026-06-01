@@ -58,9 +58,21 @@ object BikeClientMountTransforms {
         val seatOffset = getMountedBikeSeatOffset(seat.controllingPassenger ?: seat.passengers.firstOrNull())
         val seatPosition = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
         if (entity != null && entity !== seat) {
-            seatPosition.y += seat.passengersRidingOffset + entity.myRidingOffset
+            val riderOffset = transform.rotation.transform(
+                Vector3d(0.0, seat.passengersRidingOffset + entity.myRidingOffset, 0.0)
+            )
+            seatPosition.add(riderOffset)
         }
         return if (isFinite(seatPosition)) seatPosition else null
+    }
+
+    @JvmStatic
+    fun getBikeMountedEntityRenderYaw(seat: BikeSeatEntity?, entityYaw: Float): Float? {
+        val transform = getBikeRenderTransform(seat) ?: return null
+        val bikeYaw = getBikeYaw(transform)
+        val localYaw = net.minecraft.util.Mth.wrapDegrees(entityYaw - (seat?.yRot ?: bikeYaw))
+        if (!bikeYaw.isFinite() || !localYaw.isFinite()) return null
+        return bikeYaw + localYaw
     }
 
     @JvmStatic
