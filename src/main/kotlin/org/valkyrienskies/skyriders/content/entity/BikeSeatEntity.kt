@@ -63,13 +63,6 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         return position().add(0.0, 0.2, 0.0)
     }
 
-    override fun positionRider(passenger: Entity, callback: MoveFunction) {
-        super.positionRider(passenger, callback)
-        if (level().isClientSide) {
-            syncRenderPositionHistory(passenger)
-        }
-    }
-
     override fun defineSynchedData() {
         entityData.define(BODY_ID, 0L)
     }
@@ -95,19 +88,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         if (!isFinite(seatWorld) || !isFinite(forward)) return false
 
         moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yawFromForward(forward), xRot)
-        if (level().isClientSide) {
-            syncRenderPositionHistory(this)
-        }
         return true
-    }
-
-    private fun syncRenderPositionHistory(entity: Entity) {
-        entity.xo = entity.x
-        entity.yo = entity.y
-        entity.zo = entity.z
-        entity.xOld = entity.x
-        entity.yOld = entity.y
-        entity.zOld = entity.z
     }
 
     private fun rotatePassengersByBikeYawDelta(fallbackPreviousYaw: Float) {

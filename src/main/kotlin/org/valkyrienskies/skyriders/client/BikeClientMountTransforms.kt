@@ -16,6 +16,12 @@ object BikeClientMountTransforms {
     @JvmStatic
     fun getMountedBikeRenderTransform(entity: Entity?): BodyTransform? {
         val seat = entity?.vehicle as? BikeSeatEntity ?: return null
+        return getBikeRenderTransform(seat)
+    }
+
+    @JvmStatic
+    fun getBikeRenderTransform(seat: BikeSeatEntity?): BodyTransform? {
+        if (seat == null) return null
         val body = seat.level().shipWorld?.allBodies?.getById(seat.bodyId) as? ClientVsBody ?: return null
         return body.renderTransform
     }
@@ -43,6 +49,18 @@ object BikeClientMountTransforms {
         val eyeOffset = transform.rotation.transform(Vector3d(0.0, eyeHeight, 0.0))
         if (!isFinite(seatPosition) || !isFinite(eyeOffset)) return null
         return Vec3(seatPosition.x + eyeOffset.x, seatPosition.y + eyeOffset.y, seatPosition.z + eyeOffset.z)
+    }
+
+    @JvmStatic
+    fun getBikeMountedEntityRenderPosition(seat: BikeSeatEntity?, entity: Entity?): Vector3d? {
+        if (seat == null) return null
+        val transform = getBikeRenderTransform(seat) ?: return null
+        val seatOffset = getMountedBikeSeatOffset(seat.controllingPassenger ?: seat.passengers.firstOrNull())
+        val seatPosition = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        if (entity != null && entity !== seat) {
+            seatPosition.y += seat.passengersRidingOffset + entity.myRidingOffset
+        }
+        return if (isFinite(seatPosition)) seatPosition else null
     }
 
     @JvmStatic
