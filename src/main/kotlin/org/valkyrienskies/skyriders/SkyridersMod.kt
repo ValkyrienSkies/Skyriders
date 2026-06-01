@@ -7,12 +7,15 @@ import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
 import net.minecraftforge.fml.loading.FMLEnvironment
+import net.minecraftforge.common.MinecraftForge
+import net.minecraftforge.event.RegisterCommandsEvent
 import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
 import org.valkyrienskies.core.api.VsBeta
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
+import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeManager
 
 @Mod("skyriders")
@@ -39,6 +42,7 @@ object SkyridersMod {
         BLOCK_ENTITIES.register(modEventBus)
 
         modEventBus.addListener(::init)
+        MinecraftForge.EVENT_BUS.addListener { event: RegisterCommandsEvent -> SkyridersCommands.register(event) }
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
         }
