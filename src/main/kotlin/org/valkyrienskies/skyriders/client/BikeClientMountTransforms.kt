@@ -2,6 +2,8 @@ package org.valkyrienskies.skyriders.client
 
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
+import org.joml.Quaterniond
+import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.ClientVsBody
@@ -91,6 +93,18 @@ object BikeClientMountTransforms {
     }
 
     @JvmStatic
+    fun getBikeMountedEntityRenderTilt(seat: BikeSeatEntity?): Quaternionf? {
+        val transform = getBikeRenderTransform(seat) ?: return null
+        val bikeYaw = getBikeYaw(transform)
+        if (!bikeYaw.isFinite()) return null
+
+        val yawOnly = Quaterniond().rotateY(Math.toRadians(-bikeYaw.toDouble()))
+        val tilt = transform.rotation.mul(yawOnly.invert(), Quaterniond())
+        if (!isFinite(tilt)) return null
+        return Quaternionf(tilt)
+    }
+
+    @JvmStatic
     fun getMountedBikeWheelTopSpeed(entity: Entity?): Double {
         val seat = entity?.vehicle as? BikeSeatEntity ?: return DEFAULT_WHEEL_TOP_SPEED
         val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
@@ -112,6 +126,10 @@ object BikeClientMountTransforms {
 
     private fun isFinite(vector: Vector3dc): Boolean {
         return vector.x().isFinite() && vector.y().isFinite() && vector.z().isFinite()
+    }
+
+    private fun isFinite(quaternion: Quaterniond): Boolean {
+        return quaternion.x.isFinite() && quaternion.y.isFinite() && quaternion.z.isFinite() && quaternion.w.isFinite()
     }
 
     private const val DEFAULT_SEAT_OFFSET = 0.35

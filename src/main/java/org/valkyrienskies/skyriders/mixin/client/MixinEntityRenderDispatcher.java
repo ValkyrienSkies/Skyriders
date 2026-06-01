@@ -10,6 +10,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -55,7 +56,8 @@ public abstract class MixinEntityRenderDispatcher {
         final Vector3d bikePosition = BikeClientMountTransforms.getBikeMountedEntityRenderPosition(seat, entity);
         final Float lookYaw = BikeClientMountTransforms.getBikeMountedEntityRenderYaw(seat, rotationYaw);
         final Float bodyYaw = BikeClientMountTransforms.getBikeMountedBodyRenderYaw(seat);
-        if (bikePosition == null || lookYaw == null || bodyYaw == null) {
+        final Quaternionf bikeTilt = BikeClientMountTransforms.getBikeMountedEntityRenderTilt(seat);
+        if (bikePosition == null || lookYaw == null || bodyYaw == null || bikeTilt == null) {
             original.call(renderer, entity, rotationYaw, partialTicks, poseStack, buffer, packedLight);
             return;
         }
@@ -68,6 +70,7 @@ public abstract class MixinEntityRenderDispatcher {
             bikePosition.z + z - vanillaPosition.z
         );
         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+        poseStack.mulPose(bikeTilt);
         skyriders$renderWithBikeBodyYaw(renderer, entity, lookYaw, bodyYaw, partialTicks, poseStack, buffer, packedLight, original);
     }
 
