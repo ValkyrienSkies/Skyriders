@@ -21,6 +21,7 @@ object BikePhysicsSolver {
     private const val MIN_DIRECTION_LENGTH_SQUARED = 1.0e-9
     private const val MAX_FORCE_MAGNITUDE = 1.0e7
     private const val MAX_TORQUE_MAGNITUDE = 1.0e7
+    private const val GROUNDED_GRACE_SECONDS = 0.12
 
     fun updateBikePhysics(
         body: PhysVsBody,
@@ -36,10 +37,16 @@ object BikePhysicsSolver {
         val forwardSpeed = safeDot(body.kinematics.velocity, forward)
 
         val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
-        val frontContact = sampleWheelContact(body, physLevel, config.frontWheelLocalPos, contactUp, config, false)
-        val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, config, false)
+        val frontContact = sampleWheelContact(body, physLevel, config.frontWheelLocalPos, contactUp, config, dt)
+        val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, config, dt)
         val contacts = listOf(frontContact, rearContact)
         val grounded = frontContact.grounded || rearContact.grounded
+        if (grounded) {
+            state.groundedGraceTimeRemaining = GROUNDED_GRACE_SECONDS
+        } else {
+            state.groundedGraceTimeRemaining = max(0.0, state.groundedGraceTimeRemaining - dt)
+        }
+        val stabilizedGrounded = grounded || state.groundedGraceTimeRemaining > 0.0
 
         if (grounded) {
             smoothGroundNormal(state, contacts, dt, config)
@@ -57,11 +64,15 @@ object BikePhysicsSolver {
             applyJumpChargeAndRelease(body, contacts, forward, terrainUp, input, config, state, dt)
             applyPendingJumpRelease(body, contacts, state, dt)
             applyStepAssist(body, physLevel, frontContact, forward, terrainUp, input, config)
+        } else {
+            applyPendingJumpRelease(body, contacts, state, dt)
+        }
+
+        if (stabilizedGrounded) {
             applyBalanceController(body, forward, up, terrainUp, targetLean, config, forwardSpeed)
             applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
             applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
         } else {
-            applyPendingJumpRelease(body, contacts, state, dt)
             applyAirborneControl(body, forward, right, input, config)
         }
         if (!grounded) {
@@ -83,7 +94,7 @@ object BikePhysicsSolver {
         wheelLocalPos: Vector3d,
         contactUp: Vector3d,
         config: BikePhysicsConfig,
-        steerable: Boolean
+        dt: Double
     ): WheelContact {
         val transform = body.kinematics.transform
         val suspensionDirWorld = safeNormalize(contactUp, WORLD_UP)
@@ -97,13 +108,29 @@ object BikePhysicsSolver {
             Vector3d(wheelLocalPos).fma(-config.wheelWidth * 0.5, LOCAL_RIGHT),
             Vector3d(wheelLocalPos).fma(config.wheelWidth * 0.5, LOCAL_RIGHT)
         )
+        val sweepOffset = Vector3d(body.kinematics.velocity)
+            .sub(Vector3d(suspensionDirWorld).mul(safeDot(body.kinematics.velocity, suspensionDirWorld)))
+            .mul(dt.coerceIn(0.0, 0.1))
+        val sweepSamples = if (isFinite(sweepOffset) && sweepOffset.lengthSquared() > 1.0e-6) {
+            listOf(
+                Vector3d(),
+                Vector3d(sweepOffset).mul(-0.5),
+                Vector3d(sweepOffset).mul(-1.0),
+                Vector3d(sweepOffset).mul(0.35)
+            )
+        } else {
+            listOf(Vector3d())
+        }
         val bestHit = samples
             .asSequence()
-            .map { sampleLocalPos ->
+            .flatMap { sampleLocalPos ->
                 val wheelMountWorld = transform.toWorld.transformPosition(Vector3d(sampleLocalPos))
+                sweepSamples.asSequence().map { sweep -> Vector3d(wheelMountWorld).add(sweep) }
+            }
+            .map { sampleLocalPos ->
                 WheelRayHit(
-                    mountWorld = wheelMountWorld,
-                    result = physLevel.rayCast(wheelMountWorld, castDirection, maxLength, body.id)
+                    mountWorld = sampleLocalPos,
+                    result = physLevel.rayCast(sampleLocalPos, castDirection, maxLength, body.id)
                 )
             }
             .filter { hit -> hit.result != null && hit.result.hitBody.id != body.id && hit.result.distance.isFinite() }
@@ -193,12 +220,29 @@ object BikePhysicsSolver {
         config: BikePhysicsConfig
     ) {
         if (rear.grounded && input.throttle != 0.0) {
-            val forceMag = input.throttle.coerceIn(-1.0, 1.0) * config.longitudinalGrip * rear.normalForceEstimate
-            applyContactForce(body, rear, Vector3d(rear.wheelForwardWorld).mul(forceMag), rear.contactPointWorld)
+            val throttle = input.throttle.coerceIn(-1.0, 1.0)
+            val forwardVel = safeDot(rear.wheelVelocityWorld, rear.wheelForwardWorld)
+            val speedLimitFactor = computeMotorSpeedLimitFactor(forwardVel, throttle, config)
+            if (speedLimitFactor > 0.0) {
+                val forceMag = throttle * speedLimitFactor * config.longitudinalGrip * rear.normalForceEstimate
+                applyContactForce(body, rear, Vector3d(rear.wheelForwardWorld).mul(forceMag), rear.contactPointWorld)
+            }
         }
 
         applyBrake(body, front, input.brake * 0.65, config)
         applyBrake(body, rear, input.brake * 0.35, config)
+    }
+
+    private fun computeMotorSpeedLimitFactor(forwardVel: Double, throttle: Double, config: BikePhysicsConfig): Double {
+        if (throttle == 0.0) return 0.0
+        val topSpeed = config.wheelTopSpeed
+        if (!topSpeed.isFinite() || topSpeed <= 0.0) return 1.0
+
+        val throttleDirection = if (throttle > 0.0) 1.0 else -1.0
+        val signedSpeed = forwardVel * throttleDirection
+        if (signedSpeed <= topSpeed * 0.82) return 1.0
+        if (signedSpeed >= topSpeed) return 0.0
+        return 1.0 - smoothstep(topSpeed * 0.82, topSpeed, signedSpeed)
     }
 
     private fun applyBrake(body: PhysVsBody, contact: WheelContact, brakeInput: Double, config: BikePhysicsConfig) {
