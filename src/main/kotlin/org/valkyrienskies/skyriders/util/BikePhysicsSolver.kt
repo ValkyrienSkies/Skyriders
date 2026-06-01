@@ -46,6 +46,7 @@ object BikePhysicsSolver {
         applyTireForces(body, frontContact, config)
         applyTireForces(body, rearContact, config)
         applyDriveAndBrakes(body, frontContact, rearContact, input, config)
+        applyPendingJumpRelease(body, state, dt)
 
         val targetLean = computeTargetLean(forwardSpeed, input.steer, config)
         if (grounded) {
@@ -335,11 +336,22 @@ object BikePhysicsSolver {
             val charge = state.jumpCharge
             val launchForce = Vector3d(terrainUp).mul(config.jumpReleaseForce * charge)
                 .fma(config.jumpForwardBoostForce * charge, terrainForward)
-            body.applyWorldForce(launchForce, body.kinematics.position)
+            state.jumpReleaseForce.set(launchForce)
+            state.jumpReleaseTimeRemaining = config.jumpReleaseDuration
             state.jumpCharge = 0.0
         }
 
         state.wasJumpHeld = jumpHeld
+    }
+
+    private fun applyPendingJumpRelease(body: PhysVsBody, state: BikeRuntimeState, dt: Double) {
+        if (state.jumpReleaseTimeRemaining <= 0.0) return
+
+        body.applyWorldForce(state.jumpReleaseForce, body.kinematics.position)
+        state.jumpReleaseTimeRemaining = max(0.0, state.jumpReleaseTimeRemaining - dt)
+        if (state.jumpReleaseTimeRemaining <= 0.0) {
+            state.jumpReleaseForce.zero()
+        }
     }
 
     private fun dampExtremeAngularVelocity(body: PhysVsBody, config: BikePhysicsConfig) {

@@ -9,5 +9,7 @@ data class BikeRuntimeState(
     var rearWheelSpin: Double = 0.0,
     var lastGrounded: Boolean = false,
     var jumpCharge: Double = 0.0,
-    var wasJumpHeld: Boolean = false
+    var wasJumpHeld: Boolean = false,
+    var jumpReleaseTimeRemaining: Double = 0.0,
+    val jumpReleaseForce: Vector3d = Vector3d()
 )

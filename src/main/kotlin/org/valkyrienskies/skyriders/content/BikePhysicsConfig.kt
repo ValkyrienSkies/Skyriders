@@ -43,7 +43,8 @@ data class BikePhysicsConfig(
     val jumpChargeRate: Double,
     val jumpCompressionForce: Double,
     val jumpReleaseForce: Double,
-    val jumpForwardBoostForce: Double
+    val jumpForwardBoostForce: Double,
+    val jumpReleaseDuration: Double
 ) {
     companion object {
         val DEBUG_MOTORCYCLE = BikePhysicsConfig(
@@ -84,10 +85,11 @@ data class BikePhysicsConfig(
             airbornePitchControlStrength = 1800.0,
             airborneRollControlStrength = 1600.0,
             airborneBrakeDamping = 450.0,
-            jumpChargeRate = 1.35,
-            jumpCompressionForce = 4500.0,
-            jumpReleaseForce = 18000.0,
-            jumpForwardBoostForce = 4500.0
+            jumpChargeRate = 1.6,
+            jumpCompressionForce = 25000.0,
+            jumpReleaseForce = 65000.0,
+            jumpForwardBoostForce = 12000.0,
+            jumpReleaseDuration = 0.10
         )
     }
 }
