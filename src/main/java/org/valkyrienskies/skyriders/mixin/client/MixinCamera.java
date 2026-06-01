@@ -35,6 +35,7 @@ public abstract class MixinCamera implements BikeCameraDuck {
     @Shadow @Final private Vector3f up;
     @Shadow @Final private Vector3f left;
     @Unique private boolean skyriders$bikeInitialPositionApplied;
+    @Unique private boolean skyriders$bikeDetachedCamera;
     @Unique private float skyriders$zRot;
 
     @Inject(method = "setup", at = @At("HEAD"))
@@ -47,6 +48,7 @@ public abstract class MixinCamera implements BikeCameraDuck {
         final CallbackInfo ci
     ) {
         this.skyriders$bikeInitialPositionApplied = false;
+        this.skyriders$bikeDetachedCamera = detached;
         if (BikeClientMountTransforms.getMountedBikeRenderTransform(entity) == null) {
             this.skyriders$zRot = 0.0F;
         }
@@ -117,13 +119,39 @@ public abstract class MixinCamera implements BikeCameraDuck {
         }
         this.skyriders$bikeInitialPositionApplied = true;
 
-        final double eyeHeight = Mth.lerp(1.0F, this.eyeHeightOld, this.eyeHeight);
-        final Vec3 cameraPosition = BikeClientMountTransforms.getMountedBikeCameraPosition(this.entity, eyeHeight);
+        final Vec3 cameraPosition;
+        if (this.skyriders$bikeDetachedCamera) {
+            cameraPosition = BikeClientMountTransforms.getMountedBikeCenterPosition(this.entity);
+        } else {
+            final double eyeHeight = Mth.lerp(1.0F, this.eyeHeightOld, this.eyeHeight);
+            cameraPosition = BikeClientMountTransforms.getMountedBikeCameraPosition(this.entity, eyeHeight);
+        }
         if (cameraPosition == null) {
             original.call(camera, x, y, z);
             return;
         }
         original.call(camera, cameraPosition.x, cameraPosition.y, cameraPosition.z);
+    }
+
+    @WrapOperation(
+        method = "setup",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/Camera;move(DDD)V"
+        )
+    )
+    private void skyriders$moveBikeThirdPersonFurtherBack(
+        final Camera camera,
+        final double distanceOffset,
+        final double verticalOffset,
+        final double horizontalOffset,
+        final Operation<Void> original
+    ) {
+        if (this.skyriders$bikeDetachedCamera && BikeClientMountTransforms.getMountedBikeRenderTransform(this.entity) != null && distanceOffset < 0.0) {
+            original.call(camera, distanceOffset * THIRD_PERSON_BIKE_CAMERA_DISTANCE_SCALE, verticalOffset, horizontalOffset);
+            return;
+        }
+        original.call(camera, distanceOffset, verticalOffset, horizontalOffset);
     }
 
     private boolean skyriders$isFinite(final Vector3dc vector) {
@@ -134,4 +162,6 @@ public abstract class MixinCamera implements BikeCameraDuck {
     public float skyriders$getZRot() {
         return this.skyriders$zRot;
     }
+
+    private static final double THIRD_PERSON_BIKE_CAMERA_DISTANCE_SCALE = 1.35D;
 }

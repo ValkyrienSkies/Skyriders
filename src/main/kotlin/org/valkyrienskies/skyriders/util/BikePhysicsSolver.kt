@@ -22,6 +22,7 @@ object BikePhysicsSolver {
     private const val MAX_FORCE_MAGNITUDE = 1.0e7
     private const val MAX_TORQUE_MAGNITUDE = 1.0e7
     private const val GROUNDED_GRACE_SECONDS = 0.12
+    private const val FRONT_STEP_TRACTION_SCALE = 0.35
 
     fun updateBikePhysics(
         body: PhysVsBody,
@@ -228,18 +229,32 @@ object BikePhysicsSolver {
         input: BikeInput,
         config: BikePhysicsConfig
     ) {
-        if (rear.grounded && input.throttle != 0.0) {
-            val throttle = input.throttle.coerceIn(-1.0, 1.0)
-            val forwardVel = safeDot(rear.wheelVelocityWorld, rear.wheelForwardWorld)
-            val speedLimitFactor = computeMotorSpeedLimitFactor(forwardVel, throttle, config)
-            if (speedLimitFactor > 0.0) {
-                val forceMag = throttle * speedLimitFactor * config.longitudinalGrip * rear.normalForceEstimate
-                applyContactForce(body, rear, Vector3d(rear.wheelForwardWorld).mul(forceMag), rear.contactPointWorld)
-            }
+        val throttle = input.throttle.coerceIn(-1.0, 1.0)
+        if (rear.grounded && throttle != 0.0) {
+            applyDriveForce(body, rear, throttle, config, 1.0)
+        } else if (front.grounded && throttle > 0.0) {
+            applyDriveForce(body, front, throttle, config, FRONT_STEP_TRACTION_SCALE)
         }
 
         applyBrake(body, front, input.brake * 0.65, config)
         applyBrake(body, rear, input.brake * 0.35, config)
+    }
+
+    private fun applyDriveForce(
+        body: PhysVsBody,
+        contact: WheelContact,
+        throttle: Double,
+        config: BikePhysicsConfig,
+        forceScale: Double
+    ) {
+        if (!contact.grounded || throttle == 0.0 || forceScale <= 0.0) return
+
+        val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+        val speedLimitFactor = computeMotorSpeedLimitFactor(forwardVel, throttle, config)
+        if (speedLimitFactor > 0.0) {
+            val forceMag = throttle * speedLimitFactor * config.longitudinalGrip * contact.normalForceEstimate * forceScale
+            applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+        }
     }
 
     private fun computeMotorSpeedLimitFactor(forwardVel: Double, throttle: Double, config: BikePhysicsConfig): Double {

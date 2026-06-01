@@ -52,6 +52,14 @@ object BikeClientMountTransforms {
     }
 
     @JvmStatic
+    fun getMountedBikeCenterPosition(entity: Entity?): Vec3? {
+        val transform = getMountedBikeRenderTransform(entity) ?: return null
+        val position = transform.toWorld.transformPosition(Vector3d(0.0, THIRD_PERSON_PIVOT_LOCAL_Y, 0.0))
+        if (!isFinite(position)) return null
+        return Vec3(position.x, position.y, position.z)
+    }
+
+    @JvmStatic
     fun getBikeMountedEntityRenderPosition(seat: BikeSeatEntity?, entity: Entity?): Vector3d? {
         if (seat == null) return null
         val transform = getBikeRenderTransform(seat) ?: return null
@@ -108,4 +116,5 @@ object BikeClientMountTransforms {
 
     private const val DEFAULT_SEAT_OFFSET = 0.35
     private const val DEFAULT_WHEEL_TOP_SPEED = 24.0
+    private const val THIRD_PERSON_PIVOT_LOCAL_Y = 1.45
 }
