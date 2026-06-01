@@ -72,7 +72,8 @@ public abstract class MixinCamera implements BikeCameraDuck {
         }
 
         final float bikeYaw = BikeClientMountTransforms.getBikeYaw(transform);
-        final float localYaw = Mth.wrapDegrees(yaw - bikeYaw);
+        final float seatYaw = BikeClientMountTransforms.getMountedBikeSeatYaw(this.entity, bikeYaw);
+        final float localYaw = Mth.wrapDegrees(yaw - seatYaw);
         if (!Float.isFinite(localYaw) || !Float.isFinite(pitch)) {
             original.call(camera, yaw, pitch);
             return;

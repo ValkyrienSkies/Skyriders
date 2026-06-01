@@ -59,6 +59,12 @@ object BikeClientMountTransforms {
         return Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
     }
 
+    @JvmStatic
+    fun getMountedBikeSeatYaw(entity: Entity?, fallbackYaw: Float): Float {
+        val seat = entity?.vehicle as? BikeSeatEntity ?: return fallbackYaw
+        return seat.yRot
+    }
+
     private fun isFinite(vector: Vector3dc): Boolean {
         return vector.x().isFinite() && vector.y().isFinite() && vector.z().isFinite()
     }
