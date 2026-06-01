@@ -66,7 +66,7 @@ object BikePhysicsSolver {
         val suspensionDirWorld = transformDirection(body, LOCAL_UP)
         val castDirection = Vector3d(suspensionDirWorld).negate().normalize()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
-        val result = physLevel.rayCast(wheelMountWorld, castDirection, maxLength)
+        val result = physLevel.rayCast(wheelMountWorld, castDirection, maxLength, body.id)
         val forward = transformDirection(body, LOCAL_FORWARD)
         val right = transformDirection(body, LOCAL_RIGHT)
 

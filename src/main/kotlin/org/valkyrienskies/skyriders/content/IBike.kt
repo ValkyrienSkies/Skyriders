@@ -28,7 +28,7 @@ interface IBike {
     fun getTilt(): Double
 
     fun tick()
-    fun physTick(physLevel: PhysLevel, body: PhysVsBody, dt: Double)
+    fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: BikeInput, dt: Double)
 
     fun toSaveRecord(): BikeSaveRecord = BikeSaveRecord(
         bodyId = bodyId,

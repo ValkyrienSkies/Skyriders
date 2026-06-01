@@ -27,6 +27,7 @@ object BikeManager {
     val DEBUG_BIKE_ID = ResourceLocation(SkyridersMod.MOD_ID, "debug_bike")
 
     private val bikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
+    private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, BikeInput>>()
 
     fun createBike(bikeId: ResourceLocation, level: ServerLevel, position: Vector3dc): IBike {
         return when (bikeId) {
@@ -37,14 +38,31 @@ object BikeManager {
 
     fun addBike(dimensionId: DimensionId, bike: IBike) {
         bikesByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
+        inputsByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = BikeInput.EMPTY
     }
 
     fun removeBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
+        inputsByDimension[dimensionId]?.remove(bodyId)
         return bikesByDimension[dimensionId]?.remove(bodyId)
+    }
+
+    fun removeBike(level: ServerLevel, bodyId: BodyId, deleteBody: Boolean = true): IBike? {
+        val bike = removeBike(level.dimensionId, bodyId) ?: return null
+        if (deleteBody) {
+            val shipWorld = requireNotNull(vsApi.getServerShipWorld(level.server)) {
+                "Cannot delete bike body before VS server ship world is available"
+            }
+            shipWorld.allBodies.getById(bodyId)?.let(shipWorld::deleteBody)
+        }
+        return bike
     }
 
     fun getBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
         return bikesByDimension[dimensionId]?.get(bodyId)
+    }
+
+    fun getBikes(dimensionId: DimensionId): List<IBike> {
+        return bikesByDimension[dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
     }
 
     fun tick(dimensionId: DimensionId) {
@@ -54,7 +72,20 @@ object BikeManager {
     fun physTick(physLevel: PhysLevel, dt: Double) {
         bikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
             val body = physLevel.getBodyById(bike.bodyId) ?: return@forEach
-            bike.physTick(physLevel, body, dt)
+            bike.physTick(physLevel, body, getInput(physLevel.dimension, bike.bodyId), dt)
+        }
+    }
+
+    fun getInput(dimensionId: DimensionId, bodyId: BodyId): BikeInput {
+        return inputsByDimension[dimensionId]?.get(bodyId) ?: BikeInput.EMPTY
+    }
+
+    fun updateInput(dimensionId: DimensionId, bodyId: BodyId, updater: (BikeInput) -> BikeInput): BikeInput? {
+        if (getBike(dimensionId, bodyId) == null) return null
+
+        val inputs = inputsByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }
+        return inputs.compute(bodyId) { _, current ->
+            updater(current ?: BikeInput.EMPTY).clamped()
         }
     }
 

@@ -49,8 +49,8 @@ class DebugBike(override val bodyId: BodyId,
     override fun tick() {
     }
 
-    override fun physTick(physLevel: PhysLevel, body: PhysVsBody, dt: Double) {
-        BikePhysicsSolver.updateBikePhysics(body, physLevel, BikeInput.EMPTY, config, state, dt)
+    override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: BikeInput, dt: Double) {
+        BikePhysicsSolver.updateBikePhysics(body, physLevel, input, config, state, dt)
     }
 
     private fun requireBody() =

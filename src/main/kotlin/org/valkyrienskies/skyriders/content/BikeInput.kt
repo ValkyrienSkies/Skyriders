@@ -5,6 +5,12 @@ data class BikeInput(
     val throttle: Double = 0.0,
     val brake: Double = 0.0
 ) {
+    fun clamped(): BikeInput = BikeInput(
+        steer = steer.coerceIn(-1.0, 1.0),
+        throttle = throttle.coerceIn(-1.0, 1.0),
+        brake = brake.coerceIn(0.0, 1.0)
+    )
+
     companion object {
         val EMPTY = BikeInput()
     }
