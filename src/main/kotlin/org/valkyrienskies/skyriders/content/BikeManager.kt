@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 object BikeManager {
     private const val BIKES_KEY = "bikes"
     val DEBUG_BIKE_ID = ResourceLocation(SkyridersMod.MOD_ID, "debug_bike")
+    val registeredBikeIds: Set<ResourceLocation> = setOf(DEBUG_BIKE_ID)
 
     private val bikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, BikeInput>>()

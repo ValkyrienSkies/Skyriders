@@ -3,10 +3,11 @@ package org.valkyrienskies.skyriders.command
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.LongArgumentType
+import com.mojang.brigadier.arguments.StringArgumentType
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands.argument
 import net.minecraft.commands.Commands.literal
-import net.minecraft.commands.arguments.ResourceLocationArgument
+import net.minecraft.commands.SharedSuggestionProvider
 import net.minecraft.commands.arguments.coordinates.Vec3Argument
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
@@ -16,6 +17,7 @@ import net.minecraftforge.event.RegisterCommandsEvent
 import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
 
@@ -31,13 +33,16 @@ object SkyridersCommands {
                 .then(
                     literal("summon")
                         .then(
-                            argument("bike", ResourceLocationArgument.id())
+                            argument("bike", StringArgumentType.word())
+                                .suggests { _, builder ->
+                                    SharedSuggestionProvider.suggest(bikeIdSuggestions(), builder)
+                                }
                                 .then(
                                     argument("pos", Vec3Argument.vec3())
                                         .executes { ctx ->
                                             summonBike(
                                                 ctx.source,
-                                                ResourceLocationArgument.getId(ctx, "bike"),
+                                                StringArgumentType.getString(ctx, "bike"),
                                                 Vec3Argument.getVec3(ctx, "pos")
                                             )
                                         }
@@ -79,6 +84,24 @@ object SkyridersCommands {
         )
     }
 
+    private fun bikeIdSuggestions(): Iterable<String> {
+        return BikeManager.registeredBikeIds.flatMap { id ->
+            if (id.namespace == SkyridersMod.MOD_ID) {
+                listOf(id.path, id.toString())
+            } else {
+                listOf(id.toString())
+            }
+        }
+    }
+
+    private fun parseBikeId(input: String): ResourceLocation? {
+        return if (ResourceLocation.isValidResourceLocation(input)) {
+            if (':' in input) ResourceLocation(input) else ResourceLocation(SkyridersMod.MOD_ID, input)
+        } else {
+            null
+        }
+    }
+
     private fun inputSetter(
         name: String,
         min: Double,
@@ -97,10 +120,16 @@ object SkyridersCommands {
                 }
         )
 
-    private fun summonBike(source: CommandSourceStack, bikeId: ResourceLocation, pos: Vec3): Int {
+    private fun summonBike(source: CommandSourceStack, bikeIdInput: String, pos: Vec3): Int {
         val level = source.level as? ServerLevel
             ?: run {
                 source.sendFailure(Component.literal("Bikes can only be summoned on the server."))
+                return 0
+            }
+
+        val bikeId = parseBikeId(bikeIdInput)
+            ?: run {
+                source.sendFailure(Component.literal("Invalid bike id: $bikeIdInput"))
                 return 0
             }
 
