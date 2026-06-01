@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Camera;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniond;
 import org.joml.Quaterniondc;
 import org.joml.Quaternionf;
@@ -35,7 +36,9 @@ public abstract class MixinCamera implements BikeCameraDuck {
     @Shadow @Final private Vector3f left;
     @Unique private boolean skyriders$bikeInitialPositionApplied;
     @Unique private float skyriders$zRot;
-    @Unique private Float skyriders$lastBikeYaw;
+    @Unique private Float skyriders$lastEntityYaw;
+    @Unique private float skyriders$localYaw;
+    @Unique private Vec3 skyriders$bikeLookVector = Vec3.ZERO;
 
     @Inject(method = "setup", at = @At("HEAD"))
     private void skyriders$resetBikeCameraState(
@@ -49,7 +52,9 @@ public abstract class MixinCamera implements BikeCameraDuck {
         this.skyriders$bikeInitialPositionApplied = false;
         if (BikeClientMountTransforms.getMountedBikeRenderTransform(entity) == null) {
             this.skyriders$zRot = 0.0F;
-            this.skyriders$lastBikeYaw = null;
+            this.skyriders$lastEntityYaw = null;
+            this.skyriders$localYaw = 0.0F;
+            this.skyriders$bikeLookVector = Vec3.ZERO;
         }
     }
 
@@ -66,47 +71,8 @@ public abstract class MixinCamera implements BikeCameraDuck {
         final float pitch,
         final Operation<Void> original
     ) {
-        final BodyTransform transform = BikeClientMountTransforms.getMountedBikeRenderTransform(this.entity);
-        if (transform == null) {
+        if (!this.skyriders$updateBikeLook(this.entity, 1.0F)) {
             original.call(camera, yaw, pitch);
-            return;
-        }
-
-        final float bikeYaw = BikeClientMountTransforms.getBikeYaw(transform);
-        final float deltaYaw = this.skyriders$lastBikeYaw == null
-            ? 0.0F
-            : Mth.wrapDegrees(bikeYaw - this.skyriders$lastBikeYaw);
-        this.skyriders$lastBikeYaw = bikeYaw;
-
-        final float effectiveYaw = yaw + deltaYaw;
-        final float localYaw = Mth.wrapDegrees(effectiveYaw - bikeYaw);
-        if (!Float.isFinite(effectiveYaw) || !Float.isFinite(localYaw) || !Float.isFinite(pitch)) {
-            original.call(camera, yaw, pitch);
-            return;
-        }
-
-        final Quaterniondc localLook =
-            new Quaterniond().rotateY(Math.toRadians(-localYaw)).rotateX(Math.toRadians(pitch)).normalize();
-        final Quaterniondc mountedLook = transform.getRotation().mul(localLook, new Quaterniond());
-        final Vector3d euler = mountedLook.getEulerAnglesYXZ(new Vector3d());
-        final float mountedPitch = (float) Math.toDegrees(euler.x);
-        final float mountedYaw = (float) -Math.toDegrees(euler.y);
-        final float mountedRoll = (float) Math.toDegrees(euler.z);
-
-        this.xRot = mountedPitch;
-        this.yRot = mountedYaw;
-        this.skyriders$zRot = mountedRoll;
-        this.rotation.set(mountedLook);
-        this.forwards.set(0.0F, 0.0F, 1.0F);
-        this.rotation.transform(this.forwards);
-        this.up.set(0.0F, 1.0F, 0.0F);
-        this.rotation.transform(this.up);
-        this.left.set(1.0F, 0.0F, 0.0F);
-        this.rotation.transform(this.left);
-
-        if (Math.abs(deltaYaw) > 1.0e-4F) {
-            this.entity.setYRot(effectiveYaw);
-            this.entity.setYHeadRot(this.entity.getYHeadRot() + deltaYaw);
         }
     }
 
@@ -131,15 +97,13 @@ public abstract class MixinCamera implements BikeCameraDuck {
         }
         this.skyriders$bikeInitialPositionApplied = true;
 
-        final double seatOffset = BikeClientMountTransforms.getMountedBikeSeatOffset(this.entity);
         final double eyeHeight = Mth.lerp(1.0F, this.eyeHeightOld, this.eyeHeight);
-        final Vector3d seatPosition = transform.getToWorld().transformPosition(new Vector3d(0.0, seatOffset, 0.0));
-        final Vector3d eyeOffset = transform.getRotation().transform(new Vector3d(0.0, eyeHeight, 0.0));
-        if (!skyriders$isFinite(seatPosition) || !skyriders$isFinite(eyeOffset)) {
+        final Vec3 cameraPosition = BikeClientMountTransforms.getMountedBikeCameraPosition(this.entity, eyeHeight);
+        if (cameraPosition == null) {
             original.call(camera, x, y, z);
             return;
         }
-        original.call(camera, seatPosition.x + eyeOffset.x, seatPosition.y + eyeOffset.y, seatPosition.z + eyeOffset.z);
+        original.call(camera, cameraPosition.x, cameraPosition.y, cameraPosition.z);
     }
 
     private boolean skyriders$isFinite(final Vector3dc vector) {
@@ -149,5 +113,51 @@ public abstract class MixinCamera implements BikeCameraDuck {
     @Override
     public float skyriders$getZRot() {
         return this.skyriders$zRot;
+    }
+
+    @Override
+    public boolean skyriders$updateBikeLook(final Entity entity, final float partialTick) {
+        final BodyTransform transform = BikeClientMountTransforms.getMountedBikeRenderTransform(entity);
+        if (transform == null || entity == null) {
+            return false;
+        }
+
+        final float yaw = entity.getViewYRot(partialTick);
+        final float pitch = entity.getViewXRot(partialTick);
+        final float bikeYaw = BikeClientMountTransforms.getBikeYaw(transform);
+        if (this.skyriders$lastEntityYaw == null) {
+            this.skyriders$localYaw = Mth.wrapDegrees(yaw - bikeYaw);
+        } else {
+            final float mouseYawDelta = Mth.wrapDegrees(yaw - this.skyriders$lastEntityYaw);
+            this.skyriders$localYaw = Mth.wrapDegrees(this.skyriders$localYaw + mouseYawDelta);
+        }
+        this.skyriders$lastEntityYaw = yaw;
+
+        if (!Float.isFinite(this.skyriders$localYaw) || !Float.isFinite(pitch)) {
+            return false;
+        }
+
+        final Quaterniondc localLook =
+            new Quaterniond().rotateY(Math.toRadians(-this.skyriders$localYaw)).rotateX(Math.toRadians(pitch)).normalize();
+        final Quaterniondc mountedLook = transform.getRotation().mul(localLook, new Quaterniond());
+        final Vector3d euler = mountedLook.getEulerAnglesYXZ(new Vector3d());
+
+        this.xRot = (float) Math.toDegrees(euler.x);
+        this.yRot = (float) -Math.toDegrees(euler.y);
+        this.skyriders$zRot = (float) Math.toDegrees(euler.z);
+        this.rotation.set(mountedLook);
+        this.forwards.set(0.0F, 0.0F, 1.0F);
+        this.rotation.transform(this.forwards);
+        this.up.set(0.0F, 1.0F, 0.0F);
+        this.rotation.transform(this.up);
+        this.left.set(1.0F, 0.0F, 0.0F);
+        this.rotation.transform(this.left);
+        this.skyriders$bikeLookVector = new Vec3(this.forwards.x(), this.forwards.y(), this.forwards.z());
+        return true;
+    }
+
+    @Override
+    public Vec3 skyriders$getBikeLookVector() {
+        return this.skyriders$bikeLookVector;
     }
 }

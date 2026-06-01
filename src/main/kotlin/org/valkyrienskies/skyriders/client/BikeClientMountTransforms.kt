@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.client
 
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.ClientVsBody
@@ -32,6 +33,16 @@ object BikeClientMountTransforms {
         val seat = entity?.vehicle as? BikeSeatEntity ?: return DEFAULT_SEAT_OFFSET
         val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
         return bike?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
+    }
+
+    @JvmStatic
+    fun getMountedBikeCameraPosition(entity: Entity?, eyeHeight: Double): Vec3? {
+        val transform = getMountedBikeRenderTransform(entity) ?: return null
+        val seatOffset = getMountedBikeSeatOffset(entity)
+        val seatPosition = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        val eyeOffset = transform.rotation.transform(Vector3d(0.0, eyeHeight, 0.0))
+        if (!isFinite(seatPosition) || !isFinite(eyeOffset)) return null
+        return Vec3(seatPosition.x + eyeOffset.x, seatPosition.y + eyeOffset.y, seatPosition.z + eyeOffset.z)
     }
 
     @JvmStatic
