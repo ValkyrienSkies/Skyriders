@@ -14,7 +14,9 @@ import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 
 @Mod("skyriders")
-class SkyridersMod {
+object SkyridersMod {
+
+    const val MOD_ID = "skyriders"
 
     //Deferred Registries
     private val BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MOD_ID)
@@ -31,8 +33,12 @@ class SkyridersMod {
 
         modEventBus.addListener(::init)
         if (FMLEnvironment.dist.isClient) {
-            modEventBus.addListener(SkyridersModClient.Companion::clientInit)
+            modEventBus.addListener(SkyridersModClient::clientInit)
         }
+    }
+
+    @JvmStatic
+    fun init (event: FMLCommonSetupEvent) {
     }
 
     // Helper function, taken from VS2.
@@ -40,12 +46,5 @@ class SkyridersMod {
         val blockRegistry = BLOCKS.register(registryName, blockSupplier)
         ITEMS.register(registryName) { BlockItem(blockRegistry.get(), Item.Properties()) }
         return blockRegistry
-    }
-
-    companion object {
-        const val MOD_ID = "skyriders"
-        @JvmStatic
-        fun init (event: FMLCommonSetupEvent) {
-        }
     }
 }
