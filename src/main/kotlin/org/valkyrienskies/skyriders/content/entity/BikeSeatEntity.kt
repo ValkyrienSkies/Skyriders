@@ -7,6 +7,7 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
@@ -21,6 +22,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.atan2
 
 class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(type, level) {
@@ -53,6 +55,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         }
         rotatePassengersByBikeYawDelta(previousYaw)
         updateBikeInputFromPassenger()
+        sendBikeDebugToPassenger()
     }
 
     override fun getControllingPassenger(): LivingEntity? {
@@ -122,6 +125,14 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
                 riderPresent = true
             )
         }
+    }
+
+    private fun sendBikeDebugToPassenger() {
+        if (level().isClientSide) return
+
+        val player = controllingPassenger as? ServerPlayer ?: return
+        val bike = BikeManager.getBike(level().dimensionId, bodyId) ?: return
+        SkyridersNetwork.sendBikeDebug(player, bodyId, bike.state)
     }
 
     private fun yawFromForward(forward: Vector3dc): Float {

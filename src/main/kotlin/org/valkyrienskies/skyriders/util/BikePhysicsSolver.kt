@@ -56,6 +56,7 @@ object BikePhysicsSolver {
         val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, 0.0, config, dt)
         val contacts = listOf(frontContact, rearContact)
         val grounded = frontContact.grounded || rearContact.grounded
+        updateDebugState(body, state, frontContact, rearContact, activeInput, frontSteerRad, drifting)
         if (grounded) {
             state.groundedGraceTimeRemaining = GROUNDED_GRACE_SECONDS
         } else {
@@ -747,6 +748,24 @@ object BikePhysicsSolver {
         state.frontWheelSpin += forwardSpeed / config.wheelRadius * dt
         state.rearWheelSpin += forwardSpeed / config.wheelRadius * dt
         state.lastGrounded = grounded
+    }
+
+    private fun updateDebugState(
+        body: PhysVsBody,
+        state: BikeRuntimeState,
+        frontContact: WheelContact,
+        rearContact: WheelContact,
+        input: BikeInput,
+        frontSteerRad: Double,
+        drifting: Boolean
+    ) {
+        val velocity = body.kinematics.velocity
+        state.debugSpeed = if (isFinite(velocity)) velocity.length() else 0.0
+        state.debugFrontWheelGrounded = frontContact.grounded
+        state.debugRearWheelGrounded = rearContact.grounded
+        state.debugThrottle = input.throttle
+        state.debugSteeringAngleRad = frontSteerRad
+        state.debugDrifting = drifting
     }
 
     private fun smoothGroundNormal(

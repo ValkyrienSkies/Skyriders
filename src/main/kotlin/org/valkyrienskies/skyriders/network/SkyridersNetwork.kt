@@ -11,10 +11,12 @@ import net.minecraftforge.network.PacketDistributor
 import net.minecraftforge.network.simple.SimpleChannel
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
+import org.valkyrienskies.skyriders.content.BikeRuntimeState
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import java.util.function.Supplier
 
@@ -51,6 +53,13 @@ object SkyridersNetwork {
             BikeSyncPacket::decode,
             BikeSyncPacket::handle
         )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeDebugPacket::class.java,
+            BikeDebugPacket::encode,
+            BikeDebugPacket::decode,
+            BikeDebugPacket::handle
+        )
     }
 
     fun sendBikeInput(input: BikeInput) {
@@ -63,6 +72,22 @@ object SkyridersNetwork {
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
+    }
+
+    fun sendBikeDebug(player: ServerPlayer, bodyId: Long, state: BikeRuntimeState) {
+        CHANNEL.send(
+            PacketDistributor.PLAYER.with { player },
+            BikeDebugPacket(
+                bodyId = bodyId,
+                speed = state.debugSpeed,
+                frontGrounded = state.debugFrontWheelGrounded,
+                rearGrounded = state.debugRearWheelGrounded,
+                throttle = state.debugThrottle,
+                steeringAngleRad = state.debugSteeringAngleRad,
+                drifting = state.debugDrifting,
+                jumpCharge = state.jumpCharge
+            )
+        )
     }
 
     data class BikeInputPacket(val input: BikeInput) {
@@ -175,6 +200,61 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class BikeDebugPacket(
+        val bodyId: Long,
+        val speed: Double,
+        val frontGrounded: Boolean,
+        val rearGrounded: Boolean,
+        val throttle: Double,
+        val steeringAngleRad: Double,
+        val drifting: Boolean,
+        val jumpCharge: Double
+    ) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeLong(bodyId)
+            buf.writeDouble(speed)
+            buf.writeBoolean(frontGrounded)
+            buf.writeBoolean(rearGrounded)
+            buf.writeDouble(throttle)
+            buf.writeDouble(steeringAngleRad)
+            buf.writeBoolean(drifting)
+            buf.writeDouble(jumpCharge)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { BikeDebugOverlay.update(this) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeDebugPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeDebugPacket {
+                return BikeDebugPacket(
+                    bodyId = buf.readLong(),
+                    speed = buf.readDouble(),
+                    frontGrounded = buf.readBoolean(),
+                    rearGrounded = buf.readBoolean(),
+                    throttle = buf.readDouble(),
+                    steeringAngleRad = buf.readDouble(),
+                    drifting = buf.readBoolean(),
+                    jumpCharge = buf.readDouble()
+                )
+            }
+
+            fun handle(packet: BikeDebugPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

@@ -36,6 +36,7 @@ object SkyridersModClient {
         event.enqueueWork {
             EntityRenderers.register(SkyridersMod.BIKE_SEAT_ENTITY.get(), ::BikeSeatRenderer)
             MinecraftForge.EVENT_BUS.register(ClientEvents)
+            MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
         }
     }
 

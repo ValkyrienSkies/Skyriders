@@ -19,5 +19,11 @@ data class BikeRuntimeState(
     var driftBoostCharge: Double = 0.0,
     var driftBoostLevel: Int = 0,
     var driftBoostTimeRemaining: Double = 0.0,
-    var driftBoostForce: Double = 0.0
+    var driftBoostForce: Double = 0.0,
+    var debugSpeed: Double = 0.0,
+    var debugFrontWheelGrounded: Boolean = false,
+    var debugRearWheelGrounded: Boolean = false,
+    var debugThrottle: Double = 0.0,
+    var debugSteeringAngleRad: Double = 0.0,
+    var debugDrifting: Boolean = false
 )
