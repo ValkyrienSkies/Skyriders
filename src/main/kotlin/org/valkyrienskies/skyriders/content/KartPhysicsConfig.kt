@@ -19,7 +19,19 @@ data class KartPhysicsConfig(
     val wheelTopSpeed: Double,
     val yawAssist: Double,
     val uprightStrength: Double,
-    val uprightDamping: Double
+    val uprightDamping: Double,
+    val maxSteerHighSpeedRad: Double = maxSteerRad * 0.42,
+    val steeringHighSpeedStart: Double = 4.0,
+    val steeringFullSpeed: Double = 14.0,
+    val steerSmoothingTime: Double = 0.11,
+    val tireFrictionCoefficient: Double = 1.35,
+    val frontLateralGrip: Double = lateralGrip,
+    val rearLateralGrip: Double = lateralGrip,
+    val longitudinalGrip: Double = 1.0,
+    val rollingResistance: Double = 65.0,
+    val speedLimitSoftness: Double = 0.18,
+    val yawAssistMinSpeed: Double = 0.8,
+    val yawAssistMaxSpeed: Double = 12.0
 ) {
     companion object {
         val DEBUG_KART = KartPhysicsConfig(
@@ -39,12 +51,24 @@ data class KartPhysicsConfig(
             suspensionDamping = 4200.0,
             driveForce = 7200.0,
             brakeForce = 5200.0,
-            lateralGrip = 5200.0,
+            lateralGrip = 0.82,
             maxSteerRad = Math.toRadians(32.0),
             wheelTopSpeed = 16.0,
-            yawAssist = 2600.0,
+            yawAssist = 1900.0,
             uprightStrength = 12000.0,
-            uprightDamping = 1900.0
+            uprightDamping = 1900.0,
+            maxSteerHighSpeedRad = Math.toRadians(13.0),
+            steeringHighSpeedStart = 5.0,
+            steeringFullSpeed = 15.0,
+            steerSmoothingTime = 0.13,
+            tireFrictionCoefficient = 1.25,
+            frontLateralGrip = 0.92,
+            rearLateralGrip = 0.78,
+            longitudinalGrip = 1.05,
+            rollingResistance = 55.0,
+            speedLimitSoftness = 0.22,
+            yawAssistMinSpeed = 1.2,
+            yawAssistMaxSpeed = 14.0
         )
     }
 }
@@ -54,5 +78,8 @@ data class KartRuntimeState(
     var debugSpeed: Double = 0.0,
     var debugGroundedWheels: Int = 0,
     var debugSteerRad: Double = 0.0,
-    var debugThrottle: Double = 0.0
+    var debugThrottle: Double = 0.0,
+    var smoothedSteerRad: Double = 0.0,
+    var debugForwardSpeed: Double = 0.0,
+    var debugLateralSlip: Double = 0.0
 )
