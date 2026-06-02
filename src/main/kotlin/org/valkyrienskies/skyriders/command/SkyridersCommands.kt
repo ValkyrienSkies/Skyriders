@@ -207,7 +207,7 @@ object SkyridersCommands {
 
         val message = bikes.joinToString(separator = "\n") { bike ->
             val input = BikeManager.getInput(level.dimensionId, bike.bodyId)
-            "${bike.bodyId}: ${bike.definition.displayName} (${bike.id}) input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}]"
+            "${bike.bodyId}: ${bike.definition.displayName} (${bike.id}) engine=${bike.state.engineOn} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}]"
         }
         source.sendSuccess({ Component.literal(message) }, false)
         return bikes.size

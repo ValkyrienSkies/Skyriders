@@ -117,6 +117,17 @@ object BikeManager {
         }
     }
 
+    fun toggleEngine(level: ServerLevel, bodyId: BodyId): Boolean? {
+        val bike = getBike(level.dimensionId, bodyId) ?: return null
+        bike.state.engineOn = !bike.state.engineOn
+        if (!bike.state.engineOn) {
+            updateInput(level.dimensionId, bodyId) { BikeInput.EMPTY }
+        }
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
+        return bike.state.engineOn
+    }
+
     fun save(dimensionId: DimensionId): CompoundTag = CompoundTag().apply {
         val bikes = ListTag()
         serverBikesByDimension[dimensionId]?.values
@@ -149,8 +160,9 @@ object BikeManager {
         return restoredCount
     }
 
-    fun applyVisualState(level: Level, bodyId: BodyId, visualLeanRad: Double, visualSteerRad: Double, frontWheelSpin: Double, rearWheelSpin: Double) {
+    fun applyVisualState(level: Level, bodyId: BodyId, engineOn: Boolean, visualLeanRad: Double, visualSteerRad: Double, frontWheelSpin: Double, rearWheelSpin: Double) {
         val bike = getBike(level, bodyId) ?: return
+        bike.state.engineOn = engineOn
         bike.state.visualLeanRad = visualLeanRad
         bike.state.visualSteerRad = visualSteerRad
         bike.state.frontWheelSpin = frontWheelSpin
@@ -252,6 +264,7 @@ object BikeManager {
             level = level,
             definition = definition,
             state = BikeRuntimeState(
+                engineOn = record.engineOn,
                 visualLeanRad = record.visualLeanRad,
                 frontWheelSpin = record.frontWheelSpin,
                 rearWheelSpin = record.rearWheelSpin

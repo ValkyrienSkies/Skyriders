@@ -75,7 +75,7 @@ object BikeClientEffects {
         val speed = if (velocity.isFinite()) velocity.length() else 0.0
         val render = bike.definition.render
         val exhaustPos = transform.toWorld.transformPosition(Vector3d(render.exhaustLocalPos))
-        if (speed > 0.6 && exhaustPos.isFinite() && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
+        if (bike.state.engineOn && speed > 0.6 && exhaustPos.isFinite() && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
             val exhaustVelocity = transform.rotation.transform(Vector3d(0.0, 0.025, -0.075 - min(speed, 20.0) * 0.003))
             level.addParticle(
                 exhaustParticle(telemetry),
@@ -151,7 +151,7 @@ object BikeClientEffects {
 
     private fun tickEngineSound(minecraft: Minecraft, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
         val soundId = bike.definition.sounds.engineLoop
-        if (soundId == null) {
+        if (soundId == null || !bike.state.engineOn) {
             engineSoundsByBodyId.remove(bike.bodyId)?.stopNow()
             return
         }

@@ -54,7 +54,11 @@ open class DefaultBike(override val bodyId: BodyId,
     }
 
     override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: BikeInput, dt: Double) {
-        BikePhysicsSolver.updateBikePhysics(body, physLevel, input, config, state, dt)
+        BikePhysicsSolver.updateBikePhysics(body, physLevel, engineInput(input), config, state, dt)
+    }
+
+    protected fun engineInput(input: BikeInput): BikeInput {
+        return if (state.engineOn) input else BikeInput.EMPTY.copy(riderPresent = input.riderPresent)
     }
 
     private fun requireBody() =

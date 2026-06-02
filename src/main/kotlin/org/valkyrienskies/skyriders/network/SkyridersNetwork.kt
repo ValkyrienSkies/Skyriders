@@ -51,6 +51,13 @@ object SkyridersNetwork {
         )
         CHANNEL.registerMessage(
             nextPacketId++,
+            BikeEngineTogglePacket::class.java,
+            BikeEngineTogglePacket::encode,
+            BikeEngineTogglePacket::decode,
+            BikeEngineTogglePacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
             BikeSyncPacket::class.java,
             BikeSyncPacket::encode,
             BikeSyncPacket::decode,
@@ -94,6 +101,10 @@ object SkyridersNetwork {
         CHANNEL.sendToServer(BikeDismountPacket())
     }
 
+    fun sendBikeEngineToggle() {
+        CHANNEL.sendToServer(BikeEngineTogglePacket())
+    }
+
     fun sendBikeUse() {
         CHANNEL.sendToServer(BikeUsePacket())
     }
@@ -118,6 +129,7 @@ object SkyridersNetwork {
                 throttle = state.debugThrottle,
                 steeringAngleRad = state.debugSteeringAngleRad,
                 drifting = state.debugDrifting,
+                engineOn = state.engineOn,
                 driftBoostCharge = state.driftBoostCharge,
                 driftBoostLevel = state.driftBoostLevel,
                 jumpCharge = state.jumpCharge
@@ -133,6 +145,7 @@ object SkyridersNetwork {
                     val state = bike.state
                     BikeVisualState(
                         bodyId = bike.bodyId,
+                        engineOn = state.engineOn,
                         visualLeanRad = state.visualLeanRad,
                         visualSteerRad = state.visualSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
@@ -215,6 +228,31 @@ object SkyridersNetwork {
         }
     }
 
+    class BikeEngineTogglePacket {
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                val player = context.sender ?: return@enqueueWork
+                val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
+                BikeManager.toggleEngine(player.level() as net.minecraft.server.level.ServerLevel, seat.bodyId)
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeEngineTogglePacket, buf: FriendlyByteBuf) {
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeEngineTogglePacket {
+                return BikeEngineTogglePacket()
+            }
+
+            fun handle(packet: BikeEngineTogglePacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
     class BikeUsePacket {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
             val context = contextSupplier.get()
@@ -279,6 +317,7 @@ object SkyridersNetwork {
             records.forEach { record ->
                 buf.writeLong(record.bodyId)
                 buf.writeUtf(record.bikeType)
+                buf.writeBoolean(record.engineOn)
                 buf.writeDouble(record.visualLeanRad)
                 buf.writeDouble(record.frontWheelSpin)
                 buf.writeDouble(record.rearWheelSpin)
@@ -306,6 +345,7 @@ object SkyridersNetwork {
                     BikeSaveRecord(
                         bodyId = buf.readLong(),
                         bikeType = buf.readUtf(),
+                        engineOn = buf.readBoolean(),
                         visualLeanRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
                         rearWheelSpin = buf.readDouble()
@@ -330,6 +370,7 @@ object SkyridersNetwork {
         val throttle: Double,
         val steeringAngleRad: Double,
         val drifting: Boolean,
+        val engineOn: Boolean,
         val driftBoostCharge: Double,
         val driftBoostLevel: Int,
         val jumpCharge: Double
@@ -344,6 +385,7 @@ object SkyridersNetwork {
             buf.writeDouble(throttle)
             buf.writeDouble(steeringAngleRad)
             buf.writeBoolean(drifting)
+            buf.writeBoolean(engineOn)
             buf.writeDouble(driftBoostCharge)
             buf.writeInt(driftBoostLevel)
             buf.writeDouble(jumpCharge)
@@ -378,6 +420,7 @@ object SkyridersNetwork {
                     throttle = buf.readDouble(),
                     steeringAngleRad = buf.readDouble(),
                     drifting = buf.readBoolean(),
+                    engineOn = buf.readBoolean(),
                     driftBoostCharge = buf.readDouble(),
                     driftBoostLevel = buf.readInt(),
                     jumpCharge = buf.readDouble()
@@ -395,6 +438,7 @@ object SkyridersNetwork {
             buf.writeVarInt(states.size)
             states.forEach { state ->
                 buf.writeLong(state.bodyId)
+                buf.writeBoolean(state.engineOn)
                 buf.writeDouble(state.visualLeanRad)
                 buf.writeDouble(state.visualSteerRad)
                 buf.writeDouble(state.frontWheelSpin)
@@ -412,6 +456,7 @@ object SkyridersNetwork {
                             BikeManager.applyVisualState(
                                 level = level,
                                 bodyId = state.bodyId,
+                                engineOn = state.engineOn,
                                 visualLeanRad = state.visualLeanRad,
                                 visualSteerRad = state.visualSteerRad,
                                 frontWheelSpin = state.frontWheelSpin,
@@ -434,6 +479,7 @@ object SkyridersNetwork {
                 val states = (0 until count).map {
                     BikeVisualState(
                         bodyId = buf.readLong(),
+                        engineOn = buf.readBoolean(),
                         visualLeanRad = buf.readDouble(),
                         visualSteerRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
@@ -451,6 +497,7 @@ object SkyridersNetwork {
 
     data class BikeVisualState(
         val bodyId: Long,
+        val engineOn: Boolean,
         val visualLeanRad: Double,
         val visualSteerRad: Double,
         val frontWheelSpin: Double,

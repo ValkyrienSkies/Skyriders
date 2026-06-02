@@ -34,6 +34,7 @@ interface IBike {
     fun toSaveRecord(): BikeSaveRecord = BikeSaveRecord(
         bodyId = bodyId,
         bikeType = id,
+        engineOn = state.engineOn,
         visualLeanRad = state.visualLeanRad,
         frontWheelSpin = state.frontWheelSpin,
         rearWheelSpin = state.rearWheelSpin

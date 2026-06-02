@@ -34,6 +34,12 @@ object SkyridersModClient {
         GLFW.GLFW_KEY_LEFT_ALT,
         "key.categories.skyriders"
     )
+    private val bikeEngineToggleKey = KeyMapping(
+        "key.skyriders.bike_engine_toggle",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_R,
+        "key.categories.skyriders"
+    )
 
     @JvmStatic
     fun clientInit(event: FMLClientSetupEvent) {
@@ -49,6 +55,7 @@ object SkyridersModClient {
     fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
         event.register(bikeDismountKey)
         event.register(bikeBrakeKey)
+        event.register(bikeEngineToggleKey)
     }
 
     @JvmStatic
@@ -79,6 +86,9 @@ object SkyridersModClient {
 
             while (bikeDismountKey.consumeClick()) {
                 SkyridersNetwork.sendBikeDismount()
+            }
+            while (bikeEngineToggleKey.consumeClick()) {
+                SkyridersNetwork.sendBikeEngineToggle()
             }
 
             val options = minecraft.options

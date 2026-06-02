@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import org.joml.Vector3d
 
 data class BikeRuntimeState(
+    var engineOn: Boolean = false,
     val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0),
     var smoothedTargetLeanRad: Double = 0.0,
     var visualLeanRad: Double = 0.0,

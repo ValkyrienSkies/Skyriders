@@ -24,6 +24,7 @@ object BikeDebugOverlay {
             throttle = packet.throttle,
             steeringAngleRad = packet.steeringAngleRad,
             drifting = packet.drifting,
+            engineOn = packet.engineOn,
             jumpCharge = packet.jumpCharge,
             receivedAtMillis = System.currentTimeMillis()
         )
@@ -47,6 +48,7 @@ object BikeDebugOverlay {
                 "Skyriders Bike",
                 "Bike Type: ${currentSnapshot.bikeName} (${currentSnapshot.bikeId})",
                 "Current Speed: ${formatNumber(currentSnapshot.speed)}",
+                "Engine On: ${currentSnapshot.engineOn}",
                 "Front Wheel Grounded: ${currentSnapshot.frontGrounded}",
                 "Rear Wheel Grounded: ${currentSnapshot.rearGrounded}",
                 "Throttle: ${formatNumber(currentSnapshot.throttle)}",
@@ -93,6 +95,7 @@ object BikeDebugOverlay {
         val throttle: Double,
         val steeringAngleRad: Double,
         val drifting: Boolean,
+        val engineOn: Boolean,
         val jumpCharge: Double,
         val receivedAtMillis: Long
     )
