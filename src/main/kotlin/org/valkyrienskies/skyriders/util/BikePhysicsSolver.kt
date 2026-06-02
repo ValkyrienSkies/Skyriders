@@ -866,7 +866,7 @@ object BikePhysicsSolver {
 
     private fun visualSuspensionOffset(contact: WheelContact, suspensionTravel: Double): Double {
         return if (contact.grounded) {
-            -contact.compression.coerceIn(0.0, 1.0) * suspensionTravel
+            contact.compression.coerceIn(0.0, 1.0) * suspensionTravel
         } else {
             0.0
         }

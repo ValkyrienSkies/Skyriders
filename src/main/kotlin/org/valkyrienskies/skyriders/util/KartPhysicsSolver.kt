@@ -193,7 +193,7 @@ object KartPhysicsSolver {
         if (!contact.grounded) return 0.0
         val springLength = contact.hitDistance - config.wheelRadius
         val compression = (config.suspensionRestLength - springLength).coerceIn(0.0, config.suspensionTravel)
-        return -compression
+        return compression
     }
 
     private fun applyLateralGrip(body: PhysVsBody, kartContact: KartContact, drifting: Boolean, config: KartPhysicsConfig) {
