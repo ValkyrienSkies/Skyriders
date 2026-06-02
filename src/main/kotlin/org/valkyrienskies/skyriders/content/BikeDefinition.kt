@@ -49,8 +49,8 @@ data class BikeInteractionDefinition(
                 ),
                 BikeInteractionZone(
                     id = SEAT,
-                    center = Vector3d(0.0, 0.55, -0.25),
-                    size = Vector3d(0.75, 0.45, 0.75)
+                    center = Vector3d(0.0, 0.48, -0.25),
+                    size = Vector3d(0.75, 0.58, 0.75)
                 ),
                 BikeInteractionZone(
                     id = FUEL_CAP,
@@ -86,7 +86,10 @@ data class BikeSoundDefinition(
         val DEFAULT_ENGINE = BikeSoundDefinition(
             engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine"),
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
-            engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop")
+            engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop"),
+            idleVolume = 0.22,
+            speedVolume = 0.22,
+            throttleVolume = 0.18
         )
 
         val NONE = BikeSoundDefinition()

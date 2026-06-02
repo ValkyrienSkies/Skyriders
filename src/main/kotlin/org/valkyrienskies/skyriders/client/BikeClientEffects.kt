@@ -196,7 +196,7 @@ object BikeClientEffects {
             SimpleSoundInstance(
                 soundId,
                 SoundSource.NEUTRAL,
-                0.85f,
+                0.48f,
                 1.0f,
                 SoundInstance.createUnseededRandom(),
                 false,
