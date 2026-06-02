@@ -14,5 +14,10 @@ data class BikeRuntimeState(
     var wasJumpHeld: Boolean = false,
     var jumpReleaseTimeRemaining: Double = 0.0,
     val jumpReleaseForce: Vector3d = Vector3d(),
-    var groundedGraceTimeRemaining: Double = 0.0
+    var groundedGraceTimeRemaining: Double = 0.0,
+    var wasDrifting: Boolean = false,
+    var driftBoostCharge: Double = 0.0,
+    var driftBoostLevel: Int = 0,
+    var driftBoostTimeRemaining: Double = 0.0,
+    var driftBoostForce: Double = 0.0
 )

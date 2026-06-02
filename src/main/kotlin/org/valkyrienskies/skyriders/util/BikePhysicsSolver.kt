@@ -67,6 +67,7 @@ object BikePhysicsSolver {
             smoothGroundNormal(state, contacts, dt, config)
         }
         val terrainUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        updateDriftBoost(body, state, riderPresent, drifting, forward, terrainUp, config, dt)
 
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
@@ -441,6 +442,80 @@ object BikePhysicsSolver {
         return input.brake > 0.05 &&
             abs(input.steer) > 0.15 &&
             abs(forwardSpeed) >= config.driftMinSpeed
+    }
+
+    private fun updateDriftBoost(
+        body: PhysVsBody,
+        state: BikeRuntimeState,
+        riderPresent: Boolean,
+        drifting: Boolean,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        config: BikePhysicsConfig,
+        dt: Double
+    ) {
+        if (!config.driftBoostEnabled || !riderPresent) {
+            state.wasDrifting = false
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+            return
+        }
+
+        if (drifting) {
+            state.driftBoostCharge += dt
+            state.driftBoostLevel = computeDriftBoostLevel(state.driftBoostCharge, config)
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+        } else if (state.wasDrifting) {
+            val boostLevel = state.driftBoostLevel.coerceIn(0, driftBoostLevelCount(config))
+            if (boostLevel > 0) {
+                state.driftBoostForce = driftBoostForce(boostLevel, config)
+                state.driftBoostTimeRemaining = driftBoostDuration(boostLevel, config)
+            }
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+        }
+
+        state.wasDrifting = drifting
+
+        if (state.driftBoostTimeRemaining <= 0.0 || state.driftBoostForce <= 0.0) return
+
+        val boostForward = projectOntoPlane(forward, terrainUp, forward)
+        safeApplyWorldForce(body, boostForward.mul(state.driftBoostForce), body.kinematics.position)
+        state.driftBoostTimeRemaining = max(0.0, state.driftBoostTimeRemaining - dt)
+        if (state.driftBoostTimeRemaining <= 0.0) {
+            state.driftBoostForce = 0.0
+        }
+    }
+
+    private fun computeDriftBoostLevel(charge: Double, config: BikePhysicsConfig): Int {
+        var level = 0
+        val maxLevel = driftBoostLevelCount(config)
+        for (index in 0 until maxLevel) {
+            if (charge >= config.driftBoostChargeTimes[index]) {
+                level = index + 1
+            }
+        }
+        return level
+    }
+
+    private fun driftBoostForce(level: Int, config: BikePhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostForces.indices) config.driftBoostForces[index] else 0.0
+    }
+
+    private fun driftBoostDuration(level: Int, config: BikePhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostDurations.indices) config.driftBoostDurations[index] else 0.0
+    }
+
+    private fun driftBoostLevelCount(config: BikePhysicsConfig): Int {
+        return min(
+            config.driftBoostMaxLevel,
+            min(config.driftBoostChargeTimes.size, min(config.driftBoostForces.size, config.driftBoostDurations.size))
+        ).coerceAtLeast(0)
     }
 
     private fun applyGroundedPitchControl(
