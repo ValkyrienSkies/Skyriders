@@ -157,7 +157,7 @@ object SkyridersCommands {
         }
 
         source.sendSuccess(
-            { Component.literal("Summoned ${bike.id} as VS body ${bike.bodyId}") },
+            { Component.literal("Summoned ${bike.definition.displayName} (${bike.id}) as VS body ${bike.bodyId}") },
             true
         )
         return 1
@@ -207,7 +207,7 @@ object SkyridersCommands {
 
         val message = bikes.joinToString(separator = "\n") { bike ->
             val input = BikeManager.getInput(level.dimensionId, bike.bodyId)
-            "${bike.bodyId}: ${bike.id} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}]"
+            "${bike.bodyId}: ${bike.definition.displayName} (${bike.id}) input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}]"
         }
         source.sendSuccess({ Component.literal(message) }, false)
         return bikes.size
@@ -232,7 +232,7 @@ object SkyridersCommands {
             return 0
         }
 
-        source.sendSuccess({ Component.literal("Removed ${bike.id} with VS body $bodyId") }, true)
+        source.sendSuccess({ Component.literal("Removed ${bike.definition.displayName} (${bike.id}) with VS body $bodyId") }, true)
         return 1
     }
 
@@ -273,7 +273,7 @@ object SkyridersCommands {
 
         level.addFreshEntity(seat)
         player.startRiding(seat, true)
-        source.sendSuccess({ Component.literal("Mounted bike $bodyId") }, false)
+        source.sendSuccess({ Component.literal("Mounted ${bike.definition.displayName} (${bike.id}) with VS body $bodyId") }, false)
         return 1
     }
 }

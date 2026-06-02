@@ -23,8 +23,27 @@ data class BikeDefinition(
     val displayName: String,
     val config: BikePhysicsConfig,
     val seatOffset: Double,
+    val render: BikeRenderDefinition = BikeRenderDefinition.DEFAULT_BIKE,
     val factory: BikeFactory = BikeFactory(::DefaultBike)
 )
+
+data class BikeRenderDefinition(
+    val model: ResourceLocation,
+    val texture: ResourceLocation,
+    val seatTexture: ResourceLocation = texture,
+    val showWheels: Boolean = true
+) {
+    companion object {
+        val DEFAULT_BIKE = BikeRenderDefinition(
+            model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/bikes/debug_bike.png")
+        )
+
+        val HOVER_BIKE = DEFAULT_BIKE.copy(
+            showWheels = false
+        )
+    }
+}
 
 object BikeDefinitions {
     val DEBUG_BIKE = BikeDefinition(
@@ -53,6 +72,7 @@ object BikeDefinitions {
         displayName = "Hover Bike",
         config = BikePhysicsConfig.HOVER_BIKE,
         seatOffset = 0.24,
+        render = BikeRenderDefinition.HOVER_BIKE,
         factory = BikeFactory(::HoverBike)
     )
 

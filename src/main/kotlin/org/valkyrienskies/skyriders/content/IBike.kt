@@ -10,6 +10,7 @@ import org.valkyrienskies.core.api.world.PhysLevel
 
 interface IBike {
     val id: String
+    val definition: BikeDefinition
 
     val bodyId: BodyId
 

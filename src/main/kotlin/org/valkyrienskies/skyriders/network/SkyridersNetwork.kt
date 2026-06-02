@@ -13,7 +13,6 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
-import org.valkyrienskies.skyriders.content.BikeDefinitions
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
@@ -78,10 +77,7 @@ object SkyridersNetwork {
     fun sendBikeDebug(player: ServerPlayer, bike: IBike) {
         val state = bike.state
         val bikeId = bike.id
-        val bikeName = ResourceLocation.tryParse(bikeId)
-            ?.let(BikeDefinitions::get)
-            ?.displayName
-            ?: bikeId
+        val bikeName = bike.definition.displayName
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             BikeDebugPacket(
