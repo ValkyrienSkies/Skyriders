@@ -227,9 +227,10 @@ object BikePhysicsSolver {
         val compressionMeters = config.suspensionRestLength - springLength
         val compression = (compressionMeters / config.suspensionTravel).coerceIn(0.0, 1.0)
         val normalForceEstimate = max(0.0, compressionMeters * config.suspensionStrength)
+        val loaded = compressionMeters > 1.0e-4
 
         return WheelContact(
-            grounded = true,
+            grounded = loaded,
             hitBody = result.hitBody,
             contactPointWorld = contactPoint,
             contactNormalWorld = safeNormalize(result.hitNormal, suspensionDirWorld),
@@ -251,10 +252,9 @@ object BikePhysicsSolver {
         right: Vector3d,
         terrainUp: Vector3d
     ): Vector3d {
-        return Vector3d(body.kinematics.position)
-            .fma(wheelLocalPos.z, forward)
-            .fma(wheelLocalPos.x + lateralOffset, right)
-            .fma(wheelLocalPos.y, terrainUp)
+        return body.kinematics.transform.toWorld
+            .transformPosition(Vector3d(wheelLocalPos))
+            .fma(lateralOffset, right)
     }
 
     private fun applySuspension(body: PhysVsBody, contact: WheelContact, config: BikePhysicsConfig) {
