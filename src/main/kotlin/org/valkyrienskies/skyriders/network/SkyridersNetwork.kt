@@ -174,6 +174,7 @@ object SkyridersNetwork {
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
+                if (!seat.isDriverSeat()) return@enqueueWork
                 BikeManager.updateInput(player.level().dimensionId, seat.bodyId) { input.copy(riderPresent = true) }
             }
             context.packetHandled = true
@@ -234,6 +235,7 @@ object SkyridersNetwork {
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
+                if (!seat.isDriverSeat()) return@enqueueWork
                 BikeManager.toggleEngine(player.level() as net.minecraft.server.level.ServerLevel, seat.bodyId)
             }
             context.packetHandled = true

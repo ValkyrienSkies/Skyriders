@@ -22,6 +22,10 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
+import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleSeatDefinition
+import org.valkyrienskies.skyriders.content.VehicleSeatRole
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.atan2
 
@@ -29,6 +33,9 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     var bodyId: BodyId
         get() = entityData.get(BODY_ID)
         set(value) = entityData.set(BODY_ID, value)
+    var seatId: String
+        get() = entityData.get(SEAT_ID)
+        set(value) = entityData.set(SEAT_ID, value)
     private var lastBikeYaw: Float? = null
 
     init {
@@ -68,14 +75,17 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     override fun defineSynchedData() {
         entityData.define(BODY_ID, 0L)
+        entityData.define(SEAT_ID, DEFAULT_SEAT_ID)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
         bodyId = compound.getLong(BODY_ID_TAG)
+        seatId = compound.getString(SEAT_ID_TAG).takeIf(String::isNotBlank) ?: DEFAULT_SEAT_ID
     }
 
     override fun addAdditionalSaveData(compound: CompoundTag) {
         compound.putLong(BODY_ID_TAG, bodyId)
+        compound.putString(SEAT_ID_TAG, seatId)
     }
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> {
@@ -84,9 +94,9 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     private fun updateSeatPose(): Boolean {
         val body = level().shipWorld?.allBodies?.getById(bodyId) ?: return false
-        val seatOffset = BikeManager.getBike(level(), bodyId)?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
+        val localPos = seatDefinition()?.localPos ?: Vector3d(0.0, DEFAULT_SEAT_OFFSET, 0.0)
         val transform = if (level().isClientSide && body is ClientVsBody) body.renderTransform else body.kinematics.transform
-        val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        val seatWorld = transform.toWorld.transformPosition(Vector3d(localPos))
         val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
         if (!isFinite(seatWorld) || !isFinite(forward)) return false
 
@@ -113,6 +123,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     private fun updateBikeInputFromPassenger() {
         if (level().isClientSide) return
+        if (!isDriverSeat()) return
 
         val passenger = controllingPassenger ?: return
         BikeManager.updateInput(level().dimensionId, bodyId) {
@@ -122,10 +133,22 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     private fun sendBikeDebugToPassenger() {
         if (level().isClientSide) return
+        if (!isDriverSeat()) return
 
         val player = controllingPassenger as? ServerPlayer ?: return
         val bike = BikeManager.getBike(level().dimensionId, bodyId) ?: return
         SkyridersNetwork.sendBikeDebug(player, bike)
+    }
+
+    fun seatDefinition(): VehicleSeatDefinition? {
+        return VehicleManager.getVehicle(level(), bodyId)
+            ?.vehicleDefinition
+            ?.seats
+            ?.firstOrNull { it.id == seatId }
+    }
+
+    fun isDriverSeat(): Boolean {
+        return seatDefinition()?.role != VehicleSeatRole.PASSENGER
     }
 
     private fun yawFromForward(forward: Vector3dc): Float {
@@ -138,8 +161,12 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     companion object {
         private const val BODY_ID_TAG = "BodyId"
+        private const val SEAT_ID_TAG = "SeatId"
+        private const val DEFAULT_SEAT_ID = VehicleInteractionDefinition.SEAT
         private const val DEFAULT_SEAT_OFFSET = 0.35
         private val BODY_ID: EntityDataAccessor<Long> =
             SynchedEntityData.defineId(BikeSeatEntity::class.java, EntityDataSerializers.LONG)
+        private val SEAT_ID: EntityDataAccessor<String> =
+            SynchedEntityData.defineId(BikeSeatEntity::class.java, EntityDataSerializers.STRING)
     }
 }

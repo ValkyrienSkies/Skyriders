@@ -38,15 +38,21 @@ object BikeClientMountTransforms {
     @JvmStatic
     fun getMountedBikeSeatOffset(entity: Entity?): Double {
         val seat = getBikeSeat(entity) ?: return DEFAULT_SEAT_OFFSET
-        val bike = BikeManager.getBike(seat.level(), seat.bodyId)
-        return bike?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
+        return getMountedBikeSeatLocalPosition(seat).y
+    }
+
+    @JvmStatic
+    fun getMountedBikeSeatLocalPosition(entity: Entity?): Vector3d {
+        val seat = getBikeSeat(entity) ?: return Vector3d(0.0, DEFAULT_SEAT_OFFSET, 0.0)
+        return seat.seatDefinition()?.localPos?.let(::Vector3d)
+            ?: BikeManager.getBike(seat.level(), seat.bodyId)?.let { Vector3d(0.0, it.getSeatOffset(), 0.0) }
+            ?: Vector3d(0.0, DEFAULT_SEAT_OFFSET, 0.0)
     }
 
     @JvmStatic
     fun getMountedBikeCameraPosition(entity: Entity?, eyeHeight: Double): Vec3? {
         val transform = getMountedBikeRenderTransform(entity) ?: return null
-        val seatOffset = getMountedBikeSeatOffset(entity)
-        val seatPosition = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        val seatPosition = transform.toWorld.transformPosition(getMountedBikeSeatLocalPosition(entity))
         val eyeOffset = transform.rotation.transform(Vector3d(0.0, eyeHeight, 0.0))
         if (!isFinite(seatPosition) || !isFinite(eyeOffset)) return null
         return Vec3(seatPosition.x + eyeOffset.x, seatPosition.y + eyeOffset.y, seatPosition.z + eyeOffset.z)
@@ -64,8 +70,7 @@ object BikeClientMountTransforms {
     fun getBikeMountedEntityRenderPosition(seat: BikeSeatEntity?, entity: Entity?): Vector3d? {
         if (seat == null) return null
         val transform = getBikeRenderTransform(seat) ?: return null
-        val seatOffset = getMountedBikeSeatOffset(seat.controllingPassenger ?: seat.passengers.firstOrNull())
-        val seatPosition = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
+        val seatPosition = transform.toWorld.transformPosition(getMountedBikeSeatLocalPosition(seat))
         if (entity != null && entity !== seat) {
             val riderOffset = transform.rotation.transform(
                 Vector3d(0.0, seat.passengersRidingOffset + entity.myRidingOffset, 0.0)

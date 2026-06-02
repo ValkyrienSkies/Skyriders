@@ -55,13 +55,18 @@ object BikeInteractionHandler {
         if (player.isShiftKeyDown && VehicleInteractionAction.PICK_UP in target.actions) {
             startHoisting(player, target.bike)
         } else if (VehicleInteractionAction.MOUNT in target.actions) {
-            mountBike(player, target.bike, notifyPlayer = false)
+            mountBike(player, target.bike, notifyPlayer = false, interactionZoneId = target.zoneId)
         } else {
             return
         }
     }
 
-    fun mountBike(player: ServerPlayer, bike: IBike, notifyPlayer: Boolean): Boolean {
+    fun mountBike(
+        player: ServerPlayer,
+        bike: IBike,
+        notifyPlayer: Boolean,
+        interactionZoneId: String = VehicleInteractionDefinition.SEAT
+    ): Boolean {
         val level = player.level() as? ServerLevel ?: return false
         if (hoistedPlayersByBody.containsKey(bike.bodyId)) {
             if (notifyPlayer) {
@@ -79,7 +84,10 @@ object BikeInteractionHandler {
             return false
         }
 
-        val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, bike.getSeatOffset(), 0.0))
+        val seatDefinition = bike.vehicleDefinition.seats.firstOrNull { it.interactionZone == interactionZoneId }
+            ?: bike.vehicleDefinition.seats.firstOrNull { it.id == VehicleInteractionDefinition.SEAT }
+        val seatLocalPos = seatDefinition?.localPos ?: Vector3d(0.0, bike.getSeatOffset(), 0.0)
+        val seatWorld = transform.toWorld.transformPosition(Vector3d(seatLocalPos))
         val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
         val yaw = Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
         val seat = SkyridersMod.BIKE_SEAT_ENTITY.get().create(level)
@@ -91,6 +99,7 @@ object BikeInteractionHandler {
             }
 
         seat.bodyId = bike.bodyId
+        seat.seatId = seatDefinition?.id ?: VehicleInteractionDefinition.SEAT
         seat.moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yaw, 0.0f)
         level.addFreshEntity(seat)
         player.startRiding(seat, true)
