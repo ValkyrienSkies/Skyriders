@@ -16,8 +16,11 @@ import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
+import kotlin.math.exp
 
 object BikeWorldRenderer {
+    private val visualStatesByBodyId = HashMap<Long, RenderVisualState>()
+
     @SubscribeEvent
     fun onRenderLevelStage(event: RenderLevelStageEvent) {
         if (event.stage != RenderLevelStageEvent.Stage.AFTER_ENTITIES) return
@@ -26,6 +29,7 @@ object BikeWorldRenderer {
         val level = minecraft.level ?: return
         val bikes = BikeManager.getBikes(level)
         if (bikes.isEmpty()) return
+        visualStatesByBodyId.keys.retainAll(bikes.mapTo(HashSet()) { it.bodyId })
 
         val bufferSource = minecraft.renderBuffers().bufferSource()
         val cameraPosition = event.camera.position
@@ -63,6 +67,7 @@ object BikeWorldRenderer {
         val model = minecraft.modelManager.getModel(render.model)
         val missingModel = minecraft.modelManager.missingModel
         if (model === missingModel) return
+        val visualState = updateRenderVisualState(bike)
 
         val packedLight = LevelRenderer.getLightColor(
             bike.level,
@@ -91,7 +96,7 @@ object BikeWorldRenderer {
                         model = it,
                         pivot = render.frontWheelPivot,
                         steerRad = bike.state.visualSteerRad,
-                        spinRad = bike.state.frontWheelSpin,
+                        spinRad = visualState.frontWheelSpin,
                         packedLight = packedLight
                     )
                 }
@@ -106,13 +111,55 @@ object BikeWorldRenderer {
                         model = it,
                         pivot = render.rearWheelPivot,
                         steerRad = 0.0,
-                        spinRad = bike.state.rearWheelSpin,
+                        spinRad = visualState.rearWheelSpin,
                         packedLight = packedLight
                     )
                 }
         }
 
         poseStack.popPose()
+    }
+
+    private fun updateRenderVisualState(bike: IBike): RenderVisualState {
+        val now = System.nanoTime()
+        val state = visualStatesByBodyId.getOrPut(bike.bodyId) {
+            RenderVisualState(
+                lastRenderNanos = now,
+                lastRawFrontWheelSpin = bike.state.frontWheelSpin,
+                lastRawRearWheelSpin = bike.state.rearWheelSpin,
+                targetFrontWheelSpin = bike.state.frontWheelSpin * bike.definition.render.wheelSpinVisualScale,
+                targetRearWheelSpin = bike.state.rearWheelSpin * bike.definition.render.wheelSpinVisualScale,
+                frontWheelSpin = bike.state.frontWheelSpin * bike.definition.render.wheelSpinVisualScale,
+                rearWheelSpin = bike.state.rearWheelSpin * bike.definition.render.wheelSpinVisualScale
+            )
+        }
+
+        val render = bike.definition.render
+        val scale = render.wheelSpinVisualScale.takeIf { it.isFinite() && it >= 0.0 } ?: 1.0
+        val rawFront = bike.state.frontWheelSpin
+        val rawRear = bike.state.rearWheelSpin
+        if (rawFront.isFinite()) {
+            val delta = rawFront - state.lastRawFrontWheelSpin
+            if (delta.isFinite()) {
+                state.targetFrontWheelSpin += delta * scale
+            }
+            state.lastRawFrontWheelSpin = rawFront
+        }
+        if (rawRear.isFinite()) {
+            val delta = rawRear - state.lastRawRearWheelSpin
+            if (delta.isFinite()) {
+                state.targetRearWheelSpin += delta * scale
+            }
+            state.lastRawRearWheelSpin = rawRear
+        }
+
+        val dt = ((now - state.lastRenderNanos) / 1.0e9).coerceIn(0.0, 0.1)
+        state.lastRenderNanos = now
+        val smoothingTime = render.wheelSpinSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.08
+        val alpha = 1.0 - exp(-dt / smoothingTime)
+        state.frontWheelSpin += (state.targetFrontWheelSpin - state.frontWheelSpin) * alpha
+        state.rearWheelSpin += (state.targetRearWheelSpin - state.rearWheelSpin) * alpha
+        return state
     }
 
     private fun renderWheelPart(
@@ -161,4 +208,14 @@ object BikeWorldRenderer {
     private fun Vector3d.isFinite(): Boolean {
         return x.isFinite() && y.isFinite() && z.isFinite()
     }
+
+    private data class RenderVisualState(
+        var lastRenderNanos: Long,
+        var lastRawFrontWheelSpin: Double,
+        var lastRawRearWheelSpin: Double,
+        var targetFrontWheelSpin: Double,
+        var targetRearWheelSpin: Double,
+        var frontWheelSpin: Double,
+        var rearWheelSpin: Double
+    )
 }

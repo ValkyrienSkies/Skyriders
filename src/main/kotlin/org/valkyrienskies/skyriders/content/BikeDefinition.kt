@@ -38,8 +38,10 @@ data class BikeRenderDefinition(
     val frontWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 0.0),
     val rearWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 1.0),
     val modelYawRad: Double = Math.PI,
-    val modelOffset: Vector3d = Vector3d(-0.8, -0.45, -0.8),
+    val modelOffset: Vector3d = Vector3d(-0.8, -0.62, -0.8),
     val modelScale: Double = 1.6,
+    val wheelSpinVisualScale: Double = 0.35,
+    val wheelSpinSmoothingTime: Double = 0.08,
     val exhaustLocalPos: Vector3d = Vector3d(0.0, 0.35, -0.85),
     val tireParticleLocalYOffset: Double = -0.45
 ) {
