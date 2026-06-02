@@ -10,6 +10,8 @@ import org.valkyrienskies.core.api.bodies.properties.BodyTransform
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.BikeInput
+import org.valkyrienskies.skyriders.content.BikeDefinition
+import org.valkyrienskies.skyriders.content.BikeDefinitions
 import org.valkyrienskies.skyriders.content.BikePhysicsConfig
 import org.valkyrienskies.skyriders.content.BikeRuntimeState
 import org.valkyrienskies.skyriders.content.IBike
@@ -18,15 +20,17 @@ import org.valkyrienskies.skyriders.util.BikePhysicsSolver
 class DebugBike(override val bodyId: BodyId,
                 override val boundingBox: AABB,
                 override val level: Level,
-                override val config: BikePhysicsConfig = BikePhysicsConfig.DEBUG_MOTORCYCLE,
+                val definition: BikeDefinition = BikeDefinitions.DEBUG_BIKE,
                 override val state: BikeRuntimeState = BikeRuntimeState()
 ) : IBike {
+    override val config: BikePhysicsConfig
+        get() = definition.config
 
     override val id: String
-        get() = "debug_bike"
+        get() = definition.id.toString()
 
     override fun getSeatOffset(): Double {
-        return 0.22
+        return definition.seatOffset
     }
 
     override fun getKinematics(): BodyKinematics {

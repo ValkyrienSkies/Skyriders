@@ -26,18 +26,17 @@ import java.util.concurrent.ConcurrentHashMap
 
 object BikeManager {
     private const val BIKES_KEY = "bikes"
-    val DEBUG_BIKE_ID = ResourceLocation(SkyridersMod.MOD_ID, "debug_bike")
-    val registeredBikeIds: Set<ResourceLocation> = setOf(DEBUG_BIKE_ID)
+    val registeredBikeIds: Set<ResourceLocation>
+        get() = BikeDefinitions.ids
 
     private val serverBikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
     private val clientBikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, BikeInput>>()
 
     fun createBike(bikeId: ResourceLocation, level: ServerLevel, position: Vector3dc): IBike {
-        val bike = when (bikeId) {
-            DEBUG_BIKE_ID -> createDebugBike(level, position)
-            else -> throw IllegalArgumentException("Unknown bike id: $bikeId")
-        }
+        val definition = BikeDefinitions.get(bikeId)
+            ?: throw IllegalArgumentException("Unknown bike id: $bikeId")
+        val bike = createBike(definition, level, position)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
         return bike
@@ -131,11 +130,9 @@ object BikeManager {
     }
 
     fun restoreBike(level: Level, record: BikeSaveRecord): IBike? {
-        val bikeId = ResourceLocation.tryParse(record.bikeType) ?: ResourceLocation(SkyridersMod.MOD_ID, record.bikeType)
-        val bike = when (bikeId) {
-            DEBUG_BIKE_ID -> restoreDebugBike(level, record)
-            else -> null
-        } ?: return null
+        val bikeId = BikeDefinitions.resolveSavedId(record.bikeType) ?: return null
+        val definition = BikeDefinitions.get(bikeId) ?: return null
+        val bike = restoreBike(level, record, definition) ?: return null
 
         addBike(level, bike)
         return bike
@@ -172,8 +169,8 @@ object BikeManager {
         return if (level.isClientSide) clientBikesByDimension else serverBikesByDimension
     }
 
-    private fun createDebugBike(level: ServerLevel, position: Vector3dc): IBike {
-        val config = BikePhysicsConfig.DEBUG_MOTORCYCLE
+    private fun createBike(definition: BikeDefinition, level: ServerLevel, position: Vector3dc): IBike {
+        val config = definition.config
         val shipWorld = requireNotNull(vsApi.getServerShipWorld(level.server)) {
             "Cannot create bike before VS server ship world is available"
         }
@@ -219,14 +216,14 @@ object BikeManager {
                 config.collisionBoxSize.z
             ),
             level = level,
-            config = config
+            definition = definition
         )
         addBike(level.dimensionId, bike)
         return bike
     }
 
-    private fun restoreDebugBike(level: Level, record: BikeSaveRecord): IBike? {
-        val config = BikePhysicsConfig.DEBUG_MOTORCYCLE
+    private fun restoreBike(level: Level, record: BikeSaveRecord, definition: BikeDefinition): IBike? {
+        val config = definition.config
         val body = level.shipWorld?.allBodies?.getById(record.bodyId) ?: return null
         val position = body.kinematics.position
         return DebugBike(
@@ -242,7 +239,7 @@ object BikeManager {
                 config.collisionBoxSize.z
             ),
             level = level,
-            config = config,
+            definition = definition,
             state = BikeRuntimeState(
                 visualLeanRad = record.visualLeanRad,
                 frontWheelSpin = record.frontWheelSpin,
