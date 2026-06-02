@@ -66,7 +66,7 @@ object KartPhysicsSolver {
         }
 
         if (input.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, config)
+        applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, steerRad, config)
             if (grounded) {
                 if (state.drifting) {
                     applyDriftAssist(body, input, forwardSpeed, WORLD_UP, state, config)
@@ -160,19 +160,22 @@ object KartPhysicsSolver {
         forwardSpeed: Double,
         input: VehicleInput,
         drifting: Boolean,
+        steerRad: Double,
         config: KartPhysicsConfig
     ) {
         val rearContacts = contacts.filter { !it.front && it.contact.grounded && it.normalForce > 0.0 }
         if (rearContacts.isEmpty()) return
 
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
-        val driveLimitSpeed = if (drifting) {
+        val usePlanarLimit = drifting || abs(input.steer) > 0.05 || abs(steerRad) > Math.toRadians(1.0)
+        val driveLimitSpeed = if (usePlanarLimit) {
             val direction = forwardSpeed.signOrZero().takeIf { it != 0.0 } ?: throttle.signOrZero()
             planarSpeed(body, WORLD_UP) * direction
         } else {
             forwardSpeed
         }
-        val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, if (drifting) config.wheelTopSpeed * config.driftTopSpeedMultiplier else config.wheelTopSpeed, config)
+        val topSpeed = if (drifting) config.wheelTopSpeed * config.driftTopSpeedMultiplier else config.wheelTopSpeed
+        val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, topSpeed, config)
         val driveScale = if (drifting) config.driftDriveScale else 1.0
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
         rearContacts.forEach { kartContact ->
