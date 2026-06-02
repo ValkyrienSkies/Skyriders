@@ -31,7 +31,15 @@ data class KartPhysicsConfig(
     val rollingResistance: Double = 65.0,
     val speedLimitSoftness: Double = 0.18,
     val yawAssistMinSpeed: Double = 0.8,
-    val yawAssistMaxSpeed: Double = 12.0
+    val yawAssistMaxSpeed: Double = 12.0,
+    val driftMinSpeed: Double = 5.0,
+    val driftStartSteer: Double = 0.2,
+    val driftFrontGripScale: Double = 0.9,
+    val driftRearGripScale: Double = 0.48,
+    val driftYawAssist: Double = yawAssist * 1.35,
+    val driftBrakeScale: Double = 0.16,
+    val driftDriveScale: Double = 0.82,
+    val driftExitSmoothingTime: Double = 0.18
 ) {
     companion object {
         val DEBUG_KART = KartPhysicsConfig(
@@ -68,7 +76,15 @@ data class KartPhysicsConfig(
             rollingResistance = 55.0,
             speedLimitSoftness = 0.22,
             yawAssistMinSpeed = 1.2,
-            yawAssistMaxSpeed = 14.0
+            yawAssistMaxSpeed = 14.0,
+            driftMinSpeed = 5.0,
+            driftStartSteer = 0.22,
+            driftFrontGripScale = 0.88,
+            driftRearGripScale = 0.42,
+            driftYawAssist = 3600.0,
+            driftBrakeScale = 0.1,
+            driftDriveScale = 0.9,
+            driftExitSmoothingTime = 0.2
         )
     }
 }
@@ -81,5 +97,8 @@ data class KartRuntimeState(
     var debugThrottle: Double = 0.0,
     var smoothedSteerRad: Double = 0.0,
     var debugForwardSpeed: Double = 0.0,
-    var debugLateralSlip: Double = 0.0
+    var debugLateralSlip: Double = 0.0,
+    var drifting: Boolean = false,
+    var driftDirection: Double = 0.0,
+    var driftExitTimeRemaining: Double = 0.0
 )
