@@ -303,9 +303,12 @@ object BikePhysicsSolver {
             applyDriveForce(body, front, throttle, config, FRONT_STEP_TRACTION_SCALE * driveScale)
         }
 
-        val brakeScale = if (drifting) config.driftBrakeStrengthScale else 1.0
-        applyBrake(body, front, input.brake * 0.65 * brakeScale, config)
-        applyBrake(body, rear, input.brake * 0.35 * brakeScale, config)
+        if (drifting) {
+            applyBrake(body, rear, input.brake * config.driftBrakeStrengthScale, config)
+        } else {
+            applyBrake(body, front, input.brake * 0.65, config)
+            applyBrake(body, rear, input.brake * 0.35, config)
+        }
     }
 
     private fun applyDriveForce(

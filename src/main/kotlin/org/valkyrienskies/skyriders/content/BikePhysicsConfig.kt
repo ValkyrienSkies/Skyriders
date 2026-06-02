@@ -97,7 +97,7 @@ data class BikePhysicsConfig(
             driftMinSpeed = 4.0,
             driftRearGripScale = 0.42,
             driftFrontGripScale = 0.9,
-            driftBrakeStrengthScale = 0.18,
+            driftBrakeStrengthScale = 0.04,
             driftDriveForceScale = 0.85,
             driftYawAssist = 4200.0,
             driftBoostEnabled = true,

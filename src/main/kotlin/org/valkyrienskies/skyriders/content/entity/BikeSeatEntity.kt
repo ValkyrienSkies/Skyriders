@@ -116,14 +116,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
         val passenger = controllingPassenger ?: return
         BikeManager.updateInput(level().dimensionId, bodyId) {
-            BikeInput(
-                steer = passenger.xxa.toDouble(),
-                throttle = passenger.zza.toDouble(),
-                brake = it.brake,
-                jump = it.jump,
-                pitch = it.pitch,
-                riderPresent = true
-            )
+            it.copy(riderPresent = true)
         }
     }
 
