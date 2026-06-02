@@ -21,6 +21,7 @@ import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.VehicleManager
 import org.joml.Vector3d
 
 object SkyridersCommands {
@@ -98,7 +99,7 @@ object SkyridersCommands {
     }
 
     private fun bikeIdSuggestions(): Iterable<String> {
-        return BikeManager.registeredBikeIds.flatMap { id ->
+        return VehicleManager.registeredVehicleIds.flatMap { id ->
             if (id.namespace == SkyridersMod.MOD_ID) {
                 listOf(id.path, id.toString())
             } else {
@@ -146,8 +147,8 @@ object SkyridersCommands {
                 return 0
             }
 
-        val bike = try {
-            BikeManager.createBike(bikeId, level, Vector3d(pos.x, pos.y, pos.z))
+        val vehicle = try {
+            VehicleManager.createVehicle(bikeId, level, Vector3d(pos.x, pos.y, pos.z))
         } catch (ex: IllegalArgumentException) {
             source.sendFailure(Component.literal(ex.message ?: "Unknown bike id: $bikeId"))
             return 0
@@ -157,7 +158,7 @@ object SkyridersCommands {
         }
 
         source.sendSuccess(
-            { Component.literal("Summoned ${bike.definition.displayName} (${bike.id}) as VS body ${bike.bodyId}") },
+            { Component.literal("Summoned ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) as VS body ${vehicle.bodyId}") },
             true
         )
         return 1

@@ -1,0 +1,276 @@
+package org.valkyrienskies.skyriders.content
+
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.level.Level
+import org.joml.Vector3d
+import org.valkyrienskies.core.api.bodies.PhysVsBody
+import org.valkyrienskies.core.api.bodies.properties.BodyId
+import org.valkyrienskies.core.api.bodies.properties.BodyTransform
+import org.valkyrienskies.core.api.world.PhysLevel
+
+interface IVehicle {
+    val id: String
+    val bodyId: BodyId
+    val level: Level
+    val vehicleDefinition: VehicleDefinition
+    val vehicleState: VehicleRuntimeState
+
+    fun getRenderTransform(): BodyTransform
+
+    fun tick()
+    fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: VehicleInput, dt: Double)
+    fun toVehicleSaveRecord(): VehicleSaveRecord
+}
+
+fun interface VehicleFactory {
+    fun create(
+        bodyId: BodyId,
+        level: Level,
+        definition: VehicleDefinition,
+        state: VehicleRuntimeState
+    ): IVehicle
+}
+
+data class VehicleDefinition(
+    val id: ResourceLocation,
+    val displayName: String,
+    val body: VehicleBodyDefinition,
+    val render: VehicleRenderDefinition,
+    val sounds: VehicleSoundDefinition,
+    val seats: List<VehicleSeatDefinition>,
+    val interactions: VehicleInteractionDefinition,
+    val behavior: VehicleBehaviorDefinition
+)
+
+data class VehicleBodyDefinition(
+    val collisionBoxSize: Vector3d,
+    val collisionBoxOffset: Vector3d,
+    val mass: Double,
+    val centerOfMassOffset: Vector3d = Vector3d()
+)
+
+data class VehicleRenderDefinition(
+    val model: ResourceLocation,
+    val texture: ResourceLocation,
+    val seatTexture: ResourceLocation = texture,
+    val showWheels: Boolean = true,
+    val frontWheelModel: ResourceLocation? = null,
+    val rearWheelModel: ResourceLocation? = null,
+    val frontWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 0.0),
+    val rearWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 1.0),
+    val modelYawRad: Double = Math.PI,
+    val modelOffset: Vector3d = Vector3d(),
+    val modelScale: Double = 1.0,
+    val wheelSpinVisualScale: Double = 1.0,
+    val wheelSpinSmoothingTime: Double = 0.08,
+    val exhaustLocalPos: Vector3d = Vector3d(),
+    val tireParticleLocalYOffset: Double = 0.0
+)
+
+data class VehicleSoundDefinition(
+    val engineLoop: ResourceLocation? = null,
+    val engineStart: ResourceLocation? = null,
+    val engineStop: ResourceLocation? = null,
+    val idleVolume: Double = 0.18,
+    val speedVolume: Double = 0.18,
+    val throttleVolume: Double = 0.16,
+    val idlePitch: Double = 0.72,
+    val speedPitch: Double = 0.42,
+    val throttlePitch: Double = 0.35,
+    val minPitch: Double = 0.7,
+    val maxPitch: Double = 1.45,
+    val referenceSpeed: Double = 18.0
+)
+
+data class VehicleInteractionDefinition(
+    val zones: List<VehicleInteractionZone>
+) {
+    fun zone(id: String): VehicleInteractionZone? = zones.firstOrNull { it.id == id }
+
+    companion object {
+        const val BODY = "body"
+        const val SEAT = "seat"
+        const val FUEL_CAP = "fuel_cap"
+    }
+}
+
+data class VehicleInteractionZone(
+    val id: String,
+    val center: Vector3d,
+    val size: Vector3d,
+    val actions: Set<VehicleInteractionAction> = emptySet()
+)
+
+enum class VehicleInteractionAction {
+    MOUNT,
+    PICK_UP,
+    OPEN_DOOR,
+    REFUEL,
+    STORAGE,
+    ENGINE_TOGGLE
+}
+
+data class VehicleSeatDefinition(
+    val id: String,
+    val localPos: Vector3d,
+    val role: VehicleSeatRole,
+    val interactionZone: String
+)
+
+enum class VehicleSeatRole {
+    DRIVER,
+    PASSENGER
+}
+
+sealed interface VehicleBehaviorDefinition
+
+data class BikeVehicleBehaviorDefinition(
+    val physics: BikePhysicsConfig
+) : VehicleBehaviorDefinition
+
+data class VehicleInput(
+    val steer: Double = 0.0,
+    val throttle: Double = 0.0,
+    val brake: Double = 0.0,
+    val jump: Double = 0.0,
+    val pitch: Double = 0.0,
+    val handbrake: Double = 0.0,
+    val riderPresent: Boolean = false
+) {
+    fun clamped(): VehicleInput = copy(
+        steer = steer.coerceIn(-1.0, 1.0),
+        throttle = throttle.coerceIn(-1.0, 1.0),
+        brake = brake.coerceIn(0.0, 1.0),
+        jump = jump.coerceIn(0.0, 1.0),
+        pitch = pitch.coerceIn(-1.0, 1.0),
+        handbrake = handbrake.coerceIn(0.0, 1.0)
+    )
+
+    fun toBikeInput(): BikeInput = BikeInput(
+        steer = steer,
+        throttle = throttle,
+        brake = brake.coerceAtLeast(handbrake),
+        jump = jump,
+        pitch = pitch,
+        riderPresent = riderPresent
+    ).clamped()
+
+    companion object {
+        val EMPTY = VehicleInput()
+    }
+}
+
+data class VehicleRuntimeState(
+    var engineOn: Boolean = false
+)
+
+data class VehicleSaveRecord(
+    val bodyId: BodyId,
+    val vehicleType: String,
+    val engineOn: Boolean
+)
+
+object VehicleDefinitions {
+    val ids: Set<ResourceLocation>
+        get() = BikeDefinitions.ids
+
+    fun get(id: ResourceLocation): VehicleDefinition? {
+        return BikeDefinitions.get(id)?.toVehicleDefinition()
+    }
+
+    fun resolveSavedId(savedId: String): ResourceLocation? {
+        return BikeDefinitions.resolveSavedId(savedId)
+    }
+}
+
+fun BikeInput.toVehicleInput(): VehicleInput = VehicleInput(
+    steer = steer,
+    throttle = throttle,
+    brake = brake,
+    jump = jump,
+    pitch = pitch,
+    riderPresent = riderPresent
+).clamped()
+
+fun BikeRuntimeState.toVehicleRuntimeState(): VehicleRuntimeState = VehicleRuntimeState(
+    engineOn = engineOn
+)
+
+fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
+    bodyId = bodyId,
+    vehicleType = bikeType,
+    engineOn = engineOn
+)
+
+fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
+    id = id,
+    displayName = displayName,
+    body = VehicleBodyDefinition(
+        collisionBoxSize = Vector3d(config.collisionBoxSize),
+        collisionBoxOffset = Vector3d(config.collisionBoxOffset),
+        mass = config.mass,
+        centerOfMassOffset = Vector3d(0.0, -0.2, 0.0)
+    ),
+    render = render.toVehicleRenderDefinition(),
+    sounds = sounds.toVehicleSoundDefinition(),
+    seats = listOf(
+        VehicleSeatDefinition(
+            id = VehicleInteractionDefinition.SEAT,
+            localPos = Vector3d(0.0, seatOffset, 0.0),
+            role = VehicleSeatRole.DRIVER,
+            interactionZone = VehicleInteractionDefinition.SEAT
+        )
+    ),
+    interactions = interactions.toVehicleInteractionDefinition(),
+    behavior = BikeVehicleBehaviorDefinition(config)
+)
+
+fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = VehicleRenderDefinition(
+    model = model,
+    texture = texture,
+    seatTexture = seatTexture,
+    showWheels = showWheels,
+    frontWheelModel = frontWheelModel,
+    rearWheelModel = rearWheelModel,
+    frontWheelPivot = Vector3d(frontWheelPivot),
+    rearWheelPivot = Vector3d(rearWheelPivot),
+    modelYawRad = modelYawRad,
+    modelOffset = Vector3d(modelOffset),
+    modelScale = modelScale,
+    wheelSpinVisualScale = wheelSpinVisualScale,
+    wheelSpinSmoothingTime = wheelSpinSmoothingTime,
+    exhaustLocalPos = Vector3d(exhaustLocalPos),
+    tireParticleLocalYOffset = tireParticleLocalYOffset
+)
+
+fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = VehicleSoundDefinition(
+    engineLoop = engineLoop,
+    engineStart = engineStart,
+    engineStop = engineStop,
+    idleVolume = idleVolume,
+    speedVolume = speedVolume,
+    throttleVolume = throttleVolume,
+    idlePitch = idlePitch,
+    speedPitch = speedPitch,
+    throttlePitch = throttlePitch,
+    minPitch = minPitch,
+    maxPitch = maxPitch,
+    referenceSpeed = referenceSpeed
+)
+
+fun BikeInteractionDefinition.toVehicleInteractionDefinition(): VehicleInteractionDefinition =
+    VehicleInteractionDefinition(
+        zones = zones.map { zone ->
+            VehicleInteractionZone(
+                id = zone.id,
+                center = Vector3d(zone.center),
+                size = Vector3d(zone.size),
+                actions = when (zone.id) {
+                    BikeInteractionDefinition.SEAT -> setOf(VehicleInteractionAction.MOUNT)
+                    BikeInteractionDefinition.BODY -> setOf(VehicleInteractionAction.PICK_UP)
+                    BikeInteractionDefinition.FUEL_CAP -> setOf(VehicleInteractionAction.REFUEL)
+                    else -> emptySet()
+                }
+            )
+        }
+    )

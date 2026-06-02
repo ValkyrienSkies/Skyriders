@@ -8,14 +8,14 @@ import org.valkyrienskies.core.api.bodies.properties.BodyKinematics
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform
 import org.valkyrienskies.core.api.world.PhysLevel
 
-interface IBike {
-    val id: String
+interface IBike : IVehicle {
+    override val id: String
     val definition: BikeDefinition
 
-    val bodyId: BodyId
+    override val bodyId: BodyId
 
     val boundingBox: AABB
-    val level: Level
+    override val level: Level
     val config: BikePhysicsConfig
     val state: BikeRuntimeState
 
@@ -24,12 +24,24 @@ interface IBike {
     fun getKinematics(): BodyKinematics
     fun getTransform(): BodyTransform
 
-    fun getRenderTransform(): BodyTransform
+    override fun getRenderTransform(): BodyTransform
 
     fun getTilt(): Double
 
-    fun tick()
+    override fun tick()
     fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: BikeInput, dt: Double)
+
+    override val vehicleDefinition: VehicleDefinition
+        get() = definition.toVehicleDefinition()
+
+    override val vehicleState: VehicleRuntimeState
+        get() = state.toVehicleRuntimeState()
+
+    override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: VehicleInput, dt: Double) {
+        physTick(physLevel, body, input.toBikeInput(), dt)
+    }
+
+    override fun toVehicleSaveRecord(): VehicleSaveRecord = toSaveRecord().toVehicleSaveRecord()
 
     fun toSaveRecord(): BikeSaveRecord = BikeSaveRecord(
         bodyId = bodyId,

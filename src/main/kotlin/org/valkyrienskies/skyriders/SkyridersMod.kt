@@ -21,7 +21,7 @@ import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeLifecycle
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
-import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
@@ -84,7 +84,7 @@ object SkyridersMod {
         event.enqueueWork {
             SkyridersNetwork.register()
             vsApi.physTickEvent.on { physTickEvent ->
-                BikeManager.physTick(physTickEvent.world, physTickEvent.delta)
+                VehicleManager.physTick(physTickEvent.world, physTickEvent.delta)
                 BikeInteractionHandler.physTick(physTickEvent.world, physTickEvent.delta)
             }
         }
