@@ -20,7 +20,7 @@ class HoverBike(
     level: Level,
     definition: BikeDefinition,
     state: BikeRuntimeState = BikeRuntimeState()
-) : DebugBike(bodyId, boundingBox, level, definition, state) {
+) : DefaultBike(bodyId, boundingBox, level, definition, state) {
     override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: BikeInput, dt: Double) {
         HoverBikePhysics.update(body, physLevel, input, config, state, dt)
     }

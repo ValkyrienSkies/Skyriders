@@ -5,7 +5,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.skyriders.SkyridersMod
-import org.valkyrienskies.skyriders.content.bikes.DebugBike
+import org.valkyrienskies.skyriders.content.bikes.DefaultBike
 import org.valkyrienskies.skyriders.content.bikes.HoverBike
 
 fun interface BikeFactory {
@@ -23,14 +23,14 @@ data class BikeDefinition(
     val displayName: String,
     val config: BikePhysicsConfig,
     val seatOffset: Double,
-    val factory: BikeFactory = BikeFactory(::DebugBike)
+    val factory: BikeFactory = BikeFactory(::DefaultBike)
 )
 
 object BikeDefinitions {
     val DEBUG_BIKE = BikeDefinition(
         id = ResourceLocation(SkyridersMod.MOD_ID, "debug_bike"),
-        displayName = "Debug Bike",
-        config = BikePhysicsConfig.DEBUG_MOTORCYCLE,
+        displayName = "Motorcycle",
+        config = BikePhysicsConfig.MOTORCYCLE,
         seatOffset = 0.22
     )
 

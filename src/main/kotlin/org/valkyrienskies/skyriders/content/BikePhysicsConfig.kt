@@ -77,7 +77,7 @@ data class BikePhysicsConfig(
     val jumpReleaseDuration: Double
 ) {
     companion object {
-        val DEBUG_MOTORCYCLE = BikePhysicsConfig(
+        val MOTORCYCLE = BikePhysicsConfig(
             mass = 250.0,
             collisionBoxSize = Vector3d(0.45, 0.55, 1.2),
             collisionBoxOffset = Vector3d(0.0, 0.25, -0.1),
@@ -152,7 +152,7 @@ data class BikePhysicsConfig(
             jumpReleaseDuration = 0.06
         )
 
-        val DIRT_BIKE = DEBUG_MOTORCYCLE.copy(
+        val DIRT_BIKE = MOTORCYCLE.copy(
             mass = 210.0,
             suspensionRestLength = 0.32,
             suspensionTravel = 0.62,
@@ -180,7 +180,7 @@ data class BikePhysicsConfig(
             driftBoostForces = listOf(4600.0, 7000.0, 9800.0)
         )
 
-        val CRUISER = DEBUG_MOTORCYCLE.copy(
+        val CRUISER = MOTORCYCLE.copy(
             mass = 360.0,
             collisionBoxSize = Vector3d(0.55, 0.6, 1.45),
             collisionBoxOffset = Vector3d(0.0, 0.25, -0.05),
@@ -224,7 +224,7 @@ data class BikePhysicsConfig(
             jumpForwardBoostForce = 4200.0
         )
 
-        val HOVER_BIKE = DEBUG_MOTORCYCLE.copy(
+        val HOVER_BIKE = MOTORCYCLE.copy(
             mass = 230.0,
             collisionBoxSize = Vector3d(0.5, 0.5, 1.25),
             collisionBoxOffset = Vector3d(0.0, 0.28, -0.05),
