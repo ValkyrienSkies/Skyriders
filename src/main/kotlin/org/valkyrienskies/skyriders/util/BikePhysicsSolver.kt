@@ -9,10 +9,11 @@ import org.valkyrienskies.skyriders.content.BikePhysicsConfig
 import org.valkyrienskies.skyriders.content.BikeRuntimeState
 import org.valkyrienskies.skyriders.content.WheelContact
 import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.tanh
+import kotlin.math.sin
 
 object BikePhysicsSolver {
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
@@ -39,6 +40,7 @@ object BikePhysicsSolver {
         val forwardSpeed = safeDot(body.kinematics.velocity, forward)
         val riderPresent = input.riderPresent
         val activeInput = if (riderPresent) input else BikeInput.EMPTY
+        val drifting = isDrifting(activeInput, forwardSpeed, config)
         val frontSteerRad = computeFrontSteerAngle(forwardSpeed, activeInput.steer, config)
 
         val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
@@ -68,10 +70,10 @@ object BikePhysicsSolver {
 
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
-        applyTireForces(body, frontContact, config)
-        applyTireForces(body, rearContact, config)
+        applyTireForces(body, frontContact, true, drifting, config)
+        applyTireForces(body, rearContact, false, drifting, config)
         if (riderPresent) {
-            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, config)
+            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, drifting, config)
         } else {
             applyParkingBrake(body, frontContact, config)
             applyParkingBrake(body, rearContact, config)
@@ -95,6 +97,7 @@ object BikePhysicsSolver {
                 applyGroundedPitchControl(body, activeInput, forward, right, terrainUp, forwardSpeed, config)
                 if (frontContact.grounded) {
                     applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                    applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, drifting, config)
                 }
                 applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
             } else {
@@ -243,15 +246,31 @@ object BikePhysicsSolver {
         )
     }
 
-    private fun applyTireForces(body: PhysVsBody, contact: WheelContact, config: BikePhysicsConfig) {
+    private fun applyTireForces(
+        body: PhysVsBody,
+        contact: WheelContact,
+        isFrontWheel: Boolean,
+        drifting: Boolean,
+        config: BikePhysicsConfig
+    ) {
         if (!contact.grounded) return
 
         val lateralVel = safeDot(contact.wheelVelocityWorld, contact.wheelRightWorld)
         val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val safeSpeed = max(abs(forwardVel), 2.0)
         val slip = lateralVel / safeSpeed
-        val gripFactor = tanh(slip * config.slipSharpness)
-        val maxLateralForce = contact.normalForceEstimate * config.frictionCoefficient * config.lateralGrip
+        val gripFactor = pacejkaLateralGrip(slip, config)
+        val driftGripScale = if (!drifting) {
+            1.0
+        } else if (isFrontWheel) {
+            config.driftFrontGripScale
+        } else {
+            config.driftRearGripScale
+        }
+        val maxLateralForce = contact.normalForceEstimate *
+            config.frictionCoefficient *
+            config.lateralGrip *
+            driftGripScale
         val lateralForceMag = -gripFactor * maxLateralForce
 
         applyContactForce(
@@ -267,17 +286,20 @@ object BikePhysicsSolver {
         front: WheelContact,
         rear: WheelContact,
         input: BikeInput,
+        drifting: Boolean,
         config: BikePhysicsConfig
     ) {
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
+        val driveScale = if (drifting) config.driftDriveForceScale else 1.0
         if (rear.grounded && throttle != 0.0) {
-            applyDriveForce(body, rear, throttle, config, 1.0)
+            applyDriveForce(body, rear, throttle, config, driveScale)
         } else if (front.grounded && throttle > 0.0) {
-            applyDriveForce(body, front, throttle, config, FRONT_STEP_TRACTION_SCALE)
+            applyDriveForce(body, front, throttle, config, FRONT_STEP_TRACTION_SCALE * driveScale)
         }
 
-        applyBrake(body, front, input.brake * 0.65, config)
-        applyBrake(body, rear, input.brake * 0.35, config)
+        val brakeScale = if (drifting) config.driftBrakeStrengthScale else 1.0
+        applyBrake(body, front, input.brake * 0.65 * brakeScale, config)
+        applyBrake(body, rear, input.brake * 0.35 * brakeScale, config)
     }
 
     private fun applyDriveForce(
@@ -389,6 +411,36 @@ object BikePhysicsSolver {
         if (yawTorque != 0.0) {
             safeApplyWorldTorque(body, Vector3d(terrainUp).mul(yawTorque))
         }
+    }
+
+    private fun applyDriftAssist(
+        body: PhysVsBody,
+        input: BikeInput,
+        speed: Double,
+        terrainUp: Vector3d,
+        drifting: Boolean,
+        config: BikePhysicsConfig
+    ) {
+        if (!drifting) return
+
+        val direction = when {
+            speed < -0.5 -> -1.0
+            speed > 0.5 -> 1.0
+            input.throttle < -0.05 -> -1.0
+            else -> 1.0
+        }
+        val speedAmount = smoothstep(config.driftMinSpeed, config.wheelTopSpeed, abs(speed))
+        val steer = input.steer.coerceIn(-1.0, 1.0)
+        val yawTorque = steer * direction * config.driftYawAssist * speedAmount * input.brake.coerceIn(0.0, 1.0)
+        if (yawTorque != 0.0) {
+            safeApplyWorldTorque(body, Vector3d(terrainUp).mul(yawTorque))
+        }
+    }
+
+    private fun isDrifting(input: BikeInput, forwardSpeed: Double, config: BikePhysicsConfig): Boolean {
+        return input.brake > 0.05 &&
+            abs(input.steer) > 0.15 &&
+            abs(forwardSpeed) >= config.driftMinSpeed
     }
 
     private fun applyGroundedPitchControl(
@@ -652,6 +704,14 @@ object BikePhysicsSolver {
     private fun projectOntoPlane(vector: Vector3dc, normal: Vector3dc, fallback: Vector3dc): Vector3d {
         val projected = Vector3d(vector).sub(Vector3d(normal).mul(safeDot(vector, normal)))
         return safeNormalize(projected, fallback)
+    }
+
+    private fun pacejkaLateralGrip(slip: Double, config: BikePhysicsConfig): Double {
+        val x = slip.coerceIn(-3.0, 3.0)
+        val b = config.tirePacejkaB * (config.slipSharpness / 3.0)
+        val bx = b * x
+        val shaped = bx - config.tirePacejkaE * (bx - atan(bx))
+        return sin(config.tirePacejkaC * atan(shaped)).coerceIn(-1.0, 1.0)
     }
 
     private fun smoothstep(edge0: Double, edge1: Double, value: Double): Double {
