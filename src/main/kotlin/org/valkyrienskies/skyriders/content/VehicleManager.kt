@@ -293,6 +293,24 @@ object VehicleManager {
         return vehicle
     }
 
+    fun applyVisualSuspensionState(
+        level: Level,
+        bodyId: BodyId,
+        frontWheelSuspensionOffset: Double,
+        rearWheelSuspensionOffset: Double
+    ) {
+        when (val vehicle = getVehicle(level, bodyId)) {
+            is IBike -> {
+                vehicle.state.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+                vehicle.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+            }
+            is KartVehicle -> {
+                vehicle.kartState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+                vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+            }
+        }
+    }
+
     private fun vehicleMap(level: Level): ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>> {
         return if (level.isClientSide) clientVehiclesByDimension else serverVehiclesByDimension
     }

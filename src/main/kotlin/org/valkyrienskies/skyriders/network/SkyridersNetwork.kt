@@ -212,6 +212,16 @@ object SkyridersNetwork {
             is IBike -> vehicle.state.driftBoostTimeRemaining
             else -> 0.0
         }
+        val frontWheelSuspensionOffset = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.frontWheelSuspensionOffset
+            is IBike -> vehicle.state.frontWheelSuspensionOffset
+            else -> 0.0
+        }
+        val rearWheelSuspensionOffset = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.rearWheelSuspensionOffset
+            is IBike -> vehicle.state.rearWheelSuspensionOffset
+            else -> 0.0
+        }
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             VehicleDebugPacket(
@@ -229,7 +239,9 @@ object SkyridersNetwork {
                 lateralSlip = lateralSlip,
                 forwardSpeed = forwardSpeed,
                 steerAngleRad = steerAngleRad,
-                driftBoostTimeRemaining = driftBoostTimeRemaining
+                driftBoostTimeRemaining = driftBoostTimeRemaining,
+                frontWheelSuspensionOffset = frontWheelSuspensionOffset,
+                rearWheelSuspensionOffset = rearWheelSuspensionOffset
             )
         )
     }
@@ -246,7 +258,9 @@ object SkyridersNetwork {
                         visualLeanRad = state.visualLeanRad,
                         visualSteerRad = state.visualSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
-                        rearWheelSpin = state.rearWheelSpin
+                        rearWheelSpin = state.rearWheelSpin,
+                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
                     )
                 }
             )
@@ -594,7 +608,9 @@ object SkyridersNetwork {
         val lateralSlip: Double,
         val forwardSpeed: Double,
         val steerAngleRad: Double,
-        val driftBoostTimeRemaining: Double
+        val driftBoostTimeRemaining: Double,
+        val frontWheelSuspensionOffset: Double,
+        val rearWheelSuspensionOffset: Double
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -612,6 +628,8 @@ object SkyridersNetwork {
             buf.writeDouble(forwardSpeed)
             buf.writeDouble(steerAngleRad)
             buf.writeDouble(driftBoostTimeRemaining)
+            buf.writeDouble(frontWheelSuspensionOffset)
+            buf.writeDouble(rearWheelSuspensionOffset)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -621,6 +639,13 @@ object SkyridersNetwork {
                     Runnable {
                         BikeDebugOverlay.updateVehicle(this)
                         BikeClientEffects.updateVehicleTelemetry(this)
+                        val level = net.minecraft.client.Minecraft.getInstance().level ?: return@Runnable
+                        VehicleManager.applyVisualSuspensionState(
+                            level = level,
+                            bodyId = bodyId,
+                            frontWheelSuspensionOffset = frontWheelSuspensionOffset,
+                            rearWheelSuspensionOffset = rearWheelSuspensionOffset
+                        )
                     }
                 }
             }
@@ -648,7 +673,9 @@ object SkyridersNetwork {
                     lateralSlip = buf.readDouble(),
                     forwardSpeed = buf.readDouble(),
                     steerAngleRad = buf.readDouble(),
-                    driftBoostTimeRemaining = buf.readDouble()
+                    driftBoostTimeRemaining = buf.readDouble(),
+                    frontWheelSuspensionOffset = buf.readDouble(),
+                    rearWheelSuspensionOffset = buf.readDouble()
                 )
             }
 
@@ -668,6 +695,8 @@ object SkyridersNetwork {
                 buf.writeDouble(state.visualSteerRad)
                 buf.writeDouble(state.frontWheelSpin)
                 buf.writeDouble(state.rearWheelSpin)
+                buf.writeDouble(state.frontWheelSuspensionOffset)
+                buf.writeDouble(state.rearWheelSuspensionOffset)
             }
         }
 
@@ -685,7 +714,9 @@ object SkyridersNetwork {
                                 visualLeanRad = state.visualLeanRad,
                                 visualSteerRad = state.visualSteerRad,
                                 frontWheelSpin = state.frontWheelSpin,
-                                rearWheelSpin = state.rearWheelSpin
+                                rearWheelSpin = state.rearWheelSpin,
+                                frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                                rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
                             )
                         }
                     }
@@ -708,7 +739,9 @@ object SkyridersNetwork {
                         visualLeanRad = buf.readDouble(),
                         visualSteerRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
-                        rearWheelSpin = buf.readDouble()
+                        rearWheelSpin = buf.readDouble(),
+                        frontWheelSuspensionOffset = buf.readDouble(),
+                        rearWheelSuspensionOffset = buf.readDouble()
                     )
                 }
                 return BikeVisualStatePacket(states)
@@ -726,6 +759,8 @@ object SkyridersNetwork {
         val visualLeanRad: Double,
         val visualSteerRad: Double,
         val frontWheelSpin: Double,
-        val rearWheelSpin: Double
+        val rearWheelSpin: Double,
+        val frontWheelSuspensionOffset: Double,
+        val rearWheelSuspensionOffset: Double
     )
 }

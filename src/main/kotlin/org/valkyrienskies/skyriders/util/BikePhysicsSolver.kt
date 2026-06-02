@@ -133,7 +133,7 @@ object BikePhysicsSolver {
             state.wasJumpHeld = jumpHeld
         }
         dampExtremeAngularVelocity(body, config)
-        updateVisualState(state, targetLean, frontSteerRad, forwardSpeed, config, dt, grounded)
+        updateVisualState(state, targetLean, frontSteerRad, forwardSpeed, frontContact, rearContact, config, dt, grounded)
 
         state.lastGrounded = grounded
     }
@@ -839,6 +839,8 @@ object BikePhysicsSolver {
         targetLean: Double,
         targetSteer: Double,
         forwardSpeed: Double,
+        frontContact: WheelContact,
+        rearContact: WheelContact,
         config: BikePhysicsConfig,
         dt: Double,
         grounded: Boolean
@@ -849,7 +851,25 @@ object BikePhysicsSolver {
         state.visualSteerRad = lerp(state.visualSteerRad, targetSteer, steerAlpha)
         state.frontWheelSpin += forwardSpeed / config.wheelRadius * dt
         state.rearWheelSpin += forwardSpeed / config.wheelRadius * dt
+        state.frontWheelSuspensionOffset = lerp(
+            state.frontWheelSuspensionOffset,
+            visualSuspensionOffset(frontContact, config.suspensionTravel),
+            alpha
+        )
+        state.rearWheelSuspensionOffset = lerp(
+            state.rearWheelSuspensionOffset,
+            visualSuspensionOffset(rearContact, config.suspensionTravel),
+            alpha
+        )
         state.lastGrounded = grounded
+    }
+
+    private fun visualSuspensionOffset(contact: WheelContact, suspensionTravel: Double): Double {
+        return if (contact.grounded) {
+            -contact.compression.coerceIn(0.0, 1.0) * suspensionTravel
+        } else {
+            0.0
+        }
     }
 
     private fun updateDebugState(

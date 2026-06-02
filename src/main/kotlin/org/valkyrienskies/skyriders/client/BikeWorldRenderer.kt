@@ -19,6 +19,7 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
+import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import kotlin.math.exp
 
 object BikeWorldRenderer {
@@ -111,6 +112,11 @@ object BikeWorldRenderer {
                             VehicleWheelSpinSource.REAR -> visualState.rearWheelSpin
                             VehicleWheelSpinSource.NONE -> 0.0
                         },
+                        suspensionOffset = when (wheelPart.spinSource) {
+                            VehicleWheelSpinSource.FRONT -> visualState.frontWheelSuspensionOffset
+                            VehicleWheelSpinSource.REAR -> visualState.rearWheelSuspensionOffset
+                            VehicleWheelSpinSource.NONE -> 0.0
+                        },
                         packedLight = packedLight
                     )
                 }
@@ -120,32 +126,29 @@ object BikeWorldRenderer {
     }
 
     private fun updateRenderVisualState(vehicle: IVehicle): RenderVisualState {
-        val bike = vehicle as? IBike ?: return RenderVisualState(
-            lastRenderNanos = System.nanoTime(),
-            lastRawFrontWheelSpin = 0.0,
-            lastRawRearWheelSpin = 0.0,
-            targetFrontWheelSpin = 0.0,
-            targetRearWheelSpin = 0.0,
-            frontWheelSpin = 0.0,
-            rearWheelSpin = 0.0
-        )
         val now = System.nanoTime()
-        val state = visualStatesByBodyId.getOrPut(bike.bodyId) {
+        val wheelSpin = wheelSpin(vehicle)
+        val suspensionOffset = suspensionOffset(vehicle)
+        val render = vehicle.vehicleDefinition.render
+        val scale = render.wheelSpinVisualScale.takeIf { it.isFinite() && it >= 0.0 } ?: 1.0
+        val state = visualStatesByBodyId.getOrPut(vehicle.bodyId) {
             RenderVisualState(
                 lastRenderNanos = now,
-                lastRawFrontWheelSpin = bike.state.frontWheelSpin,
-                lastRawRearWheelSpin = bike.state.rearWheelSpin,
-                targetFrontWheelSpin = bike.state.frontWheelSpin * bike.definition.render.wheelSpinVisualScale,
-                targetRearWheelSpin = bike.state.rearWheelSpin * bike.definition.render.wheelSpinVisualScale,
-                frontWheelSpin = bike.state.frontWheelSpin * bike.definition.render.wheelSpinVisualScale,
-                rearWheelSpin = bike.state.rearWheelSpin * bike.definition.render.wheelSpinVisualScale
+                lastRawFrontWheelSpin = wheelSpin.front,
+                lastRawRearWheelSpin = wheelSpin.rear,
+                targetFrontWheelSpin = wheelSpin.front * scale,
+                targetRearWheelSpin = wheelSpin.rear * scale,
+                frontWheelSpin = wheelSpin.front * scale,
+                rearWheelSpin = wheelSpin.rear * scale,
+                targetFrontWheelSuspensionOffset = suspensionOffset.front,
+                targetRearWheelSuspensionOffset = suspensionOffset.rear,
+                frontWheelSuspensionOffset = suspensionOffset.front,
+                rearWheelSuspensionOffset = suspensionOffset.rear
             )
         }
 
-        val render = bike.definition.render
-        val scale = render.wheelSpinVisualScale.takeIf { it.isFinite() && it >= 0.0 } ?: 1.0
-        val rawFront = bike.state.frontWheelSpin
-        val rawRear = bike.state.rearWheelSpin
+        val rawFront = wheelSpin.front
+        val rawRear = wheelSpin.rear
         if (rawFront.isFinite()) {
             val delta = rawFront - state.lastRawFrontWheelSpin
             if (delta.isFinite()) {
@@ -160,6 +163,8 @@ object BikeWorldRenderer {
             }
             state.lastRawRearWheelSpin = rawRear
         }
+        state.targetFrontWheelSuspensionOffset = finiteOrZero(suspensionOffset.front)
+        state.targetRearWheelSuspensionOffset = finiteOrZero(suspensionOffset.rear)
 
         val dt = ((now - state.lastRenderNanos) / 1.0e9).coerceIn(0.0, 0.1)
         state.lastRenderNanos = now
@@ -167,7 +172,26 @@ object BikeWorldRenderer {
         val alpha = 1.0 - exp(-dt / smoothingTime)
         state.frontWheelSpin += (state.targetFrontWheelSpin - state.frontWheelSpin) * alpha
         state.rearWheelSpin += (state.targetRearWheelSpin - state.rearWheelSpin) * alpha
+        state.frontWheelSuspensionOffset += (state.targetFrontWheelSuspensionOffset - state.frontWheelSuspensionOffset) * alpha
+        state.rearWheelSuspensionOffset += (state.targetRearWheelSuspensionOffset - state.rearWheelSuspensionOffset) * alpha
         return state
+    }
+
+    private fun wheelSpin(vehicle: IVehicle): WheelPair {
+        val bike = vehicle as? IBike
+        return if (bike != null) {
+            WheelPair(bike.state.frontWheelSpin, bike.state.rearWheelSpin)
+        } else {
+            WheelPair(0.0, 0.0)
+        }
+    }
+
+    private fun suspensionOffset(vehicle: IVehicle): WheelPair {
+        return when (vehicle) {
+            is IBike -> WheelPair(vehicle.state.frontWheelSuspensionOffset, vehicle.state.rearWheelSuspensionOffset)
+            is KartVehicle -> WheelPair(vehicle.kartState.frontWheelSuspensionOffset, vehicle.kartState.rearWheelSuspensionOffset)
+            else -> WheelPair(0.0, 0.0)
+        }
     }
 
     private fun renderWheelPart(
@@ -177,9 +201,13 @@ object BikeWorldRenderer {
         pivot: Vector3d,
         steerRad: Double,
         spinRad: Double,
+        suspensionOffset: Double,
         packedLight: Int
     ) {
         poseStack.pushPose()
+        if (suspensionOffset.isFinite() && suspensionOffset != 0.0) {
+            poseStack.translate(0.0, suspensionOffset, 0.0)
+        }
         poseStack.translate(pivot.x, pivot.y, pivot.z)
         if (steerRad.isFinite() && steerRad != 0.0) {
             poseStack.mulPose(Axis.YP.rotation(steerRad.toFloat()))
@@ -217,6 +245,15 @@ object BikeWorldRenderer {
         return x.isFinite() && y.isFinite() && z.isFinite()
     }
 
+    private fun finiteOrZero(value: Double): Double {
+        return if (value.isFinite()) value else 0.0
+    }
+
+    private data class WheelPair(
+        val front: Double,
+        val rear: Double
+    )
+
     private data class RenderVisualState(
         var lastRenderNanos: Long,
         var lastRawFrontWheelSpin: Double,
@@ -224,6 +261,10 @@ object BikeWorldRenderer {
         var targetFrontWheelSpin: Double,
         var targetRearWheelSpin: Double,
         var frontWheelSpin: Double,
-        var rearWheelSpin: Double
+        var rearWheelSpin: Double,
+        var targetFrontWheelSuspensionOffset: Double,
+        var targetRearWheelSuspensionOffset: Double,
+        var frontWheelSuspensionOffset: Double,
+        var rearWheelSuspensionOffset: Double
     )
 }

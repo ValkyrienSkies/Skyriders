@@ -59,6 +59,7 @@ object KartPhysicsSolver {
                 normalForce = applySuspension(body, contact, config)
             )
         }
+        updateVisualSuspensionOffsets(state, contacts, config, dt)
         state.debugLateralSlip = averageLateralSlip(appliedContacts)
 
         appliedContacts.forEach { contact ->
@@ -162,6 +163,37 @@ object KartPhysicsSolver {
         val normalForce = forceMag.coerceAtLeast(0.0)
         VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(WORLD_UP).mul(normalForce))
         return normalForce
+    }
+
+    private fun updateVisualSuspensionOffsets(
+        state: KartRuntimeState,
+        contacts: List<VehicleWheelContact>,
+        config: KartPhysicsConfig,
+        dt: Double
+    ) {
+        val alpha = 1.0 - exp(-dt.coerceIn(0.0, 0.1) / 0.08)
+        state.frontWheelSuspensionOffset = lerp(
+            state.frontWheelSuspensionOffset,
+            averageVisualSuspensionOffset(contacts.take(2), config),
+            alpha
+        )
+        state.rearWheelSuspensionOffset = lerp(
+            state.rearWheelSuspensionOffset,
+            averageVisualSuspensionOffset(contacts.drop(2), config),
+            alpha
+        )
+    }
+
+    private fun averageVisualSuspensionOffset(contacts: List<VehicleWheelContact>, config: KartPhysicsConfig): Double {
+        if (contacts.isEmpty()) return 0.0
+        return contacts.sumOf { contact -> visualSuspensionOffset(contact, config) } / contacts.size
+    }
+
+    private fun visualSuspensionOffset(contact: VehicleWheelContact, config: KartPhysicsConfig): Double {
+        if (!contact.grounded) return 0.0
+        val springLength = contact.hitDistance - config.wheelRadius
+        val compression = (config.suspensionRestLength - springLength).coerceIn(0.0, config.suspensionTravel)
+        return -compression
     }
 
     private fun applyLateralGrip(body: PhysVsBody, kartContact: KartContact, drifting: Boolean, config: KartPhysicsConfig) {

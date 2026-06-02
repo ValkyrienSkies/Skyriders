@@ -10,6 +10,8 @@ data class BikeRuntimeState(
     var visualSteerRad: Double = 0.0,
     var frontWheelSpin: Double = 0.0,
     var rearWheelSpin: Double = 0.0,
+    var frontWheelSuspensionOffset: Double = 0.0,
+    var rearWheelSuspensionOffset: Double = 0.0,
     var lastGrounded: Boolean = false,
     var jumpCharge: Double = 0.0,
     var wasJumpHeld: Boolean = false,

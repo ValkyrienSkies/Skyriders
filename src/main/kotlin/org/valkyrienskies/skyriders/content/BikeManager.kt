@@ -160,13 +160,25 @@ object BikeManager {
         return restoredCount
     }
 
-    fun applyVisualState(level: Level, bodyId: BodyId, engineOn: Boolean, visualLeanRad: Double, visualSteerRad: Double, frontWheelSpin: Double, rearWheelSpin: Double) {
+    fun applyVisualState(
+        level: Level,
+        bodyId: BodyId,
+        engineOn: Boolean,
+        visualLeanRad: Double,
+        visualSteerRad: Double,
+        frontWheelSpin: Double,
+        rearWheelSpin: Double,
+        frontWheelSuspensionOffset: Double,
+        rearWheelSuspensionOffset: Double
+    ) {
         val bike = getBike(level, bodyId) ?: return
         bike.state.engineOn = engineOn
         bike.state.visualLeanRad = visualLeanRad
         bike.state.visualSteerRad = visualSteerRad
         bike.state.frontWheelSpin = frontWheelSpin
         bike.state.rearWheelSpin = rearWheelSpin
+        bike.state.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+        bike.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
     }
 
     private fun addBike(level: Level, bike: IBike) {
