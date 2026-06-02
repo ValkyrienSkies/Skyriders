@@ -70,7 +70,7 @@ object SkyridersModClient {
                 throttle = if (forward == backward) 0.0 else if (forward) 1.0 else -1.0,
                 brake = if (bikeBrakeKey.isDown) 1.0 else 0.0,
                 jump = if (options.keyJump.isDown) 1.0 else 0.0,
-                pitch = if (leanForward == leanBack) 0.0 else if (leanForward) 1.0 else -1.0
+                pitch = if (leanForward == leanBack) 0.0 else if (leanForward) -1.0 else 1.0
             )
             player.isShiftKeyDown = false
 

@@ -11,6 +11,7 @@ import org.valkyrienskies.skyriders.content.WheelContact
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.tanh
 
 object BikePhysicsSolver {
@@ -91,7 +92,10 @@ object BikePhysicsSolver {
         if (stabilizedGrounded) {
             if (riderPresent) {
                 applyBalanceController(body, forward, up, terrainUp, balanceTargetLean, config, forwardSpeed, balanceStrengthScale)
-                applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                applyGroundedPitchControl(body, activeInput, forward, right, terrainUp, forwardSpeed, config)
+                if (frontContact.grounded) {
+                    applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                }
                 applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
             } else {
                 applyParkingStabilization(body, forward, up, terrainUp, config)
@@ -384,6 +388,53 @@ object BikePhysicsSolver {
             (config.lowSpeedYawAssist * lowSpeedAmount + config.highSpeedYawAssist * highSpeedAmount)
         if (yawTorque != 0.0) {
             safeApplyWorldTorque(body, Vector3d(terrainUp).mul(yawTorque))
+        }
+    }
+
+    private fun applyGroundedPitchControl(
+        body: PhysVsBody,
+        input: BikeInput,
+        forward: Vector3d,
+        right: Vector3d,
+        terrainUp: Vector3d,
+        forwardSpeed: Double,
+        config: BikePhysicsConfig
+    ) {
+        val currentPitch = safeDot(forward, terrainUp).coerceIn(-1.0, 1.0)
+        val pitchRate = safeDot(body.kinematics.angularVelocity, right)
+        val pitchInput = input.pitch.coerceIn(-1.0, 1.0)
+        val speedAmount = smoothstep(0.75, 3.0, abs(forwardSpeed))
+
+        if (pitchInput != 0.0 && speedAmount > 0.0) {
+            val desiredPitch = if (pitchInput < 0.0) {
+                -pitchInput * kotlin.math.sin(config.maxWheelieAngleRad)
+            } else {
+                -pitchInput * kotlin.math.sin(config.maxStoppieAngleRad)
+            }
+            val pitchError = desiredPitch - currentPitch
+            val torque = Vector3d(right).mul(
+                pitchError * config.groundedPitchControlStrength * speedAmount -
+                    pitchRate * config.pitchLimitDamping * 0.35
+            )
+            safeApplyWorldTorque(body, torque)
+        }
+
+        val wheelieLimit = kotlin.math.sin(config.maxWheelieAngleRad)
+        val stoppieLimit = -kotlin.math.sin(config.maxStoppieAngleRad)
+        val limitError = when {
+            currentPitch > wheelieLimit -> currentPitch - wheelieLimit
+            currentPitch < stoppieLimit -> currentPitch - stoppieLimit
+            else -> 0.0
+        }
+        if (limitError != 0.0) {
+            val torque = Vector3d(right).mul(
+                -limitError * config.pitchLimitStrength -
+                    pitchRate * config.pitchLimitDamping
+            )
+            safeApplyWorldTorque(body, torque)
+        } else if (abs(pitchRate) > 0.5) {
+            val capDamping = min(1.0, abs(pitchRate) - 0.5)
+            safeApplyWorldTorque(body, Vector3d(right).mul(-pitchRate * config.pitchLimitDamping * 0.25 * capDamping))
         }
     }
 
