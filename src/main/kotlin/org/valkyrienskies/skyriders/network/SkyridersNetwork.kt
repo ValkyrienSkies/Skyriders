@@ -178,6 +178,25 @@ object SkyridersNetwork {
             is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
             else -> -1
         }
+        val drifting = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.drifting
+            is IBike -> vehicle.state.debugDrifting
+            else -> false
+        }
+        val driftBoostCharge = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.driftBoostCharge
+            is IBike -> vehicle.state.driftBoostCharge
+            else -> 0.0
+        }
+        val driftBoostLevel = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.driftBoostLevel
+            is IBike -> vehicle.state.driftBoostLevel
+            else -> 0
+        }
+        val lateralSlip = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugLateralSlip
+            else -> 0.0
+        }
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             VehicleDebugPacket(
@@ -188,7 +207,11 @@ object SkyridersNetwork {
                 engineOn = vehicle.vehicleState.engineOn,
                 throttle = input.throttle,
                 steer = input.steer,
-                groundedCount = groundedCount
+                groundedCount = groundedCount,
+                drifting = drifting,
+                driftBoostCharge = driftBoostCharge,
+                driftBoostLevel = driftBoostLevel,
+                lateralSlip = lateralSlip
             )
         )
     }
@@ -546,7 +569,11 @@ object SkyridersNetwork {
         val engineOn: Boolean,
         val throttle: Double,
         val steer: Double,
-        val groundedCount: Int
+        val groundedCount: Int,
+        val drifting: Boolean,
+        val driftBoostCharge: Double,
+        val driftBoostLevel: Int,
+        val lateralSlip: Double
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -557,6 +584,10 @@ object SkyridersNetwork {
             buf.writeDouble(throttle)
             buf.writeDouble(steer)
             buf.writeInt(groundedCount)
+            buf.writeBoolean(drifting)
+            buf.writeDouble(driftBoostCharge)
+            buf.writeInt(driftBoostLevel)
+            buf.writeDouble(lateralSlip)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -583,7 +614,11 @@ object SkyridersNetwork {
                     engineOn = buf.readBoolean(),
                     throttle = buf.readDouble(),
                     steer = buf.readDouble(),
-                    groundedCount = buf.readInt()
+                    groundedCount = buf.readInt(),
+                    drifting = buf.readBoolean(),
+                    driftBoostCharge = buf.readDouble(),
+                    driftBoostLevel = buf.readInt(),
+                    lateralSlip = buf.readDouble()
                 )
             }
 

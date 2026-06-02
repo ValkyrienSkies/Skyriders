@@ -10,6 +10,7 @@ import org.valkyrienskies.skyriders.content.VehicleInput
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.min
 
 object KartPhysicsSolver {
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
@@ -30,7 +31,8 @@ object KartPhysicsSolver {
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
-        val drifting = updateDriftState(state, input, forwardSpeed, dt, config)
+        val driftGripActive = updateDriftState(state, input, forwardSpeed, dt, config)
+        updateDriftBoost(body, state, input.riderPresent, state.drifting, forward, config, dt)
         val steerRad = updateSteerAngle(
             state,
             computeTargetSteerRad(input.steer, forwardSpeed, config),
@@ -60,13 +62,13 @@ object KartPhysicsSolver {
         state.debugLateralSlip = averageLateralSlip(appliedContacts)
 
         appliedContacts.forEach { contact ->
-            applyLateralGrip(body, contact, drifting, config)
+            applyLateralGrip(body, contact, driftGripActive, config)
         }
 
         if (input.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, drifting, config)
+            applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, config)
             if (grounded) {
-                if (drifting) {
+                if (state.drifting) {
                     applyDriftAssist(body, input, forwardSpeed, WORLD_UP, state, config)
                 } else {
                     applySteeringAssist(body, steerRad, forwardSpeed, WORLD_UP, config)
@@ -323,6 +325,79 @@ object KartPhysicsSolver {
         state.drifting = true
         state.driftExitTimeRemaining = 0.0
         return true
+    }
+
+    private fun updateDriftBoost(
+        body: PhysVsBody,
+        state: KartRuntimeState,
+        riderPresent: Boolean,
+        drifting: Boolean,
+        forward: Vector3d,
+        config: KartPhysicsConfig,
+        dt: Double
+    ) {
+        if (!config.driftBoostEnabled || !riderPresent) {
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+            return
+        }
+
+        if (drifting && state.drifting) {
+            state.driftBoostCharge += dt
+            state.driftBoostLevel = computeDriftBoostLevel(state.driftBoostCharge, config)
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+        } else if (!drifting && state.driftBoostCharge > 0.0) {
+            val boostLevel = state.driftBoostLevel.coerceIn(0, driftBoostLevelCount(config))
+            if (boostLevel > 0) {
+                state.driftBoostForce = driftBoostForce(boostLevel, config)
+                state.driftBoostTimeRemaining = driftBoostDuration(boostLevel, config)
+            }
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+        }
+
+        if (state.driftBoostTimeRemaining <= 0.0 || state.driftBoostForce <= 0.0) return
+
+        VehiclePhysicsMath.safeApplyWorldForce(
+            body,
+            Vector3d(forward).mul(state.driftBoostForce),
+            body.kinematics.position
+        )
+        state.driftBoostTimeRemaining = max(0.0, state.driftBoostTimeRemaining - dt)
+        if (state.driftBoostTimeRemaining <= 0.0) {
+            state.driftBoostForce = 0.0
+        }
+    }
+
+    private fun computeDriftBoostLevel(charge: Double, config: KartPhysicsConfig): Int {
+        var level = 0
+        val maxLevel = driftBoostLevelCount(config)
+        for (index in 0 until maxLevel) {
+            if (charge >= config.driftBoostChargeTimes[index]) {
+                level = index + 1
+            }
+        }
+        return level
+    }
+
+    private fun driftBoostForce(level: Int, config: KartPhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostForces.indices) config.driftBoostForces[index] else 0.0
+    }
+
+    private fun driftBoostDuration(level: Int, config: KartPhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostDurations.indices) config.driftBoostDurations[index] else 0.0
+    }
+
+    private fun driftBoostLevelCount(config: KartPhysicsConfig): Int {
+        return min(
+            config.driftBoostMaxLevel,
+            min(config.driftBoostChargeTimes.size, min(config.driftBoostForces.size, config.driftBoostDurations.size))
+        ).coerceAtLeast(0)
     }
 
     private fun smoothstep(edge0: Double, edge1: Double, value: Double): Double {

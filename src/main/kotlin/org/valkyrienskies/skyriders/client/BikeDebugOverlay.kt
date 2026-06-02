@@ -36,6 +36,10 @@ object BikeDebugOverlay {
             throttle = packet.throttle,
             steer = packet.steer,
             groundedCount = packet.groundedCount,
+            drifting = packet.drifting,
+            driftBoostCharge = packet.driftBoostCharge,
+            driftBoostLevel = packet.driftBoostLevel,
+            lateralSlip = packet.lateralSlip,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -73,6 +77,10 @@ object BikeDebugOverlay {
             lines.add("Steering Angle: ${formatDegrees(bikeDetails.steeringAngleRad)} deg")
             lines.add("Is Drifting: ${bikeDetails.drifting}")
             lines.add("Jump Charge: ${formatPercent(bikeDetails.jumpCharge)}")
+        } else {
+            lines.add("Is Drifting: ${currentSnapshot.drifting}")
+            lines.add("Drift Boost: ${formatNumber(currentSnapshot.driftBoostCharge)}s L${currentSnapshot.driftBoostLevel}")
+            lines.add("Lateral Slip: ${formatNumber(currentSnapshot.lateralSlip)}")
         }
 
         drawLines(event.guiGraphics, lines)
@@ -113,6 +121,10 @@ object BikeDebugOverlay {
         val throttle: Double,
         val steer: Double,
         val groundedCount: Int,
+        val drifting: Boolean,
+        val driftBoostCharge: Double,
+        val driftBoostLevel: Int,
+        val lateralSlip: Double,
         val receivedAtMillis: Long
     )
 
