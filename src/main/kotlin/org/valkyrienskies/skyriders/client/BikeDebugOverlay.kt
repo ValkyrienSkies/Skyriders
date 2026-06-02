@@ -16,6 +16,8 @@ object BikeDebugOverlay {
     fun update(packet: SkyridersNetwork.BikeDebugPacket) {
         snapshot = Snapshot(
             bodyId = packet.bodyId,
+            bikeId = packet.bikeId,
+            bikeName = packet.bikeName,
             speed = packet.speed,
             frontGrounded = packet.frontGrounded,
             rearGrounded = packet.rearGrounded,
@@ -43,6 +45,7 @@ object BikeDebugOverlay {
             event.guiGraphics,
             listOf(
                 "Skyriders Bike",
+                "Bike Type: ${currentSnapshot.bikeName} (${currentSnapshot.bikeId})",
                 "Current Speed: ${formatNumber(currentSnapshot.speed)}",
                 "Front Wheel Grounded: ${currentSnapshot.frontGrounded}",
                 "Rear Wheel Grounded: ${currentSnapshot.rearGrounded}",
@@ -82,6 +85,8 @@ object BikeDebugOverlay {
 
     private data class Snapshot(
         val bodyId: Long,
+        val bikeId: String,
+        val bikeName: String,
         val speed: Double,
         val frontGrounded: Boolean,
         val rearGrounded: Boolean,

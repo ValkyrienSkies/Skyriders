@@ -125,7 +125,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
         val player = controllingPassenger as? ServerPlayer ?: return
         val bike = BikeManager.getBike(level().dimensionId, bodyId) ?: return
-        SkyridersNetwork.sendBikeDebug(player, bodyId, bike.state)
+        SkyridersNetwork.sendBikeDebug(player, bike)
     }
 
     private fun yawFromForward(forward: Vector3dc): Float {

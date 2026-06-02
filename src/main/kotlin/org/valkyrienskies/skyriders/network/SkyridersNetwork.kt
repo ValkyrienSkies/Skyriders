@@ -13,10 +13,11 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
+import org.valkyrienskies.skyriders.content.BikeDefinitions
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
-import org.valkyrienskies.skyriders.content.BikeRuntimeState
+import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import java.util.function.Supplier
 
@@ -74,11 +75,19 @@ object SkyridersNetwork {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
     }
 
-    fun sendBikeDebug(player: ServerPlayer, bodyId: Long, state: BikeRuntimeState) {
+    fun sendBikeDebug(player: ServerPlayer, bike: IBike) {
+        val state = bike.state
+        val bikeId = bike.id
+        val bikeName = ResourceLocation.tryParse(bikeId)
+            ?.let(BikeDefinitions::get)
+            ?.displayName
+            ?: bikeId
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             BikeDebugPacket(
-                bodyId = bodyId,
+                bodyId = bike.bodyId,
+                bikeId = bikeId,
+                bikeName = bikeName,
                 speed = state.debugSpeed,
                 frontGrounded = state.debugFrontWheelGrounded,
                 rearGrounded = state.debugRearWheelGrounded,
@@ -207,6 +216,8 @@ object SkyridersNetwork {
 
     data class BikeDebugPacket(
         val bodyId: Long,
+        val bikeId: String,
+        val bikeName: String,
         val speed: Double,
         val frontGrounded: Boolean,
         val rearGrounded: Boolean,
@@ -217,6 +228,8 @@ object SkyridersNetwork {
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
+            buf.writeUtf(bikeId)
+            buf.writeUtf(bikeName)
             buf.writeDouble(speed)
             buf.writeBoolean(frontGrounded)
             buf.writeBoolean(rearGrounded)
@@ -244,6 +257,8 @@ object SkyridersNetwork {
             fun decode(buf: FriendlyByteBuf): BikeDebugPacket {
                 return BikeDebugPacket(
                     bodyId = buf.readLong(),
+                    bikeId = buf.readUtf(),
+                    bikeName = buf.readUtf(),
                     speed = buf.readDouble(),
                     frontGrounded = buf.readBoolean(),
                     rearGrounded = buf.readBoolean(),
