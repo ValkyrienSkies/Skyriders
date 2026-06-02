@@ -7,6 +7,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 
 object BikeLifecycle {
@@ -21,6 +22,7 @@ object BikeLifecycle {
     @SubscribeEvent
     fun onLevelSave(event: LevelEvent.Save) {
         val level = event.level as? ServerLevel ?: return
+        if (level in pendingRestoreLevels) return
         BikeSavedData.get(level).replaceFromManager(level)
     }
 
@@ -31,7 +33,12 @@ object BikeLifecycle {
         val iterator = pendingRestoreLevels.iterator()
         while (iterator.hasNext()) {
             val level = iterator.next()
-            BikeManager.restoreBikes(level, BikeSavedData.get(level).records)
+            val records = BikeSavedData.get(level).records
+            if (records.isNotEmpty() && !canRestoreBikes(level, records)) continue
+
+            val restoredCount = BikeManager.restoreBikes(level, records)
+            if (restoredCount < records.size) continue
+
             syncLevel(level)
             iterator.remove()
         }
@@ -61,5 +68,10 @@ object BikeLifecycle {
     fun syncPlayer(player: ServerPlayer) {
         val records = BikeManager.getBikes(player.level().dimensionId).map(IBike::toSaveRecord)
         SkyridersNetwork.sendBikeSync(player, records)
+    }
+
+    private fun canRestoreBikes(level: ServerLevel, records: Iterable<BikeSaveRecord>): Boolean {
+        val bodies = level.shipWorld?.allBodies ?: return false
+        return records.all { record -> bodies.getById(record.bodyId) != null }
     }
 }

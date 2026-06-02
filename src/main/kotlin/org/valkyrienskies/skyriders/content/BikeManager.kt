@@ -141,9 +141,13 @@ object BikeManager {
         return bike
     }
 
-    fun restoreBikes(level: Level, records: Iterable<BikeSaveRecord>) {
+    fun restoreBikes(level: Level, records: Iterable<BikeSaveRecord>): Int {
         clearBikes(level)
-        records.forEach { record -> restoreBike(level, record) }
+        var restoredCount = 0
+        records.forEach { record ->
+            if (restoreBike(level, record) != null) restoredCount++
+        }
+        return restoredCount
     }
 
     private fun addBike(level: Level, bike: IBike) {
