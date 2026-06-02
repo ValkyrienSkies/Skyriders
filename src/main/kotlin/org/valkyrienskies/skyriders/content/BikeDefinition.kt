@@ -33,6 +33,10 @@ data class BikeRenderDefinition(
     val texture: ResourceLocation,
     val seatTexture: ResourceLocation = texture,
     val showWheels: Boolean = true,
+    val frontWheelModel: ResourceLocation? = null,
+    val rearWheelModel: ResourceLocation? = null,
+    val frontWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 0.0),
+    val rearWheelPivot: Vector3d = Vector3d(0.5, 0.1875, 1.0),
     val modelOffset: Vector3d = Vector3d(-0.5, -0.2, -0.5),
     val modelScale: Double = 1.45,
     val exhaustLocalPos: Vector3d = Vector3d(0.0, 0.35, -0.85),
@@ -40,12 +44,16 @@ data class BikeRenderDefinition(
 ) {
     companion object {
         val DEFAULT_BIKE = BikeRenderDefinition(
-            model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike"),
-            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/bikes/debug_bike.png")
+            model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike_body"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/bikes/debug_bike.png"),
+            frontWheelModel = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike_front_wheel"),
+            rearWheelModel = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike_rear_wheel")
         )
 
         val HOVER_BIKE = DEFAULT_BIKE.copy(
-            showWheels = false
+            showWheels = false,
+            frontWheelModel = null,
+            rearWheelModel = null
         )
     }
 }

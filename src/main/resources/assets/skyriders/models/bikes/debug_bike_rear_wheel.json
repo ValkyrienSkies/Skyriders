@@ -1,0 +1,23 @@
+{
+  "credit": "Made with Blockbench",
+  "loader": "framework:open_model",
+  "texture_size": [32, 32],
+  "textures": {
+    "debug_bike": "skyriders:bikes/debug_bike"
+  },
+  "components": [
+    {
+      "from": [7, 0, 13],
+      "to": [9, 6, 19],
+      "rotation": {"angle": 0, "axis": "x", "origin": [8, 3, 16]},
+      "faces": {
+        "north": {"uv": [0, 12, 1, 15], "texture": "#debug_bike"},
+        "east": {"uv": [3, 0, 6, 3], "texture": "#debug_bike"},
+        "south": {"uv": [1, 12, 2, 15], "texture": "#debug_bike"},
+        "west": {"uv": [3, 3, 6, 6], "texture": "#debug_bike"},
+        "up": {"uv": [13, 7.5, 12, 4.5], "texture": "#debug_bike"},
+        "down": {"uv": [7, 12, 6, 15], "texture": "#debug_bike"}
+      }
+    }
+  ]
+}

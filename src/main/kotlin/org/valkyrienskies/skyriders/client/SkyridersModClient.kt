@@ -52,7 +52,13 @@ object SkyridersModClient {
     fun registerAdditionalModels(event: ModelEvent.RegisterAdditional) {
         BikeDefinitions.ids
             .mapNotNull(BikeDefinitions::get)
-            .map { it.render.model }
+            .flatMap { definition ->
+                listOfNotNull(
+                    definition.render.model,
+                    definition.render.frontWheelModel,
+                    definition.render.rearWheelModel
+                )
+            }
             .distinct()
             .forEach(event::register)
     }
