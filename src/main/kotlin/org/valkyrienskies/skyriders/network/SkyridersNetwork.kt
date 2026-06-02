@@ -61,6 +61,13 @@ object SkyridersNetwork {
             BikeDebugPacket::decode,
             BikeDebugPacket::handle
         )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeVisualStatePacket::class.java,
+            BikeVisualStatePacket::encode,
+            BikeVisualStatePacket::decode,
+            BikeVisualStatePacket::handle
+        )
     }
 
     fun sendBikeInput(input: BikeInput) {
@@ -94,6 +101,24 @@ object SkyridersNetwork {
                 driftBoostCharge = state.driftBoostCharge,
                 driftBoostLevel = state.driftBoostLevel,
                 jumpCharge = state.jumpCharge
+            )
+        )
+    }
+
+    fun sendBikeVisualState(player: ServerPlayer, bikes: List<IBike>) {
+        CHANNEL.send(
+            PacketDistributor.PLAYER.with { player },
+            BikeVisualStatePacket(
+                bikes.map { bike ->
+                    val state = bike.state
+                    BikeVisualState(
+                        bodyId = bike.bodyId,
+                        visualLeanRad = state.visualLeanRad,
+                        visualSteerRad = state.visualSteerRad,
+                        frontWheelSpin = state.frontWheelSpin,
+                        rearWheelSpin = state.rearWheelSpin
+                    )
+                }
             )
         )
     }
@@ -282,4 +307,71 @@ object SkyridersNetwork {
             }
         }
     }
+
+    data class BikeVisualStatePacket(val states: List<BikeVisualState>) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeVarInt(states.size)
+            states.forEach { state ->
+                buf.writeLong(state.bodyId)
+                buf.writeDouble(state.visualLeanRad)
+                buf.writeDouble(state.visualSteerRad)
+                buf.writeDouble(state.frontWheelSpin)
+                buf.writeDouble(state.rearWheelSpin)
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable {
+                        val level = net.minecraft.client.Minecraft.getInstance().level ?: return@Runnable
+                        states.forEach { state ->
+                            BikeManager.applyVisualState(
+                                level = level,
+                                bodyId = state.bodyId,
+                                visualLeanRad = state.visualLeanRad,
+                                visualSteerRad = state.visualSteerRad,
+                                frontWheelSpin = state.frontWheelSpin,
+                                rearWheelSpin = state.rearWheelSpin
+                            )
+                        }
+                    }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeVisualStatePacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeVisualStatePacket {
+                val count = buf.readVarInt()
+                val states = (0 until count).map {
+                    BikeVisualState(
+                        bodyId = buf.readLong(),
+                        visualLeanRad = buf.readDouble(),
+                        visualSteerRad = buf.readDouble(),
+                        frontWheelSpin = buf.readDouble(),
+                        rearWheelSpin = buf.readDouble()
+                    )
+                }
+                return BikeVisualStatePacket(states)
+            }
+
+            fun handle(packet: BikeVisualStatePacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class BikeVisualState(
+        val bodyId: Long,
+        val visualLeanRad: Double,
+        val visualSteerRad: Double,
+        val frontWheelSpin: Double,
+        val rearWheelSpin: Double
+    )
 }

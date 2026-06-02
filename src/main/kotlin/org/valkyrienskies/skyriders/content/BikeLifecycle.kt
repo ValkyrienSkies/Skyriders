@@ -26,15 +26,19 @@ object BikeLifecycle {
 
     @SubscribeEvent
     fun onServerTick(event: TickEvent.ServerTickEvent) {
-        if (event.phase != TickEvent.Phase.END || pendingRestoreLevels.isEmpty()) return
+        if (event.phase != TickEvent.Phase.END) return
 
-        val iterator = pendingRestoreLevels.iterator()
-        while (iterator.hasNext()) {
-            val level = iterator.next()
-            BikeManager.restoreBikes(level, BikeSavedData.get(level).records)
-            syncLevel(level)
-            iterator.remove()
+        if (pendingRestoreLevels.isNotEmpty()) {
+            val iterator = pendingRestoreLevels.iterator()
+            while (iterator.hasNext()) {
+                val level = iterator.next()
+                BikeManager.restoreBikes(level, BikeSavedData.get(level).records)
+                syncLevel(level)
+                iterator.remove()
+            }
         }
+
+        event.server.allLevels.forEach(::syncVisualState)
     }
 
     @SubscribeEvent
@@ -61,5 +65,11 @@ object BikeLifecycle {
     fun syncPlayer(player: ServerPlayer) {
         val records = BikeManager.getBikes(player.level().dimensionId).map(IBike::toSaveRecord)
         SkyridersNetwork.sendBikeSync(player, records)
+    }
+
+    private fun syncVisualState(level: ServerLevel) {
+        val bikes = BikeManager.getBikes(level.dimensionId)
+        if (bikes.isEmpty()) return
+        level.players().forEach { player -> SkyridersNetwork.sendBikeVisualState(player, bikes) }
     }
 }

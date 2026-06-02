@@ -24,6 +24,12 @@ object BikeClientEffects {
         )
     }
 
+    fun getTelemetry(bodyId: Long): SkyridersNetwork.BikeDebugPacket? {
+        val level = Minecraft.getInstance().level ?: return null
+        val telemetry = telemetryByBodyId[bodyId] ?: return null
+        return if (telemetry.expireTick >= level.gameTime) telemetry.packet else null
+    }
+
     fun tick() {
         val minecraft = Minecraft.getInstance()
         val level = minecraft.level ?: return

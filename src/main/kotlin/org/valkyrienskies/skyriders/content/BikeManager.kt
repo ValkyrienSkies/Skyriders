@@ -149,6 +149,14 @@ object BikeManager {
         return restoredCount
     }
 
+    fun applyVisualState(level: Level, bodyId: BodyId, visualLeanRad: Double, visualSteerRad: Double, frontWheelSpin: Double, rearWheelSpin: Double) {
+        val bike = getBike(level, bodyId) ?: return
+        bike.state.visualLeanRad = visualLeanRad
+        bike.state.visualSteerRad = visualSteerRad
+        bike.state.frontWheelSpin = frontWheelSpin
+        bike.state.rearWheelSpin = rearWheelSpin
+    }
+
     private fun addBike(level: Level, bike: IBike) {
         if (!level.isClientSide) {
             addBike(level.dimensionId, bike)

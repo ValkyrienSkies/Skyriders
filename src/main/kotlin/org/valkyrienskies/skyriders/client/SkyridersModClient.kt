@@ -39,6 +39,7 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.BIKE_SEAT_ENTITY.get(), ::BikeSeatRenderer)
             MinecraftForge.EVENT_BUS.register(ClientEvents)
             MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
+            MinecraftForge.EVENT_BUS.register(BikeWorldRenderer)
         }
     }
 
@@ -69,6 +70,7 @@ object SkyridersModClient {
             if (event.phase != TickEvent.Phase.END) return
 
             val minecraft = Minecraft.getInstance()
+            ClientBikeSyncHandler.tick()
             BikeClientEffects.tick()
             val player = minecraft.player ?: return
             if (player.vehicle !is BikeSeatEntity) return

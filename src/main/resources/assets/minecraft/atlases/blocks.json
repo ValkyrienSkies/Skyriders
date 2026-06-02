@@ -1,0 +1,8 @@
+{
+  "sources": [
+    {
+      "type": "single",
+      "resource": "skyriders:bikes/debug_bike"
+    }
+  ]
+}
