@@ -2,13 +2,19 @@ package org.valkyrienskies.skyriders.network
 
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.level.ServerPlayer
+import net.minecraftforge.api.distmarker.Dist
+import net.minecraftforge.fml.DistExecutor
 import net.minecraftforge.network.NetworkEvent
 import net.minecraftforge.network.NetworkRegistry
+import net.minecraftforge.network.PacketDistributor
 import net.minecraftforge.network.simple.SimpleChannel
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.BikeSaveRecord
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import java.util.function.Supplier
 
@@ -38,6 +44,13 @@ object SkyridersNetwork {
             BikeDismountPacket::decode,
             BikeDismountPacket::handle
         )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeSyncPacket::class.java,
+            BikeSyncPacket::encode,
+            BikeSyncPacket::decode,
+            BikeSyncPacket::handle
+        )
     }
 
     fun sendBikeInput(input: BikeInput) {
@@ -46,6 +59,10 @@ object SkyridersNetwork {
 
     fun sendBikeDismount() {
         CHANNEL.sendToServer(BikeDismountPacket())
+    }
+
+    fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
     }
 
     data class BikeInputPacket(val input: BikeInput) {
@@ -111,6 +128,53 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeDismountPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class BikeSyncPacket(val records: List<BikeSaveRecord>) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeVarInt(records.size)
+            records.forEach { record ->
+                buf.writeLong(record.bodyId)
+                buf.writeUtf(record.bikeType)
+                buf.writeDouble(record.visualLeanRad)
+                buf.writeDouble(record.frontWheelSpin)
+                buf.writeDouble(record.rearWheelSpin)
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { ClientBikeSyncHandler.handleBikeSync(records) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeSyncPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeSyncPacket {
+                val count = buf.readVarInt()
+                val records = (0 until count).map {
+                    BikeSaveRecord(
+                        bodyId = buf.readLong(),
+                        bikeType = buf.readUtf(),
+                        visualLeanRad = buf.readDouble(),
+                        frontWheelSpin = buf.readDouble(),
+                        rearWheelSpin = buf.readDouble()
+                    )
+                }
+                return BikeSyncPacket(records)
+            }
+
+            fun handle(packet: BikeSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

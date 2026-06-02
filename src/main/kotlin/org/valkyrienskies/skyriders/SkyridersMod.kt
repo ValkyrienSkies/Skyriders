@@ -17,6 +17,7 @@ import org.valkyrienskies.core.api.VsBeta
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
+import org.valkyrienskies.skyriders.content.BikeLifecycle
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -53,6 +54,7 @@ object SkyridersMod {
         BLOCK_ENTITIES.register(modEventBus)
 
         modEventBus.addListener(::init)
+        MinecraftForge.EVENT_BUS.register(BikeLifecycle)
         MinecraftForge.EVENT_BUS.addListener { event: RegisterCommandsEvent -> SkyridersCommands.register(event) }
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)

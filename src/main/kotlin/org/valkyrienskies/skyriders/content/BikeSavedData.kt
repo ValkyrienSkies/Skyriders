@@ -29,6 +29,10 @@ class BikeSavedData : SavedData() {
 
         fun createEmpty(): BikeSavedData = BikeSavedData()
 
+        fun get(level: ServerLevel): BikeSavedData {
+            return level.dataStorage.computeIfAbsent(::load, ::createEmpty, SAVED_DATA_ID)
+        }
+
         @JvmStatic
         fun load(tag: CompoundTag): BikeSavedData {
             val data = BikeSavedData()

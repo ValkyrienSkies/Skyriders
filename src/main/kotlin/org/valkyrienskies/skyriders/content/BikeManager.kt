@@ -5,6 +5,7 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix3d
@@ -16,6 +17,7 @@ import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.core.api.world.properties.DimensionId
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.mod.common.vsCore
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -31,15 +33,32 @@ object BikeManager {
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, BikeInput>>()
 
     fun createBike(bikeId: ResourceLocation, level: ServerLevel, position: Vector3dc): IBike {
-        return when (bikeId) {
+        val bike = when (bikeId) {
             DEBUG_BIKE_ID -> createDebugBike(level, position)
             else -> throw IllegalArgumentException("Unknown bike id: $bikeId")
         }
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
+        return bike
     }
 
     fun addBike(dimensionId: DimensionId, bike: IBike) {
         bikesByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
         inputsByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = BikeInput.EMPTY
+    }
+
+    fun replaceBikes(dimensionId: DimensionId, bikes: Iterable<IBike>) {
+        bikesByDimension[dimensionId] = ConcurrentHashMap<BodyId, IBike>().apply {
+            bikes.forEach { bike -> put(bike.bodyId, bike) }
+        }
+        inputsByDimension[dimensionId] = ConcurrentHashMap<BodyId, BikeInput>().apply {
+            bikesByDimension[dimensionId]?.keys?.forEach { bodyId -> put(bodyId, BikeInput.EMPTY) }
+        }
+    }
+
+    fun clearBikes(dimensionId: DimensionId) {
+        bikesByDimension.remove(dimensionId)
+        inputsByDimension.remove(dimensionId)
     }
 
     fun removeBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
@@ -55,6 +74,8 @@ object BikeManager {
             }
             shipWorld.allBodies.getById(bodyId)?.let(shipWorld::deleteBody)
         }
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
         return bike
     }
 
@@ -102,6 +123,22 @@ object BikeManager {
     fun loadRecords(tag: CompoundTag): List<BikeSaveRecord> {
         val list = tag.getList(BIKES_KEY, Tag.TAG_COMPOUND.toInt())
         return (0 until list.size).map { index -> BikeSaveRecord.load(list.getCompound(index)) }
+    }
+
+    fun restoreBike(level: Level, record: BikeSaveRecord): IBike? {
+        val bikeId = ResourceLocation.tryParse(record.bikeType) ?: ResourceLocation(SkyridersMod.MOD_ID, record.bikeType)
+        val bike = when (bikeId) {
+            DEBUG_BIKE_ID -> restoreDebugBike(level, record)
+            else -> null
+        } ?: return null
+
+        addBike(level.dimensionId, bike)
+        return bike
+    }
+
+    fun restoreBikes(level: Level, records: Iterable<BikeSaveRecord>) {
+        clearBikes(level.dimensionId)
+        records.forEach { record -> restoreBike(level, record) }
     }
 
     private fun createDebugBike(level: ServerLevel, position: Vector3dc): IBike {
@@ -155,5 +192,31 @@ object BikeManager {
         )
         addBike(level.dimensionId, bike)
         return bike
+    }
+
+    private fun restoreDebugBike(level: Level, record: BikeSaveRecord): IBike? {
+        val config = BikePhysicsConfig.DEBUG_MOTORCYCLE
+        val body = level.shipWorld?.allBodies?.getById(record.bodyId) ?: return null
+        val position = body.kinematics.position
+        return DebugBike(
+            bodyId = record.bodyId,
+            boundingBox = AABB.ofSize(
+                Vec3(
+                    position.x() + config.collisionBoxOffset.x,
+                    position.y() + config.collisionBoxOffset.y,
+                    position.z() + config.collisionBoxOffset.z
+                ),
+                config.collisionBoxSize.x,
+                config.collisionBoxSize.y,
+                config.collisionBoxSize.z
+            ),
+            level = level,
+            config = config,
+            state = BikeRuntimeState(
+                visualLeanRad = record.visualLeanRad,
+                frontWheelSpin = record.frontWheelSpin,
+                rearWheelSpin = record.rearWheelSpin
+            )
+        )
     }
 }
