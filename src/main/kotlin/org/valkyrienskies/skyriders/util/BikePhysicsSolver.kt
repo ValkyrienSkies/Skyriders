@@ -40,7 +40,7 @@ object BikePhysicsSolver {
         val forwardSpeed = safeDot(body.kinematics.velocity, forward)
         val riderPresent = input.riderPresent
         val activeInput = if (riderPresent) input else BikeInput.EMPTY
-        val drifting = isDrifting(activeInput, forwardSpeed, config)
+        val drifting = updateDriftState(state, activeInput, forwardSpeed, config)
         val frontSteerRad = updateFrontSteerAngle(
             state,
             computeFrontSteerAngle(forwardSpeed, activeInput.steer, config),
@@ -85,7 +85,11 @@ object BikePhysicsSolver {
             applyParkingBrake(body, rearContact, config)
         }
 
-        val targetLean = updateSmoothedTargetLean(state, computeTargetLean(forwardSpeed, activeInput.steer, config), dt)
+        val targetLean = updateSmoothedTargetLean(
+            state,
+            computeTargetLean(forwardSpeed, activeInput.steer, drifting, state, config),
+            dt
+        )
         val chargingJump = activeInput.jump > 0.0
         val balanceTargetLean = if (chargingJump) targetLean * 0.25 else targetLean
         val balanceStrengthScale = if (chargingJump) 1.35 else 1.0
@@ -103,7 +107,7 @@ object BikePhysicsSolver {
                 applyGroundedPitchControl(body, activeInput, forward, right, terrainUp, forwardSpeed, config)
                 if (frontContact.grounded) {
                     if (drifting) {
-                        applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                        applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, state, config)
                     } else {
                         applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
                     }
@@ -364,9 +368,25 @@ object BikePhysicsSolver {
         applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
     }
 
-    private fun computeTargetLean(forwardSpeed: Double, steerInput: Double, config: BikePhysicsConfig): Double {
+    private fun computeTargetLean(
+        forwardSpeed: Double,
+        steerInput: Double,
+        drifting: Boolean,
+        state: BikeRuntimeState,
+        config: BikePhysicsConfig
+    ): Double {
         val speedLeanAmount = smoothstep(config.minLeanSpeed, config.fullLeanSpeed, abs(forwardSpeed))
-        return -steerInput.coerceIn(-1.0, 1.0) * config.maxLeanAngleRad * speedLeanAmount
+        if (!drifting || abs(state.driftDirection) <= 0.05) {
+            return -steerInput.coerceIn(-1.0, 1.0) * config.maxLeanAngleRad * speedLeanAmount
+        }
+
+        val steerBias = steerInput.coerceIn(-1.0, 1.0) * state.driftDirection
+        val leanBias = when {
+            steerBias > 0.15 -> 1.0
+            steerBias < -0.15 -> 0.45
+            else -> 0.7
+        }
+        return -state.driftDirection * config.maxLeanAngleRad * speedLeanAmount * leanBias
     }
 
     private fun updateSmoothedTargetLean(state: BikeRuntimeState, targetLean: Double, dt: Double): Double {
@@ -436,6 +456,7 @@ object BikePhysicsSolver {
         input: BikeInput,
         speed: Double,
         terrainUp: Vector3d,
+        state: BikeRuntimeState,
         config: BikePhysicsConfig
     ) {
         val direction = when {
@@ -445,17 +466,40 @@ object BikePhysicsSolver {
             else -> 1.0
         }
         val speedAmount = smoothstep(config.driftMinSpeed, config.wheelTopSpeed, abs(speed))
-        val steer = input.steer.coerceIn(-1.0, 1.0)
-        val yawTorque = steer * direction * config.driftYawAssist * speedAmount * input.brake.coerceIn(0.0, 1.0)
+        val driftDirection = state.driftDirection.takeIf { abs(it) > 0.05 } ?: input.steer.coerceIn(-1.0, 1.0)
+        val bias = input.steer.coerceIn(-1.0, 1.0) * driftDirection
+        val turnBias = when {
+            bias > 0.15 -> 1.28
+            bias < -0.15 -> 0.12
+            else -> 0.62
+        }
+        val yawTorque = driftDirection * direction * config.driftYawAssist * speedAmount * turnBias * input.brake.coerceIn(0.0, 1.0)
         if (yawTorque != 0.0) {
             safeApplyWorldTorque(body, Vector3d(terrainUp).mul(yawTorque))
         }
     }
 
-    private fun isDrifting(input: BikeInput, forwardSpeed: Double, config: BikePhysicsConfig): Boolean {
-        return input.brake > 0.05 &&
-            abs(input.steer) > 0.15 &&
-            abs(forwardSpeed) >= config.driftMinSpeed
+    private fun updateDriftState(
+        state: BikeRuntimeState,
+        input: BikeInput,
+        forwardSpeed: Double,
+        config: BikePhysicsConfig
+    ): Boolean {
+        if (input.brake <= 0.05) {
+            state.driftDirection = 0.0
+            return false
+        }
+
+        if (state.wasDrifting) return true
+
+        val steer = input.steer.coerceIn(-1.0, 1.0)
+        if (abs(steer) <= 0.15 || abs(forwardSpeed) < config.driftMinSpeed) {
+            state.driftDirection = 0.0
+            return false
+        }
+
+        state.driftDirection = if (steer > 0.0) 1.0 else -1.0
+        return true
     }
 
     private fun updateDriftBoost(
@@ -470,6 +514,7 @@ object BikePhysicsSolver {
     ) {
         if (!config.driftBoostEnabled || !riderPresent) {
             state.wasDrifting = false
+            state.driftDirection = 0.0
             state.driftBoostCharge = 0.0
             state.driftBoostLevel = 0
             state.driftBoostTimeRemaining = 0.0
@@ -490,6 +535,7 @@ object BikePhysicsSolver {
             }
             state.driftBoostCharge = 0.0
             state.driftBoostLevel = 0
+            state.driftDirection = 0.0
         }
 
         state.wasDrifting = drifting

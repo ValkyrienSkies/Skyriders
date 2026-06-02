@@ -103,7 +103,7 @@ data class BikePhysicsConfig(
             driftBoostEnabled = true,
             driftBoostMaxLevel = 3,
             driftBoostChargeTimes = listOf(0.85, 1.7, 2.8),
-            driftBoostForces = listOf(2600.0, 4200.0, 6000.0),
+            driftBoostForces = listOf(4200.0, 6500.0, 9000.0),
             driftBoostDurations = listOf(0.35, 0.55, 0.8),
             maxSteerLowSpeedRad = Math.toRadians(32.0),
             maxSteerHighSpeedRad = Math.toRadians(22.0),
