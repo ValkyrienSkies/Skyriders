@@ -79,7 +79,7 @@ object SkyridersNetwork {
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
-                BikeManager.updateInput(player.level().dimensionId, seat.bodyId) { input }
+                BikeManager.updateInput(player.level().dimensionId, seat.bodyId) { input.copy(riderPresent = true) }
             }
             context.packetHandled = true
         }

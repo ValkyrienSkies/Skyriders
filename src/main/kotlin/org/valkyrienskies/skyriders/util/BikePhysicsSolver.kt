@@ -36,7 +36,9 @@ object BikePhysicsSolver {
         val right = transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = transformDirection(body, LOCAL_UP, LOCAL_UP)
         val forwardSpeed = safeDot(body.kinematics.velocity, forward)
-        val frontSteerRad = computeFrontSteerAngle(forwardSpeed, input.steer, config)
+        val riderPresent = input.riderPresent
+        val activeInput = if (riderPresent) input else BikeInput.EMPTY
+        val frontSteerRad = computeFrontSteerAngle(forwardSpeed, activeInput.steer, config)
 
         val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val frontContact = sampleWheelContact(
@@ -67,29 +69,42 @@ object BikePhysicsSolver {
         applySuspension(body, rearContact, config)
         applyTireForces(body, frontContact, config)
         applyTireForces(body, rearContact, config)
-        applyDriveAndBrakes(body, frontContact, rearContact, input, config)
+        if (riderPresent) {
+            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, config)
+        } else {
+            applyParkingBrake(body, frontContact, config)
+            applyParkingBrake(body, rearContact, config)
+        }
 
-        val targetLean = updateSmoothedTargetLean(state, computeTargetLean(forwardSpeed, input.steer, config), dt)
-        val chargingJump = input.jump > 0.0
+        val targetLean = updateSmoothedTargetLean(state, computeTargetLean(forwardSpeed, activeInput.steer, config), dt)
+        val chargingJump = activeInput.jump > 0.0
         val balanceTargetLean = if (chargingJump) targetLean * 0.25 else targetLean
         val balanceStrengthScale = if (chargingJump) 1.35 else 1.0
-        if (grounded) {
-            applyJumpChargeAndRelease(body, contacts, forward, terrainUp, input, config, state, dt)
+        if (grounded && riderPresent) {
+            applyJumpChargeAndRelease(body, contacts, forward, terrainUp, activeInput, config, state, dt)
             applyPendingJumpRelease(body, contacts, state, dt)
-            applyStepAssist(body, physLevel, frontContact, forward, terrainUp, input, config)
+            applyStepAssist(body, physLevel, frontContact, forward, terrainUp, activeInput, config)
         } else {
             applyPendingJumpRelease(body, contacts, state, dt)
         }
 
         if (stabilizedGrounded) {
-            applyBalanceController(body, forward, up, terrainUp, balanceTargetLean, config, forwardSpeed, balanceStrengthScale)
-            applySteeringAssist(body, input, forwardSpeed, terrainUp, config)
-            applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
+            if (riderPresent) {
+                applyBalanceController(body, forward, up, terrainUp, balanceTargetLean, config, forwardSpeed, balanceStrengthScale)
+                applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
+            } else {
+                applyParkingStabilization(body, forward, up, terrainUp, config)
+            }
         } else {
-            applyAirborneControl(body, forward, right, up, input, config)
+            if (riderPresent) {
+                applyAirborneControl(body, forward, right, up, activeInput, config)
+            } else {
+                applyAirborneParkingDamping(body, config)
+            }
         }
         if (!grounded) {
-            val jumpHeld = input.jump > 0.0
+            val jumpHeld = activeInput.jump > 0.0
             if (!jumpHeld) {
                 state.jumpCharge = 0.0
             }
@@ -299,6 +314,18 @@ object BikePhysicsSolver {
         applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
     }
 
+    private fun applyParkingBrake(body: PhysVsBody, contact: WheelContact, config: BikePhysicsConfig) {
+        if (!contact.grounded) return
+
+        val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+        val maxBrakeForce = contact.normalForceEstimate *
+            config.frictionCoefficient *
+            config.longitudinalGrip *
+            config.parkingBrakeStrength
+        val forceMag = (-forwardVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
+        applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+    }
+
     private fun computeTargetLean(forwardSpeed: Double, steerInput: Double, config: BikePhysicsConfig): Double {
         val speedLeanAmount = smoothstep(config.minLeanSpeed, config.fullLeanSpeed, abs(forwardSpeed))
         return -steerInput.coerceIn(-1.0, 1.0) * config.maxLeanAngleRad * speedLeanAmount
@@ -381,6 +408,35 @@ object BikePhysicsSolver {
         if (safeDot(up, terrainUp) < 0.0) {
             safeApplyWorldTorque(body, Vector3d(forward).mul(config.antiFlipStrength))
         }
+    }
+
+    private fun applyParkingStabilization(
+        body: PhysVsBody,
+        forward: Vector3d,
+        up: Vector3d,
+        terrainUp: Vector3d,
+        config: BikePhysicsConfig
+    ) {
+        val errorAxis = Vector3d(up).cross(terrainUp)
+        val angularVelocity = Vector3d(body.kinematics.angularVelocity)
+        val yawVelocity = safeDot(angularVelocity, terrainUp)
+        val nonYawAngularVelocity = Vector3d(angularVelocity).fma(-yawVelocity, terrainUp)
+        val torque = errorAxis.mul(config.balanceStrength * config.parkingBalanceStrengthScale)
+            .sub(nonYawAngularVelocity.mul(config.balanceDamping * config.parkingBalanceDampingScale))
+            .fma(-yawVelocity * config.parkingYawDamping, terrainUp)
+
+        safeApplyWorldTorque(body, torque)
+
+        val rollError = safeDot(transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT), terrainUp).coerceIn(-1.0, 1.0)
+        if (abs(rollError) > kotlin.math.sin(config.maxRollAngleRad * 0.65)) {
+            safeApplyWorldTorque(body, Vector3d(forward).mul(rollError * config.antiFlipStrength))
+        }
+    }
+
+    private fun applyAirborneParkingDamping(body: PhysVsBody, config: BikePhysicsConfig) {
+        val torque = Vector3d(body.kinematics.angularVelocity)
+            .mul(-config.balanceDamping * config.parkingBalanceDampingScale)
+        safeApplyWorldTorque(body, torque)
     }
 
     private fun applyStepAssist(
