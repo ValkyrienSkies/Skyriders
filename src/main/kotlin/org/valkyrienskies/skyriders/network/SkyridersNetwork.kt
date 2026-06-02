@@ -11,6 +11,7 @@ import net.minecraftforge.network.NetworkRegistry
 import net.minecraftforge.network.PacketDistributor
 import net.minecraftforge.network.simple.SimpleChannel
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.client.BikeClientEffects
 import org.valkyrienskies.skyriders.client.BikeClientHoistState
@@ -24,6 +25,7 @@ import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
+import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
 import java.util.function.Supplier
@@ -81,6 +83,13 @@ object SkyridersNetwork {
             BikeDebugPacket::encode,
             BikeDebugPacket::decode,
             BikeDebugPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            VehicleDebugPacket::class.java,
+            VehicleDebugPacket::encode,
+            VehicleDebugPacket::decode,
+            VehicleDebugPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -153,6 +162,33 @@ object SkyridersNetwork {
                 driftBoostCharge = state.driftBoostCharge,
                 driftBoostLevel = state.driftBoostLevel,
                 jumpCharge = state.jumpCharge
+            )
+        )
+    }
+
+    fun sendVehicleDebug(player: ServerPlayer, vehicle: org.valkyrienskies.skyriders.content.IVehicle) {
+        val input = VehicleManager.getInput(player.level().dimensionId, vehicle.bodyId)
+        val speed = try {
+            player.level().shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
+        } catch (_: IllegalStateException) {
+            0.0
+        }
+        val groundedCount = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugGroundedWheels
+            is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
+            else -> -1
+        }
+        CHANNEL.send(
+            PacketDistributor.PLAYER.with { player },
+            VehicleDebugPacket(
+                bodyId = vehicle.bodyId,
+                vehicleId = vehicle.id,
+                vehicleName = vehicle.vehicleDefinition.displayName,
+                speed = speed,
+                engineOn = vehicle.vehicleState.engineOn,
+                throttle = input.throttle,
+                steer = input.steer,
+                groundedCount = groundedCount
             )
         )
     }
@@ -497,6 +533,61 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeDebugPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class VehicleDebugPacket(
+        val bodyId: Long,
+        val vehicleId: String,
+        val vehicleName: String,
+        val speed: Double,
+        val engineOn: Boolean,
+        val throttle: Double,
+        val steer: Double,
+        val groundedCount: Int
+    ) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeLong(bodyId)
+            buf.writeUtf(vehicleId)
+            buf.writeUtf(vehicleName)
+            buf.writeDouble(speed)
+            buf.writeBoolean(engineOn)
+            buf.writeDouble(throttle)
+            buf.writeDouble(steer)
+            buf.writeInt(groundedCount)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { BikeDebugOverlay.updateVehicle(this) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: VehicleDebugPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): VehicleDebugPacket {
+                return VehicleDebugPacket(
+                    bodyId = buf.readLong(),
+                    vehicleId = buf.readUtf(),
+                    vehicleName = buf.readUtf(),
+                    speed = buf.readDouble(),
+                    engineOn = buf.readBoolean(),
+                    throttle = buf.readDouble(),
+                    steer = buf.readDouble(),
+                    groundedCount = buf.readInt()
+                )
+            }
+
+            fun handle(packet: VehicleDebugPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

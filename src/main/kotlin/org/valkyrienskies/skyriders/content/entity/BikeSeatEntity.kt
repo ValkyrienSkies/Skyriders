@@ -134,7 +134,9 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         if (!isDriverSeat()) return
 
         val player = controllingPassenger as? ServerPlayer ?: return
-        val bike = VehicleManager.getVehicle(level().dimensionId, bodyId) as? org.valkyrienskies.skyriders.content.IBike ?: return
+        val vehicle = VehicleManager.getVehicle(level().dimensionId, bodyId) ?: return
+        SkyridersNetwork.sendVehicleDebug(player, vehicle)
+        val bike = vehicle as? org.valkyrienskies.skyriders.content.IBike ?: return
         SkyridersNetwork.sendBikeDebug(player, bike)
     }
 

@@ -11,21 +11,31 @@ import kotlin.math.PI
 
 object BikeDebugOverlay {
     private const val STALE_AFTER_MILLIS = 750L
-    private var snapshot: Snapshot? = null
+    private var vehicleSnapshot: VehicleSnapshot? = null
+    private var bikeSnapshot: BikeSnapshot? = null
 
     fun update(packet: SkyridersNetwork.BikeDebugPacket) {
-        snapshot = Snapshot(
+        bikeSnapshot = BikeSnapshot(
             bodyId = packet.bodyId,
-            bikeId = packet.bikeId,
-            bikeName = packet.bikeName,
-            speed = packet.speed,
             frontGrounded = packet.frontGrounded,
             rearGrounded = packet.rearGrounded,
-            throttle = packet.throttle,
             steeringAngleRad = packet.steeringAngleRad,
             drifting = packet.drifting,
-            engineOn = packet.engineOn,
             jumpCharge = packet.jumpCharge,
+            receivedAtMillis = System.currentTimeMillis()
+        )
+    }
+
+    fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
+        vehicleSnapshot = VehicleSnapshot(
+            bodyId = packet.bodyId,
+            vehicleId = packet.vehicleId,
+            vehicleName = packet.vehicleName,
+            speed = packet.speed,
+            engineOn = packet.engineOn,
+            throttle = packet.throttle,
+            steer = packet.steer,
+            groundedCount = packet.groundedCount,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -35,28 +45,37 @@ object BikeDebugOverlay {
         val minecraft = Minecraft.getInstance()
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
-            snapshot = null
+            vehicleSnapshot = null
+            bikeSnapshot = null
             return
         }
-        val currentSnapshot = snapshot ?: return
+        val currentSnapshot = vehicleSnapshot ?: return
         if (currentSnapshot.bodyId != seat.bodyId) return
         if (System.currentTimeMillis() - currentSnapshot.receivedAtMillis > STALE_AFTER_MILLIS) return
+        val bikeDetails = bikeSnapshot
+            ?.takeIf { it.bodyId == currentSnapshot.bodyId }
+            ?.takeIf { System.currentTimeMillis() - it.receivedAtMillis <= STALE_AFTER_MILLIS }
 
-        drawLines(
-            event.guiGraphics,
-            listOf(
-                "Skyriders Bike",
-                "Bike Type: ${currentSnapshot.bikeName} (${currentSnapshot.bikeId})",
-                "Current Speed: ${formatNumber(currentSnapshot.speed)}",
-                "Engine On: ${currentSnapshot.engineOn}",
-                "Front Wheel Grounded: ${currentSnapshot.frontGrounded}",
-                "Rear Wheel Grounded: ${currentSnapshot.rearGrounded}",
-                "Throttle: ${formatNumber(currentSnapshot.throttle)}",
-                "Steering Angle: ${formatDegrees(currentSnapshot.steeringAngleRad)} deg",
-                "Is Drifting: ${currentSnapshot.drifting}",
-                "Jump Charge: ${formatPercent(currentSnapshot.jumpCharge)}"
-            )
+        val lines = mutableListOf(
+            "Skyriders Vehicle",
+            "Vehicle Type: ${currentSnapshot.vehicleName} (${currentSnapshot.vehicleId})",
+            "Current Speed: ${formatNumber(currentSnapshot.speed)}",
+            "Engine On: ${currentSnapshot.engineOn}",
+            "Throttle: ${formatNumber(currentSnapshot.throttle)}",
+            "Steer Input: ${formatNumber(currentSnapshot.steer)}"
         )
+        if (currentSnapshot.groundedCount >= 0) {
+            lines.add("Grounded Wheels: ${currentSnapshot.groundedCount}")
+        }
+        if (bikeDetails != null) {
+            lines.add("Front Wheel Grounded: ${bikeDetails.frontGrounded}")
+            lines.add("Rear Wheel Grounded: ${bikeDetails.rearGrounded}")
+            lines.add("Steering Angle: ${formatDegrees(bikeDetails.steeringAngleRad)} deg")
+            lines.add("Is Drifting: ${bikeDetails.drifting}")
+            lines.add("Jump Charge: ${formatPercent(bikeDetails.jumpCharge)}")
+        }
+
+        drawLines(event.guiGraphics, lines)
     }
 
     private fun drawLines(guiGraphics: GuiGraphics, lines: List<String>) {
@@ -85,17 +104,24 @@ object BikeDebugOverlay {
         return String.format(Locale.ROOT, "%.0f%%", percent)
     }
 
-    private data class Snapshot(
+    private data class VehicleSnapshot(
         val bodyId: Long,
-        val bikeId: String,
-        val bikeName: String,
+        val vehicleId: String,
+        val vehicleName: String,
         val speed: Double,
+        val engineOn: Boolean,
+        val throttle: Double,
+        val steer: Double,
+        val groundedCount: Int,
+        val receivedAtMillis: Long
+    )
+
+    private data class BikeSnapshot(
+        val bodyId: Long,
         val frontGrounded: Boolean,
         val rearGrounded: Boolean,
-        val throttle: Double,
         val steeringAngleRad: Double,
         val drifting: Boolean,
-        val engineOn: Boolean,
         val jumpCharge: Double,
         val receivedAtMillis: Long
     )

@@ -13,12 +13,12 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
 import org.lwjgl.glfw.GLFW
 import org.valkyrienskies.skyriders.SkyridersMod
-import org.valkyrienskies.skyriders.content.BikeInteractionHandler
+import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
-import org.valkyrienskies.skyriders.content.BikeDefinitions
+import org.valkyrienskies.skyriders.content.VehicleDefinitions
 
 object SkyridersModClient {
     private var lastSentInput = BikeInput.EMPTY
@@ -47,7 +47,7 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.BIKE_SEAT_ENTITY.get(), ::BikeSeatRenderer)
             MinecraftForge.EVENT_BUS.register(ClientEvents)
             MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
-            MinecraftForge.EVENT_BUS.register(BikeWorldRenderer)
+            MinecraftForge.EVENT_BUS.register(VehicleWorldRenderer)
         }
     }
 
@@ -60,8 +60,8 @@ object SkyridersModClient {
 
     @JvmStatic
     fun registerAdditionalModels(event: ModelEvent.RegisterAdditional) {
-        BikeDefinitions.ids
-            .mapNotNull(BikeDefinitions::get)
+        VehicleDefinitions.ids
+            .mapNotNull(VehicleDefinitions::get)
             .flatMap { definition ->
                 listOfNotNull(
                     definition.render.model,
@@ -79,8 +79,8 @@ object SkyridersModClient {
             if (event.phase != TickEvent.Phase.END) return
 
             val minecraft = Minecraft.getInstance()
-            ClientBikeSyncHandler.tick()
-            BikeClientEffects.tick()
+            ClientVehicleSyncHandler.tick()
+            VehicleClientEffects.tick()
             val player = minecraft.player ?: return
             if (player.vehicle !is BikeSeatEntity) return
 
@@ -124,7 +124,7 @@ object SkyridersModClient {
 
             val eye = player.getEyePosition(1.0f)
             val end = eye.add(player.lookAngle.scale(5.0))
-            val hitBike = BikeInteractionHandler.findBikeOnRay(level, eye, end) != null
+            val hitBike = VehicleInteractionHandler.findVehicleOnRay(level, eye, end) != null
             if (!hitBike && !BikeClientHoistState.hoisting) return
 
             SkyridersNetwork.sendBikeUse()

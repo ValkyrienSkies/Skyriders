@@ -13,16 +13,19 @@ import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.level.block.state.BlockState
 import org.joml.Vector3d
-import org.valkyrienskies.skyriders.content.BikeSoundDefinition
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
+import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleSoundDefinition
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import org.valkyrienskies.mod.api.shipWorld
 import kotlin.math.abs
 import kotlin.math.min
 
 object BikeClientEffects {
     private val telemetryByBodyId = HashMap<Long, TimedTelemetry>()
-    private val engineSoundsByBodyId = HashMap<Long, BikeEngineSound>()
+    private val engineSoundsByBodyId = HashMap<Long, VehicleEngineSound>()
     private val lastEngineStateByBodyId = HashMap<Long, Boolean>()
 
     fun updateTelemetry(packet: SkyridersNetwork.BikeDebugPacket) {
@@ -44,8 +47,9 @@ object BikeClientEffects {
         val gameTime = level.gameTime
         telemetryByBodyId.entries.removeIf { it.value.expireTick < gameTime }
 
-        val bikes = BikeManager.getBikes(level)
-        val activeBodyIds = bikes.mapTo(HashSet()) { it.bodyId }
+        val vehicles = VehicleManager.getVehicles(level)
+        val bikes = vehicles.filterIsInstance<IBike>()
+        val activeBodyIds = vehicles.mapTo(HashSet()) { it.bodyId }
         lastEngineStateByBodyId.keys.retainAll(activeBodyIds)
         engineSoundsByBodyId.entries.removeIf { entry ->
             if (entry.key in activeBodyIds) {
@@ -55,8 +59,8 @@ object BikeClientEffects {
                 true
             }
         }
-        bikes.forEach { bike ->
-            tickEngineSound(minecraft, bike, telemetryByBodyId[bike.bodyId]?.packet)
+        vehicles.forEach { vehicle ->
+            tickEngineSound(minecraft, vehicle, telemetryByBodyId[vehicle.bodyId]?.packet)
         }
 
         bikes.forEach { bike ->
@@ -152,27 +156,28 @@ object BikeClientEffects {
         return if (telemetry?.drifting == true) 0.85 else speedChance
     }
 
-    private fun tickEngineSound(minecraft: Minecraft, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
-        playEngineTransitionSound(minecraft, bike)
+    private fun tickEngineSound(minecraft: Minecraft, vehicle: IVehicle, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+        playEngineTransitionSound(minecraft, vehicle)
 
-        val soundId = bike.definition.sounds.engineLoop
-        if (soundId == null || !bike.state.engineOn) {
-            engineSoundsByBodyId.remove(bike.bodyId)?.stopNow()
+        val soundDefinition = vehicle.vehicleDefinition.sounds
+        val soundId = soundDefinition.engineLoop
+        if (soundId == null || !vehicle.vehicleState.engineOn) {
+            engineSoundsByBodyId.remove(vehicle.bodyId)?.stopNow()
             return
         }
         val speed = try {
-            bike.getKinematics().velocity.length()
+            vehicle.level.shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
         } catch (_: IllegalStateException) {
             0.0
         }
         val throttle = abs(telemetry?.throttle ?: 0.0)
-        val existingSound = engineSoundsByBodyId[bike.bodyId]
+        val existingSound = engineSoundsByBodyId[vehicle.bodyId]
         val sound = if (existingSound?.soundId == soundId) {
             existingSound
         } else {
             existingSound?.stopNow()
-            BikeEngineSound(bike, soundId, bike.definition.sounds).also {
-                engineSoundsByBodyId[bike.bodyId] = it
+            VehicleEngineSound(vehicle, soundId, soundDefinition).also {
+                engineSoundsByBodyId[vehicle.bodyId] = it
             }
         }
         sound.update(speed, throttle)
@@ -181,14 +186,15 @@ object BikeClientEffects {
         }
     }
 
-    private fun playEngineTransitionSound(minecraft: Minecraft, bike: IBike) {
-        val previous = lastEngineStateByBodyId.put(bike.bodyId, bike.state.engineOn)
-        if (previous == null || previous == bike.state.engineOn) return
+    private fun playEngineTransitionSound(minecraft: Minecraft, vehicle: IVehicle) {
+        val engineOn = vehicle.vehicleState.engineOn
+        val previous = lastEngineStateByBodyId.put(vehicle.bodyId, engineOn)
+        if (previous == null || previous == engineOn) return
 
-        val soundId = if (bike.state.engineOn) bike.definition.sounds.engineStart else bike.definition.sounds.engineStop
+        val soundId = if (engineOn) vehicle.vehicleDefinition.sounds.engineStart else vehicle.vehicleDefinition.sounds.engineStop
         soundId ?: return
         val position = try {
-            bike.getRenderTransform().toWorld.transformPosition(Vector3d())
+            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
         } catch (_: IllegalStateException) {
             return
         }
@@ -239,10 +245,10 @@ object BikeClientEffects {
         val expireTick: Long
     )
 
-    private class BikeEngineSound(
-        private val bike: IBike,
+    private class VehicleEngineSound(
+        private val vehicle: IVehicle,
         val soundId: net.minecraft.resources.ResourceLocation,
-        private val soundDefinition: BikeSoundDefinition
+        private val soundDefinition: VehicleSoundDefinition
     ) : AbstractSoundInstance(
         soundId,
         SoundSource.NEUTRAL,
@@ -259,7 +265,7 @@ object BikeClientEffects {
 
         fun update(speed: Double, throttle: Double) {
             val transform = try {
-                bike.getRenderTransform()
+                vehicle.getRenderTransform()
             } catch (_: IllegalStateException) {
                 volume = 0.0f
                 return
@@ -285,7 +291,7 @@ object BikeClientEffects {
         }
 
         override fun tick() {
-            if (bike.level.isClientSide && BikeManager.getBike(bike.level, bike.bodyId) != null) {
+            if (vehicle.level.isClientSide && VehicleManager.getVehicle(vehicle.level, vehicle.bodyId) != null) {
                 return
             }
             stopNow()
