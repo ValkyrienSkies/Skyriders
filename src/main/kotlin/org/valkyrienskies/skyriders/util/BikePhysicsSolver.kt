@@ -102,8 +102,11 @@ object BikePhysicsSolver {
                 applyBalanceController(body, forward, up, terrainUp, balanceTargetLean, config, forwardSpeed, balanceStrengthScale)
                 applyGroundedPitchControl(body, activeInput, forward, right, terrainUp, forwardSpeed, config)
                 if (frontContact.grounded) {
-                    applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
-                    applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, drifting, config)
+                    if (drifting) {
+                        applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                    } else {
+                        applySteeringAssist(body, activeInput, forwardSpeed, terrainUp, config)
+                    }
                 }
                 applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
             } else {
@@ -303,11 +306,11 @@ object BikePhysicsSolver {
             applyDriveForce(body, front, throttle, config, FRONT_STEP_TRACTION_SCALE * driveScale)
         }
 
-        if (drifting) {
-            applyBrake(body, rear, input.brake * config.driftBrakeStrengthScale, config)
-        } else {
+        if (!drifting) {
             applyBrake(body, front, input.brake * 0.65, config)
             applyBrake(body, rear, input.brake * 0.35, config)
+        } else if (config.driftBrakeStrengthScale > 0.0) {
+            applyBrake(body, rear, input.brake * config.driftBrakeStrengthScale, config)
         }
     }
 
@@ -433,11 +436,8 @@ object BikePhysicsSolver {
         input: BikeInput,
         speed: Double,
         terrainUp: Vector3d,
-        drifting: Boolean,
         config: BikePhysicsConfig
     ) {
-        if (!drifting) return
-
         val direction = when {
             speed < -0.5 -> -1.0
             speed > 0.5 -> 1.0
