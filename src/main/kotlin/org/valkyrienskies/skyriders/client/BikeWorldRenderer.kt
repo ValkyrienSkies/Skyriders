@@ -60,7 +60,11 @@ object BikeWorldRenderer {
         } catch (_: IllegalStateException) {
             return
         }
-        val bodyPosition = transform.toWorld.transformPosition(Vector3d())
+        val carriedPlayer = Minecraft.getInstance().player?.takeIf {
+            BikeClientHoistState.hoisting && BikeClientHoistState.bodyId == bike.bodyId
+        }
+        val bodyPosition = carriedPlayer?.let(BikeClientHoistState::carriedPosition)
+            ?: transform.toWorld.transformPosition(Vector3d())
         if (!bodyPosition.isFinite()) return
 
         val render = bike.definition.render
@@ -76,7 +80,7 @@ object BikeWorldRenderer {
 
         poseStack.pushPose()
         poseStack.translate(bodyPosition.x - cameraX, bodyPosition.y - cameraY, bodyPosition.z - cameraZ)
-        poseStack.mulPose(Quaternionf(transform.rotation))
+        poseStack.mulPose(Quaternionf(carriedPlayer?.let(BikeClientHoistState::carriedRotation) ?: transform.rotation))
         if (render.modelYawRad.isFinite() && render.modelYawRad != 0.0) {
             poseStack.mulPose(Axis.YP.rotation(render.modelYawRad.toFloat()))
         }

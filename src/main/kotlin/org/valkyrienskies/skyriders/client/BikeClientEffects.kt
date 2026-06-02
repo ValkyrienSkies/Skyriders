@@ -2,12 +2,16 @@ package org.valkyrienskies.skyriders.client
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance
+import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleOptions
 import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.sounds.SoundSource
 import net.minecraft.world.level.block.state.BlockState
 import org.joml.Vector3d
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -16,6 +20,7 @@ import kotlin.math.min
 
 object BikeClientEffects {
     private val telemetryByBodyId = HashMap<Long, TimedTelemetry>()
+    private val engineSoundsByBodyId = HashMap<Long, BikeEngineSound>()
 
     fun updateTelemetry(packet: SkyridersNetwork.BikeDebugPacket) {
         telemetryByBodyId[packet.bodyId] = TimedTelemetry(
@@ -36,7 +41,21 @@ object BikeClientEffects {
         val gameTime = level.gameTime
         telemetryByBodyId.entries.removeIf { it.value.expireTick < gameTime }
 
-        BikeManager.getBikes(level).forEach { bike ->
+        val bikes = BikeManager.getBikes(level)
+        val activeBodyIds = bikes.mapTo(HashSet()) { it.bodyId }
+        engineSoundsByBodyId.entries.removeIf { entry ->
+            if (entry.key in activeBodyIds) {
+                false
+            } else {
+                entry.value.stopNow()
+                true
+            }
+        }
+        bikes.forEach { bike ->
+            tickEngineSound(minecraft, bike, telemetryByBodyId[bike.bodyId]?.packet)
+        }
+
+        bikes.forEach { bike ->
             spawnBikeEffects(level, bike, telemetryByBodyId[bike.bodyId]?.packet)
         }
     }
@@ -53,11 +72,9 @@ object BikeClientEffects {
             return
         }
         val speed = if (velocity.isFinite()) velocity.length() else 0.0
-        if (speed < 0.6) return
-
         val render = bike.definition.render
         val exhaustPos = transform.toWorld.transformPosition(Vector3d(render.exhaustLocalPos))
-        if (exhaustPos.isFinite() && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
+        if (speed > 0.6 && exhaustPos.isFinite() && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
             val exhaustVelocity = transform.rotation.transform(Vector3d(0.0, 0.025, -0.075 - min(speed, 20.0) * 0.003))
             level.addParticle(
                 exhaustParticle(telemetry),
@@ -74,10 +91,10 @@ object BikeClientEffects {
         val frontGrounded = telemetry?.frontGrounded ?: (speed > 4.0)
         val rearGrounded = telemetry?.rearGrounded ?: (speed > 4.0)
         if (frontGrounded) {
-            spawnTireParticles(level, transform.toWorld.transformPosition(Vector3d(bike.config.frontWheelLocalPos).add(0.0, render.tireParticleLocalYOffset, 0.0)), speed, drifting)
+            spawnTireParticles(level, wheelGroundParticlePos(bike, true, transform), speed, drifting)
         }
         if (rearGrounded) {
-            spawnTireParticles(level, transform.toWorld.transformPosition(Vector3d(bike.config.rearWheelLocalPos).add(0.0, render.tireParticleLocalYOffset, 0.0)), speed, drifting)
+            spawnTireParticles(level, wheelGroundParticlePos(bike, false, transform), speed, drifting)
         }
     }
 
@@ -85,21 +102,21 @@ object BikeClientEffects {
         if (!position.isFinite()) return
 
         val chance = if (drifting) {
-            0.65
+            0.9
         } else {
-            ((speed - 7.0) / 18.0).coerceIn(0.0, 0.28)
+            ((speed - 2.5) / 13.0).coerceIn(0.0, 0.45)
         }
         if (level.random.nextDouble() >= chance) return
 
-        if (drifting && level.random.nextDouble() < 0.55) {
+        if (drifting && level.random.nextDouble() < 0.35) {
             level.addParticle(
-                ParticleTypes.SMOKE,
+                ParticleTypes.CLOUD,
                 position.x,
-                position.y + 0.05,
+                position.y + 0.015,
                 position.z,
-                randomSpread(level, 0.035),
-                0.035 + level.random.nextDouble() * 0.025,
-                randomSpread(level, 0.035)
+                randomSpread(level, 0.045),
+                0.012 + level.random.nextDouble() * 0.012,
+                randomSpread(level, 0.045)
             )
         }
 
@@ -108,16 +125,16 @@ object BikeClientEffects {
         level.addParticle(
             particle,
             position.x,
-            position.y + 0.025,
+            position.y + 0.01,
             position.z,
-            randomSpread(level, 0.045),
-            0.025 + level.random.nextDouble() * 0.025,
-            randomSpread(level, 0.045)
+            randomSpread(level, 0.055),
+            0.012 + level.random.nextDouble() * 0.02,
+            randomSpread(level, 0.055)
         )
     }
 
     private fun exhaustParticle(telemetry: SkyridersNetwork.BikeDebugPacket?): ParticleOptions {
-        if (telemetry?.drifting != true) return ParticleTypes.CAMPFIRE_COSY_SMOKE
+        if (telemetry?.drifting != true) return ParticleTypes.SMOKE
         return when {
             telemetry.driftBoostLevel >= 3 -> ParticleTypes.DRAGON_BREATH
             telemetry.driftBoostLevel >= 2 -> ParticleTypes.SOUL_FIRE_FLAME
@@ -129,6 +146,32 @@ object BikeClientEffects {
     private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.BikeDebugPacket?): Double {
         val speedChance = (0.12 + speed / 42.0).coerceIn(0.12, 0.55)
         return if (telemetry?.drifting == true) 0.85 else speedChance
+    }
+
+    private fun tickEngineSound(minecraft: Minecraft, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+        val speed = try {
+            bike.getKinematics().velocity.length()
+        } catch (_: IllegalStateException) {
+            0.0
+        }
+        val throttle = abs(telemetry?.throttle ?: 0.0)
+        val sound = engineSoundsByBodyId.getOrPut(bike.bodyId) {
+            BikeEngineSound(bike)
+        }
+        sound.update(speed, throttle)
+        if (!minecraft.soundManager.isActive(sound)) {
+            minecraft.soundManager.play(sound)
+        }
+    }
+
+    private fun wheelGroundParticlePos(
+        bike: IBike,
+        front: Boolean,
+        transform: org.valkyrienskies.core.api.bodies.properties.BodyTransform
+    ): Vector3d {
+        val local = Vector3d(if (front) bike.config.frontWheelLocalPos else bike.config.rearWheelLocalPos)
+        local.y -= bike.config.wheelRadius + 0.035
+        return transform.toWorld.transformPosition(local)
     }
 
     private fun groundState(level: ClientLevel, position: Vector3d): BlockState? {
@@ -149,4 +192,46 @@ object BikeClientEffects {
         val packet: SkyridersNetwork.BikeDebugPacket,
         val expireTick: Long
     )
+
+    private class BikeEngineSound(private val bike: IBike) : AbstractTickableSoundInstance(
+        SkyridersMod.BIKE_ENGINE_SOUND.get(),
+        SoundSource.NEUTRAL,
+        SoundInstance.createUnseededRandom()
+    ) {
+        init {
+            looping = true
+            attenuation = SoundInstance.Attenuation.LINEAR
+            volume = 0.0f
+            pitch = 0.75f
+        }
+
+        fun update(speed: Double, throttle: Double) {
+            val transform = try {
+                bike.getRenderTransform()
+            } catch (_: IllegalStateException) {
+                volume = 0.0f
+                return
+            }
+            val position = transform.toWorld.transformPosition(Vector3d())
+            x = position.x
+            y = position.y
+            z = position.z
+
+            val speedT = (speed / 18.0).coerceIn(0.0, 1.0)
+            val accelT = throttle.coerceIn(0.0, 1.0)
+            volume = (0.18 + speedT * 0.18 + accelT * 0.16).toFloat()
+            pitch = (0.72 + speedT * 0.42 + accelT * 0.35).coerceIn(0.7, 1.45).toFloat()
+        }
+
+        override fun tick() {
+            if (bike.level.isClientSide && BikeManager.getBike(bike.level, bike.bodyId) != null) {
+                return
+            }
+            stop()
+        }
+
+        fun stopNow() {
+            stop()
+        }
+    }
 }

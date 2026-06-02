@@ -32,9 +32,9 @@ object BikeInteractionHandler {
     private const val HOIST_FORWARD_OFFSET = 0.45
     private const val HOIST_UP_OFFSET = 1.05
     private const val PLACE_UP_OFFSET = 0.45
-    private const val TOSS_FORCE_DURATION = 0.18
-    private const val TOSS_FORWARD_FORCE_PER_MASS = 105.0
-    private const val TOSS_UP_FORCE_PER_MASS = 28.0
+    private const val TOSS_FORCE_DURATION = 0.12
+    private const val TOSS_FORWARD_FORCE_PER_MASS = 45.0
+    private const val TOSS_UP_FORCE_PER_MASS = 8.0
 
     private val hoistedByPlayer = ConcurrentHashMap<UUID, HoistedBike>()
     private val hoistedPlayersByBody = ConcurrentHashMap<BodyId, UUID>()
@@ -177,7 +177,7 @@ object BikeInteractionHandler {
 
         hoistedByPlayer[player.uuid] = HoistedBike(level.dimensionId, bike.bodyId)
         hoistedPlayersByBody[bike.bodyId] = player.uuid
-        SkyridersNetwork.sendBikeHoistState(player, true)
+        SkyridersNetwork.sendBikeHoistState(player, true, bike.bodyId)
         updateHoistedBike(player)
     }
 

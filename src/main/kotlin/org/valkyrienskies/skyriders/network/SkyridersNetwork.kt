@@ -143,8 +143,8 @@ object SkyridersNetwork {
         )
     }
 
-    fun sendBikeHoistState(player: ServerPlayer, hoisting: Boolean) {
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting))
+    fun sendBikeHoistState(player: ServerPlayer, hoisting: Boolean, bodyId: Long = -1L) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting, bodyId))
     }
 
     data class BikeInputPacket(val input: BikeInput) {
@@ -239,16 +239,20 @@ object SkyridersNetwork {
         }
     }
 
-    data class BikeHoistStatePacket(val hoisting: Boolean) {
+    data class BikeHoistStatePacket(val hoisting: Boolean, val bodyId: Long) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeBoolean(hoisting)
+            buf.writeLong(bodyId)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
             val context = contextSupplier.get()
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
-                    Runnable { BikeClientHoistState.hoisting = hoisting }
+                    Runnable {
+                        BikeClientHoistState.hoisting = hoisting
+                        BikeClientHoistState.bodyId = if (hoisting) bodyId else -1L
+                    }
                 }
             }
             context.packetHandled = true
@@ -260,7 +264,7 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): BikeHoistStatePacket {
-                return BikeHoistStatePacket(buf.readBoolean())
+                return BikeHoistStatePacket(buf.readBoolean(), buf.readLong())
             }
 
             fun handle(packet: BikeHoistStatePacket, contextSupplier: Supplier<NetworkEvent.Context>) {

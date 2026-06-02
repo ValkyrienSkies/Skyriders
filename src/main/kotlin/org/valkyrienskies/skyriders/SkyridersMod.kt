@@ -5,6 +5,8 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.level.block.Block
+import net.minecraft.sounds.SoundEvent
+import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
 import net.minecraftforge.fml.loading.FMLEnvironment
@@ -34,6 +36,7 @@ object SkyridersMod {
     private val ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MOD_ID)
     private val ENTITIES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MOD_ID)
     private val BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID)
+    private val SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID)
 
     // Put RegistryObjects here:
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
@@ -42,6 +45,9 @@ object SkyridersMod {
             .clientTrackingRange(10)
             .updateInterval(1)
             .build("$MOD_ID:bike_seat")
+    }
+    val BIKE_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine"))
     }
 
     // end of RegistryObjects
@@ -53,6 +59,7 @@ object SkyridersMod {
         ITEMS.register(modEventBus)
         ENTITIES.register(modEventBus)
         BLOCK_ENTITIES.register(modEventBus)
+        SOUND_EVENTS.register(modEventBus)
 
         modEventBus.addListener(::init)
         MinecraftForge.EVENT_BUS.register(BikeLifecycle)
