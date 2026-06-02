@@ -53,9 +53,9 @@ object BikeInteractionHandler {
 
         val target = findBikeInLook(player, USE_RANGE) ?: return
         if (player.isShiftKeyDown && VehicleInteractionAction.PICK_UP in target.actions) {
-            startHoisting(player, target.bike)
+            startHoisting(player, target.vehicle)
         } else if (VehicleInteractionAction.MOUNT in target.actions) {
-            mountBike(player, target.bike, notifyPlayer = false, interactionZoneId = target.zoneId)
+            mountVehicle(player, target.vehicle, notifyPlayer = false, interactionZoneId = target.zoneId)
         } else {
             return
         }
@@ -67,26 +67,35 @@ object BikeInteractionHandler {
         notifyPlayer: Boolean,
         interactionZoneId: String = VehicleInteractionDefinition.SEAT
     ): Boolean {
+        return mountVehicle(player, bike, notifyPlayer, interactionZoneId)
+    }
+
+    fun mountVehicle(
+        player: ServerPlayer,
+        vehicle: IVehicle,
+        notifyPlayer: Boolean,
+        interactionZoneId: String = VehicleInteractionDefinition.SEAT
+    ): Boolean {
         val level = player.level() as? ServerLevel ?: return false
-        if (hoistedPlayersByBody.containsKey(bike.bodyId)) {
+        if (hoistedPlayersByBody.containsKey(vehicle.bodyId)) {
             if (notifyPlayer) {
-                player.sendSystemMessage(Component.literal("That bike is being carried."))
+                player.sendSystemMessage(Component.literal("That vehicle is being carried."))
             }
             return false
         }
 
         val transform = try {
-            bike.getTransform()
+            vehicle.getRenderTransform()
         } catch (ex: IllegalStateException) {
             if (notifyPlayer) {
-                player.sendSystemMessage(Component.literal(ex.message ?: "Bike body is missing."))
+                player.sendSystemMessage(Component.literal(ex.message ?: "Vehicle body is missing."))
             }
             return false
         }
 
-        val seatDefinition = bike.vehicleDefinition.seats.firstOrNull { it.interactionZone == interactionZoneId }
-            ?: bike.vehicleDefinition.seats.firstOrNull { it.id == VehicleInteractionDefinition.SEAT }
-        val seatLocalPos = seatDefinition?.localPos ?: Vector3d(0.0, bike.getSeatOffset(), 0.0)
+        val seatDefinition = vehicle.vehicleDefinition.seats.firstOrNull { it.interactionZone == interactionZoneId }
+            ?: vehicle.vehicleDefinition.seats.firstOrNull { it.id == VehicleInteractionDefinition.SEAT }
+        val seatLocalPos = seatDefinition?.localPos ?: Vector3d(0.0, 0.35, 0.0)
         val seatWorld = transform.toWorld.transformPosition(Vector3d(seatLocalPos))
         val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
         val yaw = Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
@@ -96,9 +105,9 @@ object BikeInteractionHandler {
                     player.sendSystemMessage(Component.literal("Could not create bike seat entity."))
                 }
                 return false
-            }
+        }
 
-        seat.bodyId = bike.bodyId
+        seat.bodyId = vehicle.bodyId
         seat.seatId = seatDefinition?.id ?: VehicleInteractionDefinition.SEAT
         seat.moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yaw, 0.0f)
         level.addFreshEntity(seat)
@@ -106,22 +115,21 @@ object BikeInteractionHandler {
         alignPlayerToBike(player, yaw)
 
         if (notifyPlayer) {
-            player.sendSystemMessage(Component.literal("Mounted ${bike.definition.displayName} (${bike.id}) with VS body ${bike.bodyId}"))
+            player.sendSystemMessage(Component.literal("Mounted ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body ${vehicle.bodyId}"))
         }
         return true
     }
 
-    fun findBikeInLook(player: Player, range: Double = USE_RANGE): BikeRayHit? {
+    fun findBikeInLook(player: Player, range: Double = USE_RANGE): VehicleInteractionHit? {
         val start = player.getEyePosition(1.0f)
         val end = start.add(player.lookAngle.scale(range))
         return findBikeOnRay(player.level(), start, end)
     }
 
-    fun findBikeOnRay(level: net.minecraft.world.level.Level, start: Vec3, end: Vec3): BikeRayHit? {
+    fun findBikeOnRay(level: net.minecraft.world.level.Level, start: Vec3, end: Vec3): VehicleInteractionHit? {
         val hit = VehicleInteractionPicker.findVehicleOnRay(level, start, end) ?: return null
-        val bike = hit.vehicle as? IBike ?: return null
-        return BikeRayHit(
-            bike = bike,
+        return VehicleInteractionHit(
+            vehicle = hit.vehicle,
             zoneId = hit.zone.id,
             actions = hit.zone.actions,
             distanceSqr = hit.distanceSqr
@@ -180,18 +188,18 @@ object BikeInteractionHandler {
         }
     }
 
-    private fun startHoisting(player: ServerPlayer, bike: IBike) {
+    private fun startHoisting(player: ServerPlayer, vehicle: IVehicle) {
         if (player.vehicle is BikeSeatEntity) return
-        if (hoistedPlayersByBody.containsKey(bike.bodyId)) return
+        if (hoistedPlayersByBody.containsKey(vehicle.bodyId)) return
 
         val level = player.level() as? ServerLevel ?: return
-        val body = getServerBody(level, bike.bodyId) ?: return
+        val body = getServerBody(level, vehicle.bodyId) ?: return
         body.isStatic = true
-        BikeManager.updateInput(level.dimensionId, bike.bodyId) { BikeInput.EMPTY }
+        VehicleManager.clearInput(level.dimensionId, vehicle.bodyId)
 
-        hoistedByPlayer[player.uuid] = HoistedBike(level.dimensionId, bike.bodyId)
-        hoistedPlayersByBody[bike.bodyId] = player.uuid
-        SkyridersNetwork.sendBikeHoistState(player, true, bike.bodyId)
+        hoistedByPlayer[player.uuid] = HoistedBike(level.dimensionId, vehicle.bodyId)
+        hoistedPlayersByBody[vehicle.bodyId] = player.uuid
+        SkyridersNetwork.sendBikeHoistState(player, true, vehicle.bodyId)
         updateHoistedBike(player)
     }
 
@@ -216,7 +224,7 @@ object BikeInteractionHandler {
     private fun releaseHoistedBike(player: ServerPlayer, hoisted: HoistedBike) {
         val level = player.level() as? ServerLevel ?: return clearHoist(player.uuid, hoisted.bodyId)
         val body = getServerBody(level, hoisted.bodyId) ?: return clearHoist(player.uuid, hoisted.bodyId)
-        val bike = BikeManager.getBike(level.dimensionId, hoisted.bodyId)
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, hoisted.bodyId)
         val hit = player.pick(USE_RANGE, 1.0f, false)
 
         if (hit.type == HitResult.Type.BLOCK && hit is BlockHitResult) {
@@ -237,7 +245,7 @@ object BikeInteractionHandler {
                 eye.z + look.z * 1.15
             )
             pendingReleases[hoisted.bodyId] = ReleasePose(level.dimensionId, pos, carriedRotation(player))
-            val mass = bike?.config?.mass ?: 250.0
+            val mass = vehicle?.vehicleDefinition?.body?.mass ?: 250.0
             val direction = Vector3d(look.x, max(look.y, 0.0) + 0.18, look.z).normalize()
             pendingTosses[hoisted.bodyId] = PendingToss(
                 dimensionId = level.dimensionId,
@@ -273,8 +281,8 @@ object BikeInteractionHandler {
         return shipWorld.allBodies.getById(bodyId) as? ServerBaseVsBody
     }
 
-    data class BikeRayHit(
-        val bike: IBike,
+    data class VehicleInteractionHit(
+        val vehicle: IVehicle,
         val zoneId: String,
         val actions: Set<VehicleInteractionAction>,
         val distanceSqr: Double

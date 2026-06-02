@@ -14,8 +14,9 @@ import net.minecraftforge.client.model.data.ModelData
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.joml.Quaternionf
 import org.joml.Vector3d
-import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
+import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleManager
 import kotlin.math.exp
 
 object BikeWorldRenderer {
@@ -27,15 +28,15 @@ object BikeWorldRenderer {
 
         val minecraft = Minecraft.getInstance()
         val level = minecraft.level ?: return
-        val bikes = BikeManager.getBikes(level)
-        if (bikes.isEmpty()) return
-        visualStatesByBodyId.keys.retainAll(bikes.mapTo(HashSet()) { it.bodyId })
+        val vehicles = VehicleManager.getVehicles(level)
+        if (vehicles.isEmpty()) return
+        visualStatesByBodyId.keys.retainAll(vehicles.mapTo(HashSet()) { it.bodyId })
 
         val bufferSource = minecraft.renderBuffers().bufferSource()
         val cameraPosition = event.camera.position
-        bikes.forEach { bike ->
-            renderBike(
-                bike = bike,
+        vehicles.forEach { vehicle ->
+            renderVehicle(
+                vehicle = vehicle,
                 poseStack = event.poseStack,
                 bufferSource = bufferSource,
                 cameraX = cameraPosition.x,
@@ -46,8 +47,8 @@ object BikeWorldRenderer {
         bufferSource.endBatch(RenderType.cutout())
     }
 
-    private fun renderBike(
-        bike: IBike,
+    private fun renderVehicle(
+        vehicle: IVehicle,
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
         cameraX: Double,
@@ -56,25 +57,25 @@ object BikeWorldRenderer {
     ) {
         val minecraft = Minecraft.getInstance()
         val transform = try {
-            bike.getRenderTransform()
+            vehicle.getRenderTransform()
         } catch (_: IllegalStateException) {
             return
         }
         val carriedPlayer = Minecraft.getInstance().player?.takeIf {
-            BikeClientHoistState.hoisting && BikeClientHoistState.bodyId == bike.bodyId
+            BikeClientHoistState.hoisting && BikeClientHoistState.bodyId == vehicle.bodyId
         }
         val bodyPosition = carriedPlayer?.let(BikeClientHoistState::carriedPosition)
             ?: transform.toWorld.transformPosition(Vector3d())
         if (!bodyPosition.isFinite()) return
 
-        val render = bike.definition.render
+        val render = vehicle.vehicleDefinition.render
         val model = minecraft.modelManager.getModel(render.model)
         val missingModel = minecraft.modelManager.missingModel
         if (model === missingModel) return
-        val visualState = updateRenderVisualState(bike)
+        val visualState = updateRenderVisualState(vehicle)
 
         val packedLight = LevelRenderer.getLightColor(
-            bike.level,
+            vehicle.level,
             BlockPos.containing(bodyPosition.x, bodyPosition.y, bodyPosition.z)
         )
 
@@ -99,7 +100,7 @@ object BikeWorldRenderer {
                         bufferSource = bufferSource,
                         model = it,
                         pivot = render.frontWheelPivot,
-                        steerRad = bike.state.visualSteerRad,
+                        steerRad = (vehicle as? IBike)?.state?.visualSteerRad ?: 0.0,
                         spinRad = visualState.frontWheelSpin,
                         packedLight = packedLight
                     )
@@ -124,7 +125,16 @@ object BikeWorldRenderer {
         poseStack.popPose()
     }
 
-    private fun updateRenderVisualState(bike: IBike): RenderVisualState {
+    private fun updateRenderVisualState(vehicle: IVehicle): RenderVisualState {
+        val bike = vehicle as? IBike ?: return RenderVisualState(
+            lastRenderNanos = System.nanoTime(),
+            lastRawFrontWheelSpin = 0.0,
+            lastRawRearWheelSpin = 0.0,
+            targetFrontWheelSpin = 0.0,
+            targetRearWheelSpin = 0.0,
+            frontWheelSpin = 0.0,
+            rearWheelSpin = 0.0
+        )
         val now = System.nanoTime()
         val state = visualStatesByBodyId.getOrPut(bike.bodyId) {
             RenderVisualState(

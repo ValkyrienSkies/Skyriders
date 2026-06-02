@@ -129,6 +129,10 @@ data class BikeVehicleBehaviorDefinition(
     val physics: BikePhysicsConfig
 ) : VehicleBehaviorDefinition
 
+data class KartVehicleBehaviorDefinition(
+    val physics: KartPhysicsConfig
+) : VehicleBehaviorDefinition
+
 data class VehicleInput(
     val steer: Double = 0.0,
     val throttle: Double = 0.0,
@@ -196,10 +200,11 @@ data class VehicleSaveRecord(
 
 object VehicleDefinitions {
     val ids: Set<ResourceLocation>
-        get() = BikeDefinitions.ids
+        get() = BikeDefinitions.ids + KartDefinitions.ids
 
     fun get(id: ResourceLocation): VehicleDefinition? {
         return BikeDefinitions.get(id)?.toVehicleDefinition()
+            ?: KartDefinitions.get(id)
     }
 
     fun resolveSavedId(savedId: String): ResourceLocation? {

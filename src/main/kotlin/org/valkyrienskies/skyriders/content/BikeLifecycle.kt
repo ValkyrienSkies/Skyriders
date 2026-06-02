@@ -58,13 +58,13 @@ object BikeLifecycle {
     }
 
     fun syncLevel(level: ServerLevel) {
-        val records = BikeManager.getBikes(level.dimensionId).map(IBike::toSaveRecord)
-        level.players().forEach { player -> SkyridersNetwork.sendBikeSync(player, records) }
+        val records = VehicleManager.getSaveRecords(level.dimensionId)
+        level.players().forEach { player -> SkyridersNetwork.sendVehicleSync(player, records) }
     }
 
     fun syncPlayer(player: ServerPlayer) {
-        val records = BikeManager.getBikes(player.level().dimensionId).map(IBike::toSaveRecord)
-        SkyridersNetwork.sendBikeSync(player, records)
+        val records = VehicleManager.getSaveRecords(player.level().dimensionId)
+        SkyridersNetwork.sendVehicleSync(player, records)
     }
 
     private fun syncVisualState(level: ServerLevel) {

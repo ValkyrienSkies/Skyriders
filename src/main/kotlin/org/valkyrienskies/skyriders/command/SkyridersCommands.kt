@@ -18,9 +18,8 @@ import net.minecraftforge.event.RegisterCommandsEvent
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
-import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
-import org.valkyrienskies.skyriders.content.BikeManager
+import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.joml.Vector3d
 
@@ -67,7 +66,7 @@ object SkyridersCommands {
                                             setInput(
                                                 ctx.source,
                                                 LongArgumentType.getLong(ctx, "bodyId"),
-                                                BikeInput.EMPTY
+                                                VehicleInput.EMPTY
                                             )
                                         }
                                 )
@@ -120,7 +119,7 @@ object SkyridersCommands {
         name: String,
         min: Double,
         max: Double,
-        update: (BikeInput, Double) -> BikeInput
+        update: (VehicleInput, Double) -> VehicleInput
     ) = literal(name)
         .then(
             argument("value", DoubleArgumentType.doubleArg(min, max))
@@ -168,7 +167,7 @@ object SkyridersCommands {
         source: CommandSourceStack,
         bodyId: BodyId,
         label: String,
-        updater: (BikeInput) -> BikeInput
+        updater: (VehicleInput) -> VehicleInput
     ): Int {
         val level = source.level as? ServerLevel
             ?: run {
@@ -176,20 +175,20 @@ object SkyridersCommands {
                 return 0
             }
 
-        val input = BikeManager.updateInput(level.dimensionId, bodyId, updater)
+        val input = VehicleManager.updateInput(level.dimensionId, bodyId, updater)
             ?: run {
-                source.sendFailure(Component.literal("No bike with VS body id $bodyId in this dimension."))
+                source.sendFailure(Component.literal("No vehicle with VS body id $bodyId in this dimension."))
                 return 0
             }
 
         source.sendSuccess(
-            { Component.literal("Set $label for bike $bodyId: steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}") },
+            { Component.literal("Set $label for vehicle $bodyId: steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, handbrake=${input.handbrake}, rider=${input.riderPresent}") },
             false
         )
         return 1
     }
 
-    private fun setInput(source: CommandSourceStack, bodyId: BodyId, input: BikeInput): Int {
+    private fun setInput(source: CommandSourceStack, bodyId: BodyId, input: VehicleInput): Int {
         return updateInput(source, bodyId, "input") { input }
     }
 
@@ -200,18 +199,18 @@ object SkyridersCommands {
                 return 0
             }
 
-        val bikes = BikeManager.getBikes(level.dimensionId)
-        if (bikes.isEmpty()) {
-            source.sendSuccess({ Component.literal("No bikes in this dimension.") }, false)
+        val vehicles = VehicleManager.getVehicles(level.dimensionId)
+        if (vehicles.isEmpty()) {
+            source.sendSuccess({ Component.literal("No vehicles in this dimension.") }, false)
             return 1
         }
 
-        val message = bikes.joinToString(separator = "\n") { bike ->
-            val input = BikeManager.getInput(level.dimensionId, bike.bodyId)
-            "${bike.bodyId}: ${bike.definition.displayName} (${bike.id}) engine=${bike.state.engineOn} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, rider=${input.riderPresent}]"
+        val message = vehicles.joinToString(separator = "\n") { vehicle ->
+            val input = VehicleManager.getInput(level.dimensionId, vehicle.bodyId)
+            "${vehicle.bodyId}: ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) engine=${vehicle.vehicleState.engineOn} input[steer=${input.steer}, throttle=${input.throttle}, brake=${input.brake}, jump=${input.jump}, pitch=${input.pitch}, handbrake=${input.handbrake}, rider=${input.riderPresent}]"
         }
         source.sendSuccess({ Component.literal(message) }, false)
-        return bikes.size
+        return vehicles.size
     }
 
     private fun removeBike(source: CommandSourceStack, bodyId: BodyId): Int {
@@ -221,19 +220,19 @@ object SkyridersCommands {
                 return 0
             }
 
-        val bike = try {
-            BikeManager.removeBike(level, bodyId)
+        val vehicle = try {
+            VehicleManager.removeVehicle(level, bodyId)
         } catch (ex: IllegalStateException) {
             source.sendFailure(Component.literal(ex.message ?: "VS body world is not ready."))
             return 0
         }
 
-        if (bike == null) {
-            source.sendFailure(Component.literal("No bike with VS body id $bodyId in this dimension."))
+        if (vehicle == null) {
+            source.sendFailure(Component.literal("No vehicle with VS body id $bodyId in this dimension."))
             return 0
         }
 
-        source.sendSuccess({ Component.literal("Removed ${bike.definition.displayName} (${bike.id}) with VS body $bodyId") }, true)
+        source.sendSuccess({ Component.literal("Removed ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body $bodyId") }, true)
         return 1
     }
 
@@ -248,17 +247,17 @@ object SkyridersCommands {
                 source.sendFailure(Component.literal("Only players can ride bikes."))
                 return 0
             }
-        val bike = BikeManager.getBike(level.dimensionId, bodyId)
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, bodyId)
             ?: run {
-                source.sendFailure(Component.literal("No bike with VS body id $bodyId in this dimension."))
+                source.sendFailure(Component.literal("No vehicle with VS body id $bodyId in this dimension."))
                 return 0
             }
 
-        if (!BikeInteractionHandler.mountBike(player, bike, notifyPlayer = false)) {
-            source.sendFailure(Component.literal("Could not mount ${bike.definition.displayName} (${bike.id})."))
+        if (!BikeInteractionHandler.mountVehicle(player, vehicle, notifyPlayer = false)) {
+            source.sendFailure(Component.literal("Could not mount ${vehicle.vehicleDefinition.displayName} (${vehicle.id})."))
             return 0
         }
-        source.sendSuccess({ Component.literal("Mounted ${bike.definition.displayName} (${bike.id}) with VS body $bodyId") }, false)
+        source.sendSuccess({ Component.literal("Mounted ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body $bodyId") }, false)
         return 1
     }
 }

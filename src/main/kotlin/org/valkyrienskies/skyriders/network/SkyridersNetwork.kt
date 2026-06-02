@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.network
 
 import net.minecraft.network.FriendlyByteBuf
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.minecraftforge.api.distmarker.Dist
@@ -22,6 +23,7 @@ import org.valkyrienskies.skyriders.content.BikeSaveRecord
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleSaveRecord
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
 import java.util.function.Supplier
@@ -65,6 +67,13 @@ object SkyridersNetwork {
             BikeSyncPacket::encode,
             BikeSyncPacket::decode,
             BikeSyncPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            VehicleSyncPacket::class.java,
+            VehicleSyncPacket::encode,
+            VehicleSyncPacket::decode,
+            VehicleSyncPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -118,6 +127,10 @@ object SkyridersNetwork {
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
+    }
+
+    fun sendVehicleSync(player: ServerPlayer, records: List<VehicleSaveRecord>) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, VehicleSyncPacket(records))
     }
 
     fun sendBikeDebug(player: ServerPlayer, bike: IBike) {
@@ -245,7 +258,7 @@ object SkyridersNetwork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
                 if (!seat.isDriverSeat()) return@enqueueWork
-                BikeManager.toggleEngine(player.level() as net.minecraft.server.level.ServerLevel, seat.bodyId)
+                VehicleManager.toggleEngine(player.level() as net.minecraft.server.level.ServerLevel, seat.bodyId)
             }
             context.packetHandled = true
         }
@@ -366,6 +379,51 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class VehicleSyncPacket(val records: List<VehicleSaveRecord>) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeVarInt(records.size)
+            records.forEach { record ->
+                buf.writeLong(record.bodyId)
+                buf.writeUtf(record.vehicleType)
+                buf.writeBoolean(record.engineOn)
+                buf.writeNbt(record.behaviorTag)
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { ClientBikeSyncHandler.handleVehicleSync(records) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: VehicleSyncPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): VehicleSyncPacket {
+                val count = buf.readVarInt()
+                val records = (0 until count).map {
+                    VehicleSaveRecord(
+                        bodyId = buf.readLong(),
+                        vehicleType = buf.readUtf(),
+                        engineOn = buf.readBoolean(),
+                        behaviorTag = buf.readNbt() ?: CompoundTag()
+                    )
+                }
+                return VehicleSyncPacket(records)
+            }
+
+            fun handle(packet: VehicleSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }
