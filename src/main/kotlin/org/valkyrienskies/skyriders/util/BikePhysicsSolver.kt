@@ -72,10 +72,12 @@ object BikePhysicsSolver {
             smoothGroundNormal(state, contacts, dt, config)
         }
         val terrainUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        updateLandingDampingWindow(state, grounded, config)
         updateDriftBoost(body, state, riderPresent, drifting, forward, terrainUp, config, dt)
 
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
+        applyLandingDamping(body, terrainUp, state, config, dt)
         applyTireForces(body, frontContact, true, drifting, config)
         applyTireForces(body, rearContact, false, drifting, config)
         if (riderPresent) {
@@ -134,6 +136,21 @@ object BikePhysicsSolver {
         updateVisualState(state, targetLean, frontSteerRad, forwardSpeed, config, dt, grounded)
 
         state.lastGrounded = grounded
+    }
+
+    private fun updateLandingDampingWindow(
+        state: BikeRuntimeState,
+        grounded: Boolean,
+        config: BikePhysicsConfig
+    ) {
+        if (!config.landingDampingEnabled) {
+            state.landingDampingTimeRemaining = 0.0
+            return
+        }
+
+        if (grounded && !state.lastGrounded) {
+            state.landingDampingTimeRemaining = config.landingDampingDuration
+        }
     }
 
     private fun sampleWheelContact(
@@ -257,6 +274,32 @@ object BikePhysicsSolver {
             Vector3d(contact.suspensionDirWorld).mul(totalForceMag),
             contact.contactPointWorld
         )
+    }
+
+    private fun applyLandingDamping(
+        body: PhysVsBody,
+        terrainUp: Vector3d,
+        state: BikeRuntimeState,
+        config: BikePhysicsConfig,
+        dt: Double
+    ) {
+        if (!config.landingDampingEnabled || state.landingDampingTimeRemaining <= 0.0) return
+
+        val verticalVelocity = safeDot(body.kinematics.velocity, terrainUp)
+        if (verticalVelocity < 0.0) {
+            val verticalDampingForce = Vector3d(terrainUp)
+                .mul(-verticalVelocity * config.mass * config.landingVerticalDamping)
+            safeApplyWorldForce(body, verticalDampingForce, body.kinematics.position)
+        }
+
+        val yawVelocity = safeDot(body.kinematics.angularVelocity, terrainUp)
+        val pitchRollAngularVelocity = Vector3d(body.kinematics.angularVelocity)
+            .fma(-yawVelocity, terrainUp)
+        if (isFinite(pitchRollAngularVelocity) && pitchRollAngularVelocity.lengthSquared() > 1.0e-6) {
+            safeApplyWorldTorque(body, pitchRollAngularVelocity.mul(-config.landingAngularDamping))
+        }
+
+        state.landingDampingTimeRemaining = max(0.0, state.landingDampingTimeRemaining - dt)
     }
 
     private fun applyTireForces(
