@@ -52,11 +52,11 @@ object BikeClientEffects {
         val activeBodyIds = vehicles.mapTo(HashSet()) { it.bodyId }
         lastEngineStateByBodyId.keys.retainAll(activeBodyIds)
         engineSoundsByBodyId.entries.removeIf { entry ->
-            if (entry.key in activeBodyIds) {
-                false
-            } else {
+            if (entry.value.isStopped() || entry.key !in activeBodyIds) {
                 entry.value.stopNow()
                 true
+            } else {
+                false
             }
         }
         vehicles.forEach { vehicle ->
@@ -301,7 +301,13 @@ object BikeClientEffects {
         }
 
         override fun tick() {
-            if (vehicle.level.isClientSide && VehicleManager.getVehicle(vehicle.level, vehicle.bodyId) != null) {
+            if (vehicle.level.isClientSide) {
+                val currentVehicle = VehicleManager.getVehicle(vehicle.level, vehicle.bodyId)
+                if (currentVehicle != null && currentVehicle.vehicleState.engineOn) {
+                    return
+                }
+                volume = 0.0f
+                stopNow()
                 return
             }
             stopNow()
