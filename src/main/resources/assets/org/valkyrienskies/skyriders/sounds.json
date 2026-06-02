@@ -1,0 +1,12 @@
+{
+  "bike_engine": {
+    "sounds": [
+      {
+        "name": "skyriders:bike_engine",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.bike_engine"
+  }
+}

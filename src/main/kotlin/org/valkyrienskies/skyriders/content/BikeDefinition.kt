@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
+import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.bikes.DefaultBike
@@ -31,7 +32,11 @@ data class BikeRenderDefinition(
     val model: ResourceLocation,
     val texture: ResourceLocation,
     val seatTexture: ResourceLocation = texture,
-    val showWheels: Boolean = true
+    val showWheels: Boolean = true,
+    val modelOffset: Vector3d = Vector3d(-0.5, -0.2, -0.5),
+    val modelScale: Double = 1.45,
+    val exhaustLocalPos: Vector3d = Vector3d(0.0, 0.35, -0.85),
+    val tireParticleLocalYOffset: Double = -0.45
 ) {
     companion object {
         val DEFAULT_BIKE = BikeRenderDefinition(

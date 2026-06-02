@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.entity.EntityRenderers
+import net.minecraftforge.client.event.ModelEvent
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent
 import net.minecraftforge.event.TickEvent
@@ -15,6 +16,7 @@ import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
+import org.valkyrienskies.skyriders.content.BikeDefinitions
 
 object SkyridersModClient {
     private var lastSentInput = BikeInput.EMPTY
@@ -46,12 +48,22 @@ object SkyridersModClient {
         event.register(bikeBrakeKey)
     }
 
+    @JvmStatic
+    fun registerAdditionalModels(event: ModelEvent.RegisterAdditional) {
+        BikeDefinitions.ids
+            .mapNotNull(BikeDefinitions::get)
+            .map { it.render.model }
+            .distinct()
+            .forEach(event::register)
+    }
+
     object ClientEvents {
         @SubscribeEvent
         fun onClientTick(event: TickEvent.ClientTickEvent) {
             if (event.phase != TickEvent.Phase.END) return
 
             val minecraft = Minecraft.getInstance()
+            BikeClientEffects.tick()
             val player = minecraft.player ?: return
             if (player.vehicle !is BikeSeatEntity) return
 

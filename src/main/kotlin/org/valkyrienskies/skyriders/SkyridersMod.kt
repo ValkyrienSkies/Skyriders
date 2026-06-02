@@ -59,6 +59,7 @@ object SkyridersMod {
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
             modEventBus.addListener(SkyridersModClient::registerKeyMappings)
+            modEventBus.addListener(SkyridersModClient::registerAdditionalModels)
         }
     }
 

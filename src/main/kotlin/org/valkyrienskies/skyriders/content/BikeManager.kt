@@ -89,6 +89,10 @@ object BikeManager {
         return serverBikesByDimension[dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
     }
 
+    fun getBikes(level: Level): List<IBike> {
+        return bikeMap(level)[level.dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
+    }
+
     fun tick(dimensionId: DimensionId) {
         serverBikesByDimension[dimensionId]?.values?.forEach(IBike::tick)
     }

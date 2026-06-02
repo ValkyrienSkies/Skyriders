@@ -11,6 +11,7 @@ import net.minecraftforge.network.PacketDistributor
 import net.minecraftforge.network.simple.SimpleChannel
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.client.BikeClientEffects
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.content.BikeInput
@@ -90,6 +91,8 @@ object SkyridersNetwork {
                 throttle = state.debugThrottle,
                 steeringAngleRad = state.debugSteeringAngleRad,
                 drifting = state.debugDrifting,
+                driftBoostCharge = state.driftBoostCharge,
+                driftBoostLevel = state.driftBoostLevel,
                 jumpCharge = state.jumpCharge
             )
         )
@@ -220,6 +223,8 @@ object SkyridersNetwork {
         val throttle: Double,
         val steeringAngleRad: Double,
         val drifting: Boolean,
+        val driftBoostCharge: Double,
+        val driftBoostLevel: Int,
         val jumpCharge: Double
     ) {
         fun encode(buf: FriendlyByteBuf) {
@@ -232,6 +237,8 @@ object SkyridersNetwork {
             buf.writeDouble(throttle)
             buf.writeDouble(steeringAngleRad)
             buf.writeBoolean(drifting)
+            buf.writeDouble(driftBoostCharge)
+            buf.writeInt(driftBoostLevel)
             buf.writeDouble(jumpCharge)
         }
 
@@ -239,7 +246,10 @@ object SkyridersNetwork {
             val context = contextSupplier.get()
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
-                    Runnable { BikeDebugOverlay.update(this) }
+                    Runnable {
+                        BikeDebugOverlay.update(this)
+                        BikeClientEffects.updateTelemetry(this)
+                    }
                 }
             }
             context.packetHandled = true
@@ -261,6 +271,8 @@ object SkyridersNetwork {
                     throttle = buf.readDouble(),
                     steeringAngleRad = buf.readDouble(),
                     drifting = buf.readBoolean(),
+                    driftBoostCharge = buf.readDouble(),
+                    driftBoostLevel = buf.readInt(),
                     jumpCharge = buf.readDouble()
                 )
             }
