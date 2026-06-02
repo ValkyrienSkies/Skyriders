@@ -54,9 +54,11 @@ object BikeInteractionHandler {
 
         val target = findBikeInLook(player, USE_RANGE) ?: return
         if (player.isShiftKeyDown) {
-            startHoisting(player, target)
+            startHoisting(player, target.bike)
+        } else if (target.zoneId == BikeInteractionDefinition.SEAT) {
+            mountBike(player, target.bike, notifyPlayer = false)
         } else {
-            mountBike(player, target, notifyPlayer = false)
+            return
         }
     }
 
@@ -101,16 +103,16 @@ object BikeInteractionHandler {
         return true
     }
 
-    fun findBikeInLook(player: Player, range: Double = USE_RANGE): IBike? {
+    fun findBikeInLook(player: Player, range: Double = USE_RANGE): BikeRayHit? {
         val start = player.getEyePosition(1.0f)
         val end = start.add(player.lookAngle.scale(range))
-        return findBikeOnRay(player.level(), start, end)?.bike
+        return findBikeOnRay(player.level(), start, end)
     }
 
     fun findBikeOnRay(level: net.minecraft.world.level.Level, start: Vec3, end: Vec3): BikeRayHit? {
         return BikeManager.getBikes(level)
             .asSequence()
-            .mapNotNull { bike -> hitBikeAabb(bike, start, end) }
+            .flatMap { bike -> hitBikeInteractionZones(bike, start, end).asSequence() }
             .minByOrNull(BikeRayHit::distanceSqr)
     }
 
@@ -259,19 +261,32 @@ object BikeInteractionHandler {
         return shipWorld.allBodies.getById(bodyId) as? ServerBaseVsBody
     }
 
-    private fun hitBikeAabb(bike: IBike, start: Vec3, end: Vec3): BikeRayHit? {
+    private fun hitBikeInteractionZones(bike: IBike, start: Vec3, end: Vec3): List<BikeRayHit> {
         val transform = try {
             bike.getRenderTransform()
         } catch (ex: IllegalStateException) {
-            return null
+            return emptyList()
         }
+        val zones = bike.definition.interactions.zones.ifEmpty {
+            listOf(fallbackBodyZone(bike))
+        }
+        return zones.mapNotNull { zone ->
+            hitBikeZone(bike, zone, transform, start, end)
+        }
+    }
+
+    private fun hitBikeZone(
+        bike: IBike,
+        zone: BikeInteractionZone,
+        transform: org.valkyrienskies.core.api.bodies.properties.BodyTransform,
+        start: Vec3,
+        end: Vec3
+    ): BikeRayHit? {
         val config = bike.config
-        val center = transform.toWorld.transformPosition(Vector3d(config.collisionBoxOffset))
-        val halfX = max(config.collisionBoxSize.x * 0.5, config.wheelWidth * 0.5) + 0.25
-        val halfY = max(config.collisionBoxSize.y * 0.5, config.wheelRadius + config.suspensionRestLength * 0.5) + 0.35
-        val frontZ = config.frontWheelLocalPos.z + config.wheelRadius
-        val rearZ = -config.rearWheelLocalPos.z + config.wheelRadius
-        val halfZ = max(config.collisionBoxSize.z * 0.5, max(frontZ, rearZ)) + 0.25
+        val center = transform.toWorld.transformPosition(Vector3d(zone.center))
+        val halfX = max(zone.size.x * 0.5, config.wheelWidth * 0.5)
+        val halfY = zone.size.y * 0.5
+        val halfZ = zone.size.z * 0.5
         val aabb = AABB(
             center.x - halfX,
             center.y - halfY,
@@ -281,10 +296,25 @@ object BikeInteractionHandler {
             center.z + halfZ
         )
         val hit = aabb.clip(start, end).orElse(null) ?: return null
-        return BikeRayHit(bike, hit.distanceToSqr(start))
+        return BikeRayHit(bike, zone.id, hit.distanceToSqr(start))
     }
 
-    data class BikeRayHit(val bike: IBike, val distanceSqr: Double)
+    private fun fallbackBodyZone(bike: IBike): BikeInteractionZone {
+        val config = bike.config
+        val frontZ = config.frontWheelLocalPos.z + config.wheelRadius + 0.25
+        val rearZ = config.rearWheelLocalPos.z - config.wheelRadius - 0.25
+        return BikeInteractionZone(
+            id = BikeInteractionDefinition.BODY,
+            center = Vector3d(config.collisionBoxOffset),
+            size = Vector3d(
+                max(config.collisionBoxSize.x, config.wheelWidth) + 0.5,
+                max(config.collisionBoxSize.y, config.wheelRadius + config.suspensionRestLength) + 0.7,
+                max(config.collisionBoxSize.z, frontZ - rearZ)
+            )
+        )
+    }
+
+    data class BikeRayHit(val bike: IBike, val zoneId: String, val distanceSqr: Double)
 
     private data class HoistedBike(
         val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,

@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.client
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.resources.sounds.AbstractSoundInstance
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.client.resources.sounds.TickableSoundInstance
 import net.minecraft.core.BlockPos
@@ -22,6 +23,7 @@ import kotlin.math.min
 object BikeClientEffects {
     private val telemetryByBodyId = HashMap<Long, TimedTelemetry>()
     private val engineSoundsByBodyId = HashMap<Long, BikeEngineSound>()
+    private val lastEngineStateByBodyId = HashMap<Long, Boolean>()
 
     fun updateTelemetry(packet: SkyridersNetwork.BikeDebugPacket) {
         telemetryByBodyId[packet.bodyId] = TimedTelemetry(
@@ -44,6 +46,7 @@ object BikeClientEffects {
 
         val bikes = BikeManager.getBikes(level)
         val activeBodyIds = bikes.mapTo(HashSet()) { it.bodyId }
+        lastEngineStateByBodyId.keys.retainAll(activeBodyIds)
         engineSoundsByBodyId.entries.removeIf { entry ->
             if (entry.key in activeBodyIds) {
                 false
@@ -150,6 +153,8 @@ object BikeClientEffects {
     }
 
     private fun tickEngineSound(minecraft: Minecraft, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+        playEngineTransitionSound(minecraft, bike)
+
         val soundId = bike.definition.sounds.engineLoop
         if (soundId == null || !bike.state.engineOn) {
             engineSoundsByBodyId.remove(bike.bodyId)?.stopNow()
@@ -174,6 +179,35 @@ object BikeClientEffects {
         if (!minecraft.soundManager.isActive(sound)) {
             minecraft.soundManager.play(sound)
         }
+    }
+
+    private fun playEngineTransitionSound(minecraft: Minecraft, bike: IBike) {
+        val previous = lastEngineStateByBodyId.put(bike.bodyId, bike.state.engineOn)
+        if (previous == null || previous == bike.state.engineOn) return
+
+        val soundId = if (bike.state.engineOn) bike.definition.sounds.engineStart else bike.definition.sounds.engineStop
+        soundId ?: return
+        val position = try {
+            bike.getRenderTransform().toWorld.transformPosition(Vector3d())
+        } catch (_: IllegalStateException) {
+            return
+        }
+        minecraft.soundManager.play(
+            SimpleSoundInstance(
+                soundId,
+                SoundSource.NEUTRAL,
+                0.85f,
+                1.0f,
+                SoundInstance.createUnseededRandom(),
+                false,
+                0,
+                SoundInstance.Attenuation.LINEAR,
+                position.x,
+                position.y,
+                position.z,
+                false
+            )
+        )
     }
 
     private fun wheelGroundParticlePos(

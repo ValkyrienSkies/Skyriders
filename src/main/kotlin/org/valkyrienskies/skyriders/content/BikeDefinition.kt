@@ -26,7 +26,46 @@ data class BikeDefinition(
     val seatOffset: Double,
     val render: BikeRenderDefinition = BikeRenderDefinition.DEFAULT_BIKE,
     val sounds: BikeSoundDefinition = BikeSoundDefinition.DEFAULT_ENGINE,
+    val interactions: BikeInteractionDefinition = BikeInteractionDefinition.DEFAULT_BIKE,
     val factory: BikeFactory = BikeFactory(::DefaultBike)
+)
+
+data class BikeInteractionDefinition(
+    val zones: List<BikeInteractionZone>
+) {
+    fun zone(id: String): BikeInteractionZone? = zones.firstOrNull { it.id == id }
+
+    companion object {
+        const val BODY = "body"
+        const val SEAT = "seat"
+        const val FUEL_CAP = "fuel_cap"
+
+        val DEFAULT_BIKE = BikeInteractionDefinition(
+            zones = listOf(
+                BikeInteractionZone(
+                    id = BODY,
+                    center = Vector3d(0.0, 0.25, -0.05),
+                    size = Vector3d(0.9, 0.95, 2.0)
+                ),
+                BikeInteractionZone(
+                    id = SEAT,
+                    center = Vector3d(0.0, 0.55, -0.25),
+                    size = Vector3d(0.75, 0.45, 0.75)
+                ),
+                BikeInteractionZone(
+                    id = FUEL_CAP,
+                    center = Vector3d(0.0, 0.62, 0.15),
+                    size = Vector3d(0.45, 0.25, 0.45)
+                )
+            )
+        )
+    }
+}
+
+data class BikeInteractionZone(
+    val id: String,
+    val center: Vector3d,
+    val size: Vector3d
 )
 
 data class BikeSoundDefinition(
@@ -45,7 +84,9 @@ data class BikeSoundDefinition(
 ) {
     companion object {
         val DEFAULT_ENGINE = BikeSoundDefinition(
-            engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine")
+            engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine"),
+            engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
+            engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop")
         )
 
         val NONE = BikeSoundDefinition()

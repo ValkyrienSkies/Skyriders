@@ -8,5 +8,25 @@
       }
     ],
     "subtitle": "skyriders.subtitle.bike_engine"
+  },
+  "bike_engine_start": {
+    "sounds": [
+      {
+        "name": "skyriders:bike_engine_start",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.bike_engine_start"
+  },
+  "bike_engine_stop": {
+    "sounds": [
+      {
+        "name": "skyriders:bike_engine_stop",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.bike_engine_stop"
   }
 }
