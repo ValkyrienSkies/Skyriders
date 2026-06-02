@@ -40,7 +40,7 @@ object KartPhysicsSolver {
             config
         )
         val contacts = config.wheelLocalPositions.mapIndexed { index, localPos ->
-            sampleWheel(body, physLevel, localPos, index < 2, steerRad, config)
+            sampleWheel(body, physLevel, localPos, index < 2, steerRad, config, dt)
         }
         val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
         val grounded = groundedContacts.isNotEmpty()
@@ -66,7 +66,7 @@ object KartPhysicsSolver {
         }
 
         if (input.riderPresent) {
-        applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, steerRad, config)
+            applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, steerRad, config)
             if (grounded) {
                 if (state.drifting) {
                     applyDriftAssist(body, input, forwardSpeed, WORLD_UP, state, config)
@@ -88,7 +88,8 @@ object KartPhysicsSolver {
         wheelLocalPos: Vector3dc,
         front: Boolean,
         steerRad: Double,
-        config: KartPhysicsConfig
+        config: KartPhysicsConfig,
+        dt: Double
     ): VehicleWheelContact {
         val mountWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
         val castDir = Vector3d(WORLD_UP).negate()
@@ -107,15 +108,47 @@ object KartPhysicsSolver {
             Vector3d(WORLD_UP).cross(wheelForward),
             VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         )
-        return VehicleWheelPhysics.sampleRaycastWheel(
-            body = body,
-            physLevel = physLevel,
-            mountWorld = mountWorld,
-            suspensionDirWorld = castDir,
-            maxLength = maxLength,
-            wheelForwardWorld = wheelForward,
-            wheelRightWorld = wheelRight
-        )
+        val sweepOffset = Vector3d(body.kinematics.velocity)
+            .sub(Vector3d(WORLD_UP).mul(VehiclePhysicsMath.safeDot(body.kinematics.velocity, WORLD_UP)))
+            .mul(dt.coerceIn(0.0, config.wheelSweepTime))
+        val sweepSamples = if (VehiclePhysicsMath.isFinite(sweepOffset) && sweepOffset.lengthSquared() > 1.0e-6) {
+            listOf(
+                Vector3d(),
+                Vector3d(sweepOffset).mul(-0.5),
+                Vector3d(sweepOffset).mul(-1.0),
+                Vector3d(sweepOffset).mul(0.3)
+            )
+        } else {
+            listOf(Vector3d())
+        }
+        val lateralOffsets = listOf(-config.wheelSampleWidth * 0.5, 0.0, config.wheelSampleWidth * 0.5)
+        val samples = lateralOffsets.flatMap { lateralOffset ->
+            val base = Vector3d(mountWorld).fma(lateralOffset, wheelRight)
+            sweepSamples.map { sweep -> Vector3d(base).add(sweep) }
+        }
+        return samples
+            .map { samplePos ->
+                VehicleWheelPhysics.sampleRaycastWheel(
+                    body = body,
+                    physLevel = physLevel,
+                    mountWorld = samplePos,
+                    suspensionDirWorld = castDir,
+                    maxLength = maxLength,
+                    wheelForwardWorld = wheelForward,
+                    wheelRightWorld = wheelRight
+                )
+            }
+            .filter(VehicleWheelContact::grounded)
+            .minByOrNull(VehicleWheelContact::hitDistance)
+            ?: VehicleWheelPhysics.sampleRaycastWheel(
+                body = body,
+                physLevel = physLevel,
+                mountWorld = mountWorld,
+                suspensionDirWorld = castDir,
+                maxLength = maxLength,
+                wheelForwardWorld = wheelForward,
+                wheelRightWorld = wheelRight
+            )
     }
 
     private fun applySuspension(body: PhysVsBody, contact: VehicleWheelContact, config: KartPhysicsConfig): Double {

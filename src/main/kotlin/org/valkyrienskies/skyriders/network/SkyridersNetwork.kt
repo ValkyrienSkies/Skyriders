@@ -197,6 +197,21 @@ object SkyridersNetwork {
             is KartVehicle -> vehicle.kartState.debugLateralSlip
             else -> 0.0
         }
+        val forwardSpeed = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugForwardSpeed
+            is IBike -> vehicle.state.debugSpeed
+            else -> speed
+        }
+        val steerAngleRad = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugSteerRad
+            is IBike -> vehicle.state.debugSteeringAngleRad
+            else -> 0.0
+        }
+        val driftBoostTimeRemaining = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
+            is IBike -> vehicle.state.driftBoostTimeRemaining
+            else -> 0.0
+        }
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             VehicleDebugPacket(
@@ -211,7 +226,10 @@ object SkyridersNetwork {
                 drifting = drifting,
                 driftBoostCharge = driftBoostCharge,
                 driftBoostLevel = driftBoostLevel,
-                lateralSlip = lateralSlip
+                lateralSlip = lateralSlip,
+                forwardSpeed = forwardSpeed,
+                steerAngleRad = steerAngleRad,
+                driftBoostTimeRemaining = driftBoostTimeRemaining
             )
         )
     }
@@ -573,7 +591,10 @@ object SkyridersNetwork {
         val drifting: Boolean,
         val driftBoostCharge: Double,
         val driftBoostLevel: Int,
-        val lateralSlip: Double
+        val lateralSlip: Double,
+        val forwardSpeed: Double,
+        val steerAngleRad: Double,
+        val driftBoostTimeRemaining: Double
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -588,13 +609,19 @@ object SkyridersNetwork {
             buf.writeDouble(driftBoostCharge)
             buf.writeInt(driftBoostLevel)
             buf.writeDouble(lateralSlip)
+            buf.writeDouble(forwardSpeed)
+            buf.writeDouble(steerAngleRad)
+            buf.writeDouble(driftBoostTimeRemaining)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
             val context = contextSupplier.get()
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
-                    Runnable { BikeDebugOverlay.updateVehicle(this) }
+                    Runnable {
+                        BikeDebugOverlay.updateVehicle(this)
+                        BikeClientEffects.updateVehicleTelemetry(this)
+                    }
                 }
             }
             context.packetHandled = true
@@ -618,7 +645,10 @@ object SkyridersNetwork {
                     drifting = buf.readBoolean(),
                     driftBoostCharge = buf.readDouble(),
                     driftBoostLevel = buf.readInt(),
-                    lateralSlip = buf.readDouble()
+                    lateralSlip = buf.readDouble(),
+                    forwardSpeed = buf.readDouble(),
+                    steerAngleRad = buf.readDouble(),
+                    driftBoostTimeRemaining = buf.readDouble()
                 )
             }
 

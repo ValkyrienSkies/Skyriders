@@ -40,6 +40,9 @@ object BikeDebugOverlay {
             driftBoostCharge = packet.driftBoostCharge,
             driftBoostLevel = packet.driftBoostLevel,
             lateralSlip = packet.lateralSlip,
+            forwardSpeed = packet.forwardSpeed,
+            steerAngleRad = packet.steerAngleRad,
+            driftBoostTimeRemaining = packet.driftBoostTimeRemaining,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -64,6 +67,7 @@ object BikeDebugOverlay {
             "Skyriders Vehicle",
             "Vehicle Type: ${currentSnapshot.vehicleName} (${currentSnapshot.vehicleId})",
             "Current Speed: ${formatNumber(currentSnapshot.speed)}",
+            "Forward Speed: ${formatNumber(currentSnapshot.forwardSpeed)}",
             "Engine On: ${currentSnapshot.engineOn}",
             "Throttle: ${formatNumber(currentSnapshot.throttle)}",
             "Steer Input: ${formatNumber(currentSnapshot.steer)}"
@@ -78,8 +82,10 @@ object BikeDebugOverlay {
             lines.add("Is Drifting: ${bikeDetails.drifting}")
             lines.add("Jump Charge: ${formatPercent(bikeDetails.jumpCharge)}")
         } else {
+            lines.add("Steering Angle: ${formatDegrees(currentSnapshot.steerAngleRad)} deg")
             lines.add("Is Drifting: ${currentSnapshot.drifting}")
             lines.add("Drift Boost: ${formatNumber(currentSnapshot.driftBoostCharge)}s L${currentSnapshot.driftBoostLevel}")
+            lines.add("Boost Time: ${formatNumber(currentSnapshot.driftBoostTimeRemaining)}s")
             lines.add("Lateral Slip: ${formatNumber(currentSnapshot.lateralSlip)}")
         }
 
@@ -125,6 +131,9 @@ object BikeDebugOverlay {
         val driftBoostCharge: Double,
         val driftBoostLevel: Int,
         val lateralSlip: Double,
+        val forwardSpeed: Double,
+        val steerAngleRad: Double,
+        val driftBoostTimeRemaining: Double,
         val receivedAtMillis: Long
     )
 

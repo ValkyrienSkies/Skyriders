@@ -16,8 +16,10 @@ import org.joml.Vector3d
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSoundDefinition
+import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import org.valkyrienskies.mod.api.shipWorld
 import kotlin.math.abs
@@ -25,6 +27,7 @@ import kotlin.math.min
 
 object BikeClientEffects {
     private val telemetryByBodyId = HashMap<Long, TimedTelemetry>()
+    private val vehicleTelemetryByBodyId = HashMap<Long, TimedVehicleTelemetry>()
     private val engineSoundsByBodyId = HashMap<Long, VehicleEngineSound>()
     private val lastEngineStateByBodyId = HashMap<Long, Boolean>()
 
@@ -41,11 +44,19 @@ object BikeClientEffects {
         return if (telemetry.expireTick >= level.gameTime) telemetry.packet else null
     }
 
+    fun updateVehicleTelemetry(packet: SkyridersNetwork.VehicleDebugPacket) {
+        vehicleTelemetryByBodyId[packet.bodyId] = TimedVehicleTelemetry(
+            packet = packet,
+            expireTick = Minecraft.getInstance().level?.gameTime?.plus(8L) ?: 0L
+        )
+    }
+
     fun tick() {
         val minecraft = Minecraft.getInstance()
         val level = minecraft.level ?: return
         val gameTime = level.gameTime
         telemetryByBodyId.entries.removeIf { it.value.expireTick < gameTime }
+        vehicleTelemetryByBodyId.entries.removeIf { it.value.expireTick < gameTime }
 
         val vehicles = VehicleManager.getVehicles(level)
         val bikes = vehicles.filterIsInstance<IBike>()
@@ -60,7 +71,12 @@ object BikeClientEffects {
             }
         }
         vehicles.forEach { vehicle ->
-            tickEngineSound(minecraft, vehicle, telemetryByBodyId[vehicle.bodyId]?.packet)
+            val bikeTelemetry = telemetryByBodyId[vehicle.bodyId]?.packet
+            val vehicleTelemetry = vehicleTelemetryByBodyId[vehicle.bodyId]?.packet
+            tickEngineSound(minecraft, vehicle, bikeTelemetry, vehicleTelemetry)
+            if (vehicle !is IBike) {
+                spawnGenericVehicleEffects(level, vehicle, vehicleTelemetry)
+            }
         }
 
         bikes.forEach { bike ->
@@ -116,6 +132,65 @@ object BikeClientEffects {
         }
     }
 
+    private fun spawnGenericVehicleEffects(
+        level: ClientLevel,
+        vehicle: IVehicle,
+        telemetry: SkyridersNetwork.VehicleDebugPacket?
+    ) {
+        val transform = try {
+            vehicle.getRenderTransform()
+        } catch (_: IllegalStateException) {
+            return
+        }
+        val velocity = try {
+            vehicle.level.shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity ?: return
+        } catch (_: IllegalStateException) {
+            return
+        }
+        val speed = if (velocity.isFinite()) velocity.length() else 0.0
+        val render = vehicle.vehicleDefinition.render
+        val drifting = telemetry?.drifting == true
+        val boostActive = (telemetry?.driftBoostTimeRemaining ?: 0.0) > 0.0
+
+        if (vehicle.vehicleState.engineOn && speed > 0.8 && level.random.nextDouble() < vehicleExhaustChance(speed, drifting, boostActive)) {
+            render.resolvedExhaustPoints().forEach { exhaustPoint ->
+                val exhaustPos = transform.toWorld.transformPosition(Vector3d(exhaustPoint.localPos))
+                if (exhaustPos.isFinite()) {
+                    val exhaustVelocity = transform.rotation.transform(Vector3d(0.0, 0.025, -0.08 - min(speed, 24.0) * 0.003))
+                    level.addParticle(
+                        vehicleExhaustParticle(telemetry),
+                        exhaustPos.x,
+                        exhaustPos.y,
+                        exhaustPos.z,
+                        exhaustVelocity.x + randomSpread(level, 0.014),
+                        exhaustVelocity.y + randomSpread(level, 0.01),
+                        exhaustVelocity.z + randomSpread(level, 0.014)
+                    )
+                }
+            }
+        }
+
+        val tirePoints = resolvedVehicleTireParticlePoints(vehicle)
+        val grounded = (telemetry?.groundedCount ?: 0) > 0
+        if (grounded || speed > 3.5) {
+            tirePoints.forEach { localPos ->
+                val position = transform.toWorld.transformPosition(Vector3d(localPos))
+                spawnTireParticles(level, position, speed, drifting)
+                if (boostActive && level.random.nextDouble() < 0.4) {
+                    level.addParticle(
+                        ParticleTypes.FLAME,
+                        position.x,
+                        position.y + 0.03,
+                        position.z,
+                        randomSpread(level, 0.03),
+                        0.02,
+                        randomSpread(level, 0.03)
+                    )
+                }
+            }
+        }
+    }
+
     private fun spawnTireParticles(level: ClientLevel, position: Vector3d, speed: Double, drifting: Boolean) {
         if (!position.isFinite()) return
 
@@ -161,12 +236,33 @@ object BikeClientEffects {
         }
     }
 
+    private fun vehicleExhaustParticle(telemetry: SkyridersNetwork.VehicleDebugPacket?): ParticleOptions {
+        if (telemetry?.drifting != true) return ParticleTypes.SMOKE
+        return when {
+            telemetry.driftBoostLevel >= 3 -> ParticleTypes.DRAGON_BREATH
+            telemetry.driftBoostLevel >= 2 -> ParticleTypes.SOUL_FIRE_FLAME
+            telemetry.driftBoostCharge > 0.25 -> ParticleTypes.FLAME
+            else -> ParticleTypes.CLOUD
+        }
+    }
+
+    private fun vehicleExhaustChance(speed: Double, drifting: Boolean, boostActive: Boolean): Double {
+        if (boostActive) return 0.95
+        if (drifting) return 0.8
+        return (0.1 + speed / 48.0).coerceIn(0.1, 0.45)
+    }
+
     private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.BikeDebugPacket?): Double {
         val speedChance = (0.12 + speed / 42.0).coerceIn(0.12, 0.55)
         return if (telemetry?.drifting == true) 0.85 else speedChance
     }
 
-    private fun tickEngineSound(minecraft: Minecraft, vehicle: IVehicle, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+    private fun tickEngineSound(
+        minecraft: Minecraft,
+        vehicle: IVehicle,
+        bikeTelemetry: SkyridersNetwork.BikeDebugPacket?,
+        vehicleTelemetry: SkyridersNetwork.VehicleDebugPacket?
+    ) {
         playEngineTransitionSound(minecraft, vehicle)
 
         val soundDefinition = vehicle.vehicleDefinition.sounds
@@ -180,7 +276,7 @@ object BikeClientEffects {
         } catch (_: IllegalStateException) {
             0.0
         }
-        val throttle = abs(telemetry?.throttle ?: 0.0)
+        val throttle = abs(bikeTelemetry?.throttle ?: vehicleTelemetry?.throttle ?: 0.0)
         val existingSound = engineSoundsByBodyId[vehicle.bodyId]
         val sound = if (existingSound?.soundId == soundId) {
             existingSound
@@ -236,6 +332,26 @@ object BikeClientEffects {
         return local
     }
 
+    private fun resolvedVehicleTireParticlePoints(vehicle: IVehicle): List<Vector3d> {
+        val render = vehicle.vehicleDefinition.render
+        if (vehicle is KartVehicle) {
+            val behavior = vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition
+            val config = behavior?.physics
+            if (config != null) {
+                val fallback = config.wheelLocalPositions.mapIndexed { index, wheel ->
+                    Vector3d(wheel).apply {
+                        y -= config.wheelRadius + 0.04
+                    }
+                }
+                if (render.tireParticlePoints.isNotEmpty()) {
+                    return render.tireParticlePoints.map { Vector3d(it.localPos) }
+                }
+                return fallback
+            }
+        }
+        return render.tireParticlePoints.map { Vector3d(it.localPos) }
+    }
+
     private fun groundState(level: ClientLevel, position: Vector3d): BlockState? {
         val pos = BlockPos.containing(position.x, position.y - 0.08, position.z)
         val state = level.getBlockState(pos)
@@ -252,6 +368,11 @@ object BikeClientEffects {
 
     private data class TimedTelemetry(
         val packet: SkyridersNetwork.BikeDebugPacket,
+        val expireTick: Long
+    )
+
+    private data class TimedVehicleTelemetry(
+        val packet: SkyridersNetwork.VehicleDebugPacket,
         val expireTick: Long
     )
 

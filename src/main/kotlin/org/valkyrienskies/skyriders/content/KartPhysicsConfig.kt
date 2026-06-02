@@ -8,6 +8,8 @@ data class KartPhysicsConfig(
     val collisionBoxOffset: Vector3d,
     val wheelLocalPositions: List<Vector3d>,
     val wheelRadius: Double,
+    val wheelSampleWidth: Double = wheelRadius * 0.9,
+    val wheelSweepTime: Double = 0.06,
     val suspensionRestLength: Double,
     val suspensionTravel: Double,
     val suspensionStrength: Double,
@@ -60,6 +62,8 @@ data class KartPhysicsConfig(
                 Vector3d(0.55, -0.12, -0.62)
             ),
             wheelRadius = 0.28,
+            wheelSampleWidth = 0.36,
+            wheelSweepTime = 0.05,
             suspensionRestLength = 0.28,
             suspensionTravel = 0.34,
             suspensionStrength = 36000.0,
