@@ -83,7 +83,7 @@ object BikePhysicsSolver {
 
         if (stabilizedGrounded) {
             applyBalanceController(body, forward, up, terrainUp, balanceTargetLean, config, forwardSpeed, balanceStrengthScale)
-            applyLowSpeedAssist(body, input, forwardSpeed, terrainUp, config)
+            applySteeringAssist(body, input, forwardSpeed, terrainUp, config)
             applyAntiFlipAssist(body, forward, right, up, terrainUp, config)
         } else {
             applyAirborneControl(body, forward, right, up, input, config)
@@ -337,7 +337,7 @@ object BikePhysicsSolver {
         safeApplyWorldTorque(body, torque)
     }
 
-    private fun applyLowSpeedAssist(
+    private fun applySteeringAssist(
         body: PhysVsBody,
         input: BikeInput,
         speed: Double,
@@ -352,7 +352,9 @@ object BikePhysicsSolver {
             input.throttle < -0.05 -> -1.0
             else -> 1.0
         }
-        val yawTorque = input.steer.coerceIn(-1.0, 1.0) * direction * config.lowSpeedYawAssist * lowSpeedAmount
+        val highSpeedAmount = smoothstep(7.0, config.wheelTopSpeed, abs(speed)) * movementAmount
+        val yawTorque = input.steer.coerceIn(-1.0, 1.0) * direction *
+            (config.lowSpeedYawAssist * lowSpeedAmount + config.highSpeedYawAssist * highSpeedAmount)
         if (yawTorque != 0.0) {
             safeApplyWorldTorque(body, Vector3d(terrainUp).mul(yawTorque))
         }
@@ -396,10 +398,12 @@ object BikePhysicsSolver {
         if (terrainForward.lengthSquared() < 1.0e-6) return
         terrainForward.set(safeNormalize(terrainForward, forward))
 
-        val probeLength = config.wheelRadius + 0.35
+        val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
+        val speedLookahead = smoothstep(4.0, config.wheelTopSpeed, speedIntoStep)
+        val probeLength = config.wheelRadius + 0.35 + speedIntoStep * 0.04
         val lowProbeStart = Vector3d(frontContact.contactPointWorld)
             .fma(config.wheelRadius * 0.55, terrainUp)
-            .fma(0.08, terrainForward)
+            .fma(0.08 + speedLookahead * 0.18, terrainForward)
         val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
         if (obstacle.hitBody.id == body.id) return
 
@@ -407,10 +411,9 @@ object BikePhysicsSolver {
         val blockedAbove = physLevel.rayCast(highProbeStart, terrainForward, probeLength, body.id)
         if (blockedAbove != null && blockedAbove.hitBody.id != body.id) return
 
-        val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
-        val assistAmount = (1.0 - smoothstep(8.0, 18.0, speedIntoStep)).coerceIn(0.25, 1.0)
+        val assistAmount = 0.75 + speedLookahead * 0.35
         val liftForce = Vector3d(terrainUp).mul(config.stepAssistStrength * assistAmount)
-        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.04 * assistAmount)
+        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * 0.02 * assistAmount)
 
         applyContactForce(body, frontContact, liftForce.add(forwardForce), frontContact.contactPointWorld)
     }
