@@ -95,6 +95,7 @@ object KartPhysicsSolver {
         val mountWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
         val castDir = Vector3d(WORLD_UP).negate()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
+        val groundedMaxDistance = config.suspensionRestLength + config.wheelRadius - 1.0e-4
         val baseForward = VehiclePhysicsMath.projectOntoPlane(
             VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD),
             WORLD_UP,
@@ -136,7 +137,8 @@ object KartPhysicsSolver {
                     suspensionDirWorld = castDir,
                     maxLength = maxLength,
                     wheelForwardWorld = wheelForward,
-                    wheelRightWorld = wheelRight
+                    wheelRightWorld = wheelRight,
+                    groundedMaxDistance = groundedMaxDistance
                 )
             }
             .filter(VehicleWheelContact::grounded)
@@ -148,7 +150,8 @@ object KartPhysicsSolver {
                 suspensionDirWorld = castDir,
                 maxLength = maxLength,
                 wheelForwardWorld = wheelForward,
-                wheelRightWorld = wheelRight
+                wheelRightWorld = wheelRight,
+                groundedMaxDistance = groundedMaxDistance
             )
     }
 

@@ -26,7 +26,8 @@ object VehicleWheelPhysics {
         suspensionDirWorld: Vector3dc,
         maxLength: Double,
         wheelForwardWorld: Vector3dc,
-        wheelRightWorld: Vector3dc
+        wheelRightWorld: Vector3dc,
+        groundedMaxDistance: Double = maxLength
     ): VehicleWheelContact {
         val suspensionDir = VehiclePhysicsMath.safeNormalize(suspensionDirWorld, Vector3d(0.0, -1.0, 0.0))
         val hit = physLevel.rayCast(mountWorld, suspensionDir, maxLength, body.id)
@@ -47,8 +48,9 @@ object VehicleWheelPhysics {
         }
 
         val contactPoint = Vector3d(mountWorld).fma(hit.distance, suspensionDir)
+        val loaded = hit.distance <= groundedMaxDistance
         return VehicleWheelContact(
-            grounded = true,
+            grounded = loaded,
             hitBody = hit.hitBody,
             contactPointWorld = contactPoint,
             contactNormalWorld = VehiclePhysicsMath.safeNormalize(hit.hitNormal, Vector3d(suspensionDir).negate()),
