@@ -25,8 +25,32 @@ data class BikeDefinition(
     val config: BikePhysicsConfig,
     val seatOffset: Double,
     val render: BikeRenderDefinition = BikeRenderDefinition.DEFAULT_BIKE,
+    val sounds: BikeSoundDefinition = BikeSoundDefinition.DEFAULT_ENGINE,
     val factory: BikeFactory = BikeFactory(::DefaultBike)
 )
+
+data class BikeSoundDefinition(
+    val engineLoop: ResourceLocation? = null,
+    val engineStart: ResourceLocation? = null,
+    val engineStop: ResourceLocation? = null,
+    val idleVolume: Double = 0.18,
+    val speedVolume: Double = 0.18,
+    val throttleVolume: Double = 0.16,
+    val idlePitch: Double = 0.72,
+    val speedPitch: Double = 0.42,
+    val throttlePitch: Double = 0.35,
+    val minPitch: Double = 0.7,
+    val maxPitch: Double = 1.45,
+    val referenceSpeed: Double = 18.0
+) {
+    companion object {
+        val DEFAULT_ENGINE = BikeSoundDefinition(
+            engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine")
+        )
+
+        val NONE = BikeSoundDefinition()
+    }
+}
 
 data class BikeRenderDefinition(
     val model: ResourceLocation,
@@ -89,6 +113,7 @@ object BikeDefinitions {
         config = BikePhysicsConfig.HOVER_BIKE,
         seatOffset = 0.24,
         render = BikeRenderDefinition.HOVER_BIKE,
+        sounds = BikeSoundDefinition.NONE,
         factory = BikeFactory(::HoverBike)
     )
 

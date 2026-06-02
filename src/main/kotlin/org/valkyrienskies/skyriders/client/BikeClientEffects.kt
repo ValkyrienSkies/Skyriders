@@ -2,8 +2,9 @@ package org.valkyrienskies.skyriders.client
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
-import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance
+import net.minecraft.client.resources.sounds.AbstractSoundInstance
 import net.minecraft.client.resources.sounds.SoundInstance
+import net.minecraft.client.resources.sounds.TickableSoundInstance
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleOptions
@@ -11,7 +12,7 @@ import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.level.block.state.BlockState
 import org.joml.Vector3d
-import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.BikeSoundDefinition
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -149,14 +150,25 @@ object BikeClientEffects {
     }
 
     private fun tickEngineSound(minecraft: Minecraft, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+        val soundId = bike.definition.sounds.engineLoop
+        if (soundId == null) {
+            engineSoundsByBodyId.remove(bike.bodyId)?.stopNow()
+            return
+        }
         val speed = try {
             bike.getKinematics().velocity.length()
         } catch (_: IllegalStateException) {
             0.0
         }
         val throttle = abs(telemetry?.throttle ?: 0.0)
-        val sound = engineSoundsByBodyId.getOrPut(bike.bodyId) {
-            BikeEngineSound(bike)
+        val existingSound = engineSoundsByBodyId[bike.bodyId]
+        val sound = if (existingSound?.soundId == soundId) {
+            existingSound
+        } else {
+            existingSound?.stopNow()
+            BikeEngineSound(bike, soundId, bike.definition.sounds).also {
+                engineSoundsByBodyId[bike.bodyId] = it
+            }
         }
         sound.update(speed, throttle)
         if (!minecraft.soundManager.isActive(sound)) {
@@ -193,11 +205,17 @@ object BikeClientEffects {
         val expireTick: Long
     )
 
-    private class BikeEngineSound(private val bike: IBike) : AbstractTickableSoundInstance(
-        SkyridersMod.BIKE_ENGINE_SOUND.get(),
+    private class BikeEngineSound(
+        private val bike: IBike,
+        val soundId: net.minecraft.resources.ResourceLocation,
+        private val soundDefinition: BikeSoundDefinition
+    ) : AbstractSoundInstance(
+        soundId,
         SoundSource.NEUTRAL,
         SoundInstance.createUnseededRandom()
-    ) {
+    ), TickableSoundInstance {
+        private var stopped = false
+
         init {
             looping = true
             attenuation = SoundInstance.Attenuation.LINEAR
@@ -218,20 +236,33 @@ object BikeClientEffects {
             z = position.z
 
             val speedT = (speed / 18.0).coerceIn(0.0, 1.0)
+            val soundSpeedT = (speed / soundDefinition.referenceSpeed).coerceIn(0.0, 1.0)
             val accelT = throttle.coerceIn(0.0, 1.0)
-            volume = (0.18 + speedT * 0.18 + accelT * 0.16).toFloat()
-            pitch = (0.72 + speedT * 0.42 + accelT * 0.35).coerceIn(0.7, 1.45).toFloat()
+            volume = (
+                soundDefinition.idleVolume +
+                    soundSpeedT * soundDefinition.speedVolume +
+                    accelT * soundDefinition.throttleVolume
+                ).coerceAtLeast(0.0).toFloat()
+            pitch = (
+                soundDefinition.idlePitch +
+                    soundSpeedT * soundDefinition.speedPitch +
+                    accelT * soundDefinition.throttlePitch
+                ).coerceIn(soundDefinition.minPitch, soundDefinition.maxPitch).toFloat()
         }
 
         override fun tick() {
             if (bike.level.isClientSide && BikeManager.getBike(bike.level, bike.bodyId) != null) {
                 return
             }
-            stop()
+            stopNow()
+        }
+
+        override fun isStopped(): Boolean {
+            return stopped
         }
 
         fun stopNow() {
-            stop()
+            stopped = true
         }
     }
 }
