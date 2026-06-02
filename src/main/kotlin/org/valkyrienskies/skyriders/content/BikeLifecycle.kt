@@ -32,7 +32,7 @@ object BikeLifecycle {
             val iterator = pendingRestoreLevels.iterator()
             while (iterator.hasNext()) {
                 val level = iterator.next()
-                BikeManager.restoreBikes(level, BikeSavedData.get(level).records)
+                VehicleManager.restoreVehicles(level, BikeSavedData.get(level).records)
                 syncLevel(level)
                 iterator.remove()
             }

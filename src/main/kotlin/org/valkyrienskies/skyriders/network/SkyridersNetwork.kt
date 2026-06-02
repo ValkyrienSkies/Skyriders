@@ -20,7 +20,10 @@ import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
 import org.valkyrienskies.skyriders.content.IBike
+import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.toVehicleInput
 import java.util.function.Supplier
 
 object SkyridersNetwork {
@@ -37,10 +40,10 @@ object SkyridersNetwork {
     fun register() {
         CHANNEL.registerMessage(
             nextPacketId++,
-            BikeInputPacket::class.java,
-            BikeInputPacket::encode,
-            BikeInputPacket::decode,
-            BikeInputPacket::handle
+            VehicleInputPacket::class.java,
+            VehicleInputPacket::encode,
+            VehicleInputPacket::decode,
+            VehicleInputPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -94,7 +97,11 @@ object SkyridersNetwork {
     }
 
     fun sendBikeInput(input: BikeInput) {
-        CHANNEL.sendToServer(BikeInputPacket(input))
+        sendVehicleInput(input.toVehicleInput())
+    }
+
+    fun sendVehicleInput(input: VehicleInput) {
+        CHANNEL.sendToServer(VehicleInputPacket(input))
     }
 
     fun sendBikeDismount() {
@@ -160,13 +167,14 @@ object SkyridersNetwork {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting, bodyId))
     }
 
-    data class BikeInputPacket(val input: BikeInput) {
+    data class VehicleInputPacket(val input: VehicleInput) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeDouble(input.steer)
             buf.writeDouble(input.throttle)
             buf.writeDouble(input.brake)
             buf.writeDouble(input.jump)
             buf.writeDouble(input.pitch)
+            buf.writeDouble(input.handbrake)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -175,29 +183,30 @@ object SkyridersNetwork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
                 if (!seat.isDriverSeat()) return@enqueueWork
-                BikeManager.updateInput(player.level().dimensionId, seat.bodyId) { input.copy(riderPresent = true) }
+                VehicleManager.updateInput(player.level().dimensionId, seat.bodyId) { input.copy(riderPresent = true) }
             }
             context.packetHandled = true
         }
 
         companion object {
-            fun encode(packet: BikeInputPacket, buf: FriendlyByteBuf) {
+            fun encode(packet: VehicleInputPacket, buf: FriendlyByteBuf) {
                 packet.encode(buf)
             }
 
-            fun decode(buf: FriendlyByteBuf): BikeInputPacket {
-                return BikeInputPacket(
-                    BikeInput(
+            fun decode(buf: FriendlyByteBuf): VehicleInputPacket {
+                return VehicleInputPacket(
+                    VehicleInput(
                         steer = buf.readDouble(),
                         throttle = buf.readDouble(),
                         brake = buf.readDouble(),
                         jump = buf.readDouble(),
-                        pitch = buf.readDouble()
+                        pitch = buf.readDouble(),
+                        handbrake = buf.readDouble()
                     ).clamped()
                 )
             }
 
-            fun handle(packet: BikeInputPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+            fun handle(packet: VehicleInputPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

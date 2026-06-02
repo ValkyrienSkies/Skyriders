@@ -20,8 +20,6 @@ import org.valkyrienskies.core.api.bodies.ClientVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.dimensionId
-import org.valkyrienskies.skyriders.content.BikeInput
-import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSeatDefinition
@@ -47,7 +45,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     override fun tick() {
         super.tick()
         if (!level().isClientSide && passengers.isEmpty()) {
-            BikeManager.updateInput(level().dimensionId, bodyId) { BikeInput.EMPTY }
+            VehicleManager.clearInput(level().dimensionId, bodyId)
             kill()
             return
         }
@@ -126,7 +124,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         if (!isDriverSeat()) return
 
         val passenger = controllingPassenger ?: return
-        BikeManager.updateInput(level().dimensionId, bodyId) {
+        VehicleManager.updateInput(level().dimensionId, bodyId) {
             it.copy(riderPresent = true)
         }
     }
@@ -136,7 +134,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         if (!isDriverSeat()) return
 
         val player = controllingPassenger as? ServerPlayer ?: return
-        val bike = BikeManager.getBike(level().dimensionId, bodyId) ?: return
+        val bike = VehicleManager.getVehicle(level().dimensionId, bodyId) as? org.valkyrienskies.skyriders.content.IBike ?: return
         SkyridersNetwork.sendBikeDebug(player, bike)
     }
 

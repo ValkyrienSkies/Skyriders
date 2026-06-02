@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.content
 
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.level.Level
 import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.PhysVsBody
@@ -167,8 +168,31 @@ data class VehicleRuntimeState(
 data class VehicleSaveRecord(
     val bodyId: BodyId,
     val vehicleType: String,
-    val engineOn: Boolean
-)
+    val engineOn: Boolean,
+    val behaviorTag: CompoundTag = CompoundTag()
+) {
+    fun save(): CompoundTag = CompoundTag().apply {
+        putLong(BODY_ID_KEY, bodyId)
+        putString(VEHICLE_TYPE_KEY, vehicleType)
+        putBoolean(ENGINE_ON_KEY, engineOn)
+        put(BEHAVIOR_KEY, behaviorTag.copy())
+    }
+
+    companion object {
+        private const val BODY_ID_KEY = "body_id"
+        private const val VEHICLE_TYPE_KEY = "vehicle_type"
+        private const val LEGACY_BIKE_TYPE_KEY = "bike_type"
+        private const val ENGINE_ON_KEY = "engine_on"
+        private const val BEHAVIOR_KEY = "behavior"
+
+        fun load(tag: CompoundTag): VehicleSaveRecord = VehicleSaveRecord(
+            bodyId = tag.getLong(BODY_ID_KEY),
+            vehicleType = tag.getString(VEHICLE_TYPE_KEY).ifBlank { tag.getString(LEGACY_BIKE_TYPE_KEY) },
+            engineOn = tag.getBoolean(ENGINE_ON_KEY),
+            behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy()
+        )
+    }
+}
 
 object VehicleDefinitions {
     val ids: Set<ResourceLocation>
@@ -199,7 +223,22 @@ fun BikeRuntimeState.toVehicleRuntimeState(): VehicleRuntimeState = VehicleRunti
 fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
     bodyId = bodyId,
     vehicleType = bikeType,
-    engineOn = engineOn
+    engineOn = engineOn,
+    behaviorTag = CompoundTag().apply {
+        putString("behavior_type", "bike")
+        putDouble("visual_lean", visualLeanRad)
+        putDouble("front_wheel_spin", frontWheelSpin)
+        putDouble("rear_wheel_spin", rearWheelSpin)
+    }
+)
+
+fun VehicleSaveRecord.toBikeSaveRecord(): BikeSaveRecord = BikeSaveRecord(
+    bodyId = bodyId,
+    bikeType = vehicleType,
+    engineOn = engineOn,
+    visualLeanRad = behaviorTag.getDouble("visual_lean"),
+    frontWheelSpin = behaviorTag.getDouble("front_wheel_spin"),
+    rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin")
 )
 
 fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
