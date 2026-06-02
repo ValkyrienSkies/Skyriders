@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.entity.EntityRenderers
+import net.minecraftforge.client.event.InputEvent
 import net.minecraftforge.client.event.ModelEvent
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent
@@ -12,6 +13,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
 import org.lwjgl.glfw.GLFW
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -102,8 +104,28 @@ object SkyridersModClient {
         }
 
         @SubscribeEvent
+        fun onInteractionKey(event: InputEvent.InteractionKeyMappingTriggered) {
+            if (!event.isUseItem) return
+
+            val minecraft = Minecraft.getInstance()
+            val player = minecraft.player ?: return
+            val level = minecraft.level ?: return
+            if (player.vehicle is BikeSeatEntity) return
+
+            val eye = player.getEyePosition(1.0f)
+            val end = eye.add(player.lookAngle.scale(5.0))
+            val hitBike = BikeInteractionHandler.findBikeOnRay(level, eye, end) != null
+            if (!hitBike && !BikeClientHoistState.hoisting) return
+
+            SkyridersNetwork.sendBikeUse()
+            event.isCanceled = true
+            event.setSwingHand(false)
+        }
+
+        @SubscribeEvent
         fun onLoggedOut(event: ClientPlayerNetworkEvent.LoggingOut) {
             lastSentInput = BikeInput.EMPTY
+            BikeClientHoistState.hoisting = false
         }
     }
 }

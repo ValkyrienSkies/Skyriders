@@ -15,13 +15,13 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.phys.Vec3
 import net.minecraftforge.event.RegisterCommandsEvent
-import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeInput
+import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
-import kotlin.math.atan2
+import org.joml.Vector3d
 
 object SkyridersCommands {
     fun register(event: RegisterCommandsEvent) {
@@ -253,26 +253,10 @@ object SkyridersCommands {
                 return 0
             }
 
-        val transform = try {
-            bike.getTransform()
-        } catch (ex: IllegalStateException) {
-            source.sendFailure(Component.literal(ex.message ?: "Bike body is missing."))
+        if (!BikeInteractionHandler.mountBike(player, bike, notifyPlayer = false)) {
+            source.sendFailure(Component.literal("Could not mount ${bike.definition.displayName} (${bike.id})."))
             return 0
         }
-        val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, bike.getSeatOffset(), 0.0))
-        val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
-        val yaw = Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
-
-        val seat = SkyridersMod.BIKE_SEAT_ENTITY.get().create(level)
-            ?: run {
-                source.sendFailure(Component.literal("Could not create bike seat entity."))
-                return 0
-            }
-        seat.bodyId = bodyId
-        seat.moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yaw, 0.0f)
-
-        level.addFreshEntity(seat)
-        player.startRiding(seat, true)
         source.sendSuccess({ Component.literal("Mounted ${bike.definition.displayName} (${bike.id}) with VS body $bodyId") }, false)
         return 1
     }

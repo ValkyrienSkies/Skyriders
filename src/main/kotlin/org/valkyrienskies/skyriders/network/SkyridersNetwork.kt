@@ -12,9 +12,11 @@ import net.minecraftforge.network.simple.SimpleChannel
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.client.BikeClientEffects
+import org.valkyrienskies.skyriders.client.BikeClientHoistState
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.content.BikeInput
+import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
 import org.valkyrienskies.skyriders.content.IBike
@@ -68,6 +70,20 @@ object SkyridersNetwork {
             BikeVisualStatePacket::decode,
             BikeVisualStatePacket::handle
         )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeUsePacket::class.java,
+            BikeUsePacket::encode,
+            BikeUsePacket::decode,
+            BikeUsePacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            BikeHoistStatePacket::class.java,
+            BikeHoistStatePacket::encode,
+            BikeHoistStatePacket::decode,
+            BikeHoistStatePacket::handle
+        )
     }
 
     fun sendBikeInput(input: BikeInput) {
@@ -76,6 +92,10 @@ object SkyridersNetwork {
 
     fun sendBikeDismount() {
         CHANNEL.sendToServer(BikeDismountPacket())
+    }
+
+    fun sendBikeUse() {
+        CHANNEL.sendToServer(BikeUsePacket())
     }
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
@@ -121,6 +141,10 @@ object SkyridersNetwork {
                 }
             )
         )
+    }
+
+    fun sendBikeHoistState(player: ServerPlayer, hoisting: Boolean) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting))
     }
 
     data class BikeInputPacket(val input: BikeInput) {
@@ -186,6 +210,60 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeDismountPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    class BikeUsePacket {
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                val player = context.sender ?: return@enqueueWork
+                BikeInteractionHandler.handleUse(player)
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeUsePacket, buf: FriendlyByteBuf) {
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeUsePacket {
+                return BikeUsePacket()
+            }
+
+            fun handle(packet: BikeUsePacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class BikeHoistStatePacket(val hoisting: Boolean) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(hoisting)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { BikeClientHoistState.hoisting = hoisting }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: BikeHoistStatePacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): BikeHoistStatePacket {
+                return BikeHoistStatePacket(buf.readBoolean())
+            }
+
+            fun handle(packet: BikeHoistStatePacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }
