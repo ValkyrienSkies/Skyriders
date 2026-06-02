@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.content.vehicles
 
 import net.minecraft.world.level.Level
+import net.minecraft.nbt.CompoundTag
 import org.valkyrienskies.core.api.bodies.ClientVsBody
 import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
@@ -45,7 +46,10 @@ class KartVehicle(
     override fun toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
         bodyId = bodyId,
         vehicleType = id,
-        engineOn = kartState.engineOn
+        engineOn = kartState.engineOn,
+        behaviorTag = CompoundTag().apply {
+            putString("behavior_type", "kart")
+        }
     )
 
     private fun requireBody() =

@@ -64,10 +64,8 @@ object SkyridersModClient {
             .mapNotNull(VehicleDefinitions::get)
             .flatMap { definition ->
                 listOfNotNull(
-                    definition.render.model,
-                    definition.render.frontWheelModel,
-                    definition.render.rearWheelModel
-                )
+                    definition.render.model
+                ) + definition.render.resolvedWheelParts().map { it.model }
             }
             .distinct()
             .forEach(event::register)

@@ -80,29 +80,39 @@ object BikeClientEffects {
             return
         }
         val speed = if (velocity.isFinite()) velocity.length() else 0.0
-        val render = bike.definition.render
-        val exhaustPos = transform.toWorld.transformPosition(Vector3d(render.exhaustLocalPos))
-        if (bike.state.engineOn && speed > 0.6 && exhaustPos.isFinite() && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
-            val exhaustVelocity = transform.rotation.transform(Vector3d(0.0, 0.025, -0.075 - min(speed, 20.0) * 0.003))
-            level.addParticle(
-                exhaustParticle(telemetry),
-                exhaustPos.x,
-                exhaustPos.y,
-                exhaustPos.z,
-                exhaustVelocity.x + randomSpread(level, 0.012),
-                exhaustVelocity.y + randomSpread(level, 0.008),
-                exhaustVelocity.z + randomSpread(level, 0.012)
-            )
+        val render = bike.vehicleDefinition.render
+        if (bike.state.engineOn && speed > 0.6 && level.random.nextDouble() < exhaustChance(speed, telemetry)) {
+            render.resolvedExhaustPoints().forEach { exhaustPoint ->
+                val exhaustPos = transform.toWorld.transformPosition(Vector3d(exhaustPoint.localPos))
+                if (exhaustPos.isFinite()) {
+                    val exhaustVelocity = transform.rotation.transform(Vector3d(0.0, 0.025, -0.075 - min(speed, 20.0) * 0.003))
+                    level.addParticle(
+                        exhaustParticle(telemetry),
+                        exhaustPos.x,
+                        exhaustPos.y,
+                        exhaustPos.z,
+                        exhaustVelocity.x + randomSpread(level, 0.012),
+                        exhaustVelocity.y + randomSpread(level, 0.008),
+                        exhaustVelocity.z + randomSpread(level, 0.012)
+                    )
+                }
+            }
         }
 
         val drifting = telemetry?.drifting == true
         val frontGrounded = telemetry?.frontGrounded ?: (speed > 4.0)
         val rearGrounded = telemetry?.rearGrounded ?: (speed > 4.0)
-        if (frontGrounded) {
-            spawnTireParticles(level, wheelGroundParticlePos(bike, true, transform), speed, drifting)
-        }
-        if (rearGrounded) {
-            spawnTireParticles(level, wheelGroundParticlePos(bike, false, transform), speed, drifting)
+        val frontFallback = wheelGroundParticleLocalPos(bike, true)
+        val rearFallback = wheelGroundParticleLocalPos(bike, false)
+        render.resolvedTireParticlePoints(frontFallback, rearFallback).forEach { point ->
+            val grounded = when {
+                "front" in point.id -> frontGrounded
+                "rear" in point.id -> rearGrounded
+                else -> frontGrounded || rearGrounded
+            }
+            if (grounded) {
+                spawnTireParticles(level, transform.toWorld.transformPosition(Vector3d(point.localPos)), speed, drifting)
+            }
         }
     }
 
@@ -216,14 +226,14 @@ object BikeClientEffects {
         )
     }
 
-    private fun wheelGroundParticlePos(
+    private fun wheelGroundParticleLocalPos(
         bike: IBike,
-        front: Boolean,
-        transform: org.valkyrienskies.core.api.bodies.properties.BodyTransform
+        front: Boolean
     ): Vector3d {
         val local = Vector3d(if (front) bike.config.frontWheelLocalPos else bike.config.rearWheelLocalPos)
         local.y -= bike.config.wheelRadius + 0.035
-        return transform.toWorld.transformPosition(local)
+        local.y += bike.vehicleDefinition.render.tireParticleLocalYOffset
+        return local
     }
 
     private fun groundState(level: ClientLevel, position: Vector3d): BlockState? {

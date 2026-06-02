@@ -32,7 +32,7 @@ object KartPhysicsSolver {
         val contacts = config.wheelLocalPositions.mapIndexed { index, localPos ->
             sampleWheel(body, physLevel, localPos, index < 2, steerRad, config)
         }
-        val groundedContacts = contacts.filter(KartWheelContact::grounded)
+        val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
         val grounded = groundedContacts.isNotEmpty()
         val speed = body.kinematics.velocity.length()
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
@@ -67,11 +67,10 @@ object KartPhysicsSolver {
         front: Boolean,
         steerRad: Double,
         config: KartPhysicsConfig
-    ): KartWheelContact {
+    ): VehicleWheelContact {
         val mountWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
         val castDir = Vector3d(WORLD_UP).negate()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
-        val hit = physLevel.rayCast(mountWorld, castDir, maxLength, body.id)
         val baseForward = VehiclePhysicsMath.projectOntoPlane(
             VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD),
             WORLD_UP,
@@ -86,47 +85,40 @@ object KartPhysicsSolver {
             Vector3d(WORLD_UP).cross(wheelForward),
             VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         )
-        val velocity = VehiclePhysicsMath.velocityAtPoint(body, mountWorld)
-        if (hit == null || hit.hitBody.id == body.id || !hit.distance.isFinite()) {
-            return KartWheelContact(false, mountWorld, WORLD_UP, maxLength, 0.0, wheelForward, wheelRight, velocity)
-        }
-
-        val compression = (maxLength - hit.distance).coerceIn(0.0, config.suspensionTravel + config.wheelRadius)
-        val contactPoint = Vector3d(mountWorld).add(Vector3d(castDir).mul(hit.distance))
-        return KartWheelContact(
-            grounded = true,
-            contactPointWorld = contactPoint,
-            contactNormalWorld = VehiclePhysicsMath.safeNormalize(hit.hitNormal, WORLD_UP),
-            hitDistance = hit.distance,
-            compression = compression,
+        return VehicleWheelPhysics.sampleRaycastWheel(
+            body = body,
+            physLevel = physLevel,
+            mountWorld = mountWorld,
+            suspensionDirWorld = castDir,
+            maxLength = maxLength,
             wheelForwardWorld = wheelForward,
-            wheelRightWorld = wheelRight,
-            wheelVelocityWorld = velocity
+            wheelRightWorld = wheelRight
         )
     }
 
-    private fun applySuspension(body: PhysVsBody, contact: KartWheelContact, config: KartPhysicsConfig) {
+    private fun applySuspension(body: PhysVsBody, contact: VehicleWheelContact, config: KartPhysicsConfig) {
         if (!contact.grounded) return
         val springVelocity = -VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, WORLD_UP)
-        val forceMag = contact.compression * config.suspensionStrength + springVelocity * config.suspensionDamping
-        VehiclePhysicsMath.safeApplyWorldForce(body, Vector3d(WORLD_UP).mul(forceMag.coerceAtLeast(0.0)), contact.contactPointWorld)
+        val compression = contact.compressionDistance.coerceIn(0.0, config.suspensionTravel + config.wheelRadius)
+        val forceMag = compression * config.suspensionStrength + springVelocity * config.suspensionDamping
+        VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(WORLD_UP).mul(forceMag.coerceAtLeast(0.0)))
     }
 
-    private fun applyLateralGrip(body: PhysVsBody, contact: KartWheelContact, config: KartPhysicsConfig) {
+    private fun applyLateralGrip(body: PhysVsBody, contact: VehicleWheelContact, config: KartPhysicsConfig) {
         if (!contact.grounded) return
         val lateralSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelRightWorld)
         val force = Vector3d(contact.wheelRightWorld).mul((-lateralSpeed * config.lateralGrip).coerceIn(-MAX_FORCE, MAX_FORCE))
-        VehiclePhysicsMath.safeApplyWorldForce(body, force, contact.contactPointWorld)
+        VehicleWheelPhysics.applyContactForce(body, contact, force)
     }
 
     private fun applyDriveAndBrake(
         body: PhysVsBody,
-        contacts: List<KartWheelContact>,
+        contacts: List<VehicleWheelContact>,
         forwardSpeed: Double,
         input: VehicleInput,
         config: KartPhysicsConfig
     ) {
-        val rearContacts = contacts.drop(2).filter(KartWheelContact::grounded)
+        val rearContacts = contacts.drop(2).filter(VehicleWheelContact::grounded)
         if (rearContacts.isEmpty()) return
 
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
@@ -134,16 +126,16 @@ object KartPhysicsSolver {
         val driveForce = throttle * config.driveForce * speedLimitScale / rearContacts.size
         rearContacts.forEach { contact ->
             if (driveForce != 0.0) {
-                VehiclePhysicsMath.safeApplyWorldForce(body, Vector3d(contact.wheelForwardWorld).mul(driveForce), contact.contactPointWorld)
+                VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(driveForce))
             }
         }
 
         val brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
         if (brake <= 0.0) return
-        contacts.filter(KartWheelContact::grounded).forEach { contact ->
+        contacts.filter(VehicleWheelContact::grounded).forEach { contact ->
             val wheelForwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
             val brakeForce = (-wheelForwardSpeed * config.brakeForce * brake).coerceIn(-MAX_FORCE, MAX_FORCE)
-            VehiclePhysicsMath.safeApplyWorldForce(body, Vector3d(contact.wheelForwardWorld).mul(brakeForce), contact.contactPointWorld)
+            VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(brakeForce))
         }
     }
 
@@ -181,15 +173,4 @@ object KartPhysicsSolver {
             else -> 0.0
         }
     }
-
-    private data class KartWheelContact(
-        val grounded: Boolean,
-        val contactPointWorld: Vector3d,
-        val contactNormalWorld: Vector3d,
-        val hitDistance: Double,
-        val compression: Double,
-        val wheelForwardWorld: Vector3d,
-        val wheelRightWorld: Vector3d,
-        val wheelVelocityWorld: Vector3d
-    )
 }

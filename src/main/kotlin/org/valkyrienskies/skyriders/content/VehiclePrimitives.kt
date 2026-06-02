@@ -8,6 +8,7 @@ import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform
 import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.skyriders.SkyridersMod
 
 interface IVehicle {
     val id: String
@@ -65,7 +66,75 @@ data class VehicleRenderDefinition(
     val wheelSpinVisualScale: Double = 1.0,
     val wheelSpinSmoothingTime: Double = 0.08,
     val exhaustLocalPos: Vector3d = Vector3d(),
-    val tireParticleLocalYOffset: Double = 0.0
+    val tireParticleLocalYOffset: Double = 0.0,
+    val wheelParts: List<VehicleWheelRenderDefinition> = emptyList(),
+    val exhaustPoints: List<VehicleEffectPointDefinition> = emptyList(),
+    val tireParticlePoints: List<VehicleEffectPointDefinition> = emptyList()
+) {
+    fun resolvedWheelParts(): List<VehicleWheelRenderDefinition> {
+        if (!showWheels) return emptyList()
+        if (wheelParts.isNotEmpty()) return wheelParts
+
+        return listOfNotNull(
+            frontWheelModel?.let { model ->
+                VehicleWheelRenderDefinition(
+                    id = "front",
+                    model = model,
+                    pivot = Vector3d(frontWheelPivot),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                )
+            },
+            rearWheelModel?.let { model ->
+                VehicleWheelRenderDefinition(
+                    id = "rear",
+                    model = model,
+                    pivot = Vector3d(rearWheelPivot),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                )
+            }
+        )
+    }
+
+    fun resolvedExhaustPoints(): List<VehicleEffectPointDefinition> {
+        return exhaustPoints.ifEmpty {
+            listOf(VehicleEffectPointDefinition("exhaust", Vector3d(exhaustLocalPos)))
+        }
+    }
+
+    fun resolvedTireParticlePoints(frontFallback: Vector3d, rearFallback: Vector3d): List<VehicleEffectPointDefinition> {
+        return tireParticlePoints.ifEmpty {
+            listOf(
+                VehicleEffectPointDefinition("front_tire", frontFallback),
+                VehicleEffectPointDefinition("rear_tire", rearFallback)
+            )
+        }
+    }
+}
+
+data class VehicleWheelRenderDefinition(
+    val id: String,
+    val model: ResourceLocation,
+    val pivot: Vector3d,
+    val steerSource: VehicleWheelSteerSource = VehicleWheelSteerSource.NONE,
+    val spinSource: VehicleWheelSpinSource = VehicleWheelSpinSource.NONE
+)
+
+enum class VehicleWheelSteerSource {
+    NONE,
+    FRONT
+}
+
+enum class VehicleWheelSpinSource {
+    NONE,
+    FRONT,
+    REAR
+}
+
+data class VehicleEffectPointDefinition(
+    val id: String,
+    val localPos: Vector3d
 )
 
 data class VehicleSoundDefinition(
@@ -208,7 +277,13 @@ object VehicleDefinitions {
     }
 
     fun resolveSavedId(savedId: String): ResourceLocation? {
-        return BikeDefinitions.resolveSavedId(savedId)
+        val id = if (':' in savedId) {
+            ResourceLocation.tryParse(savedId)
+        } else {
+            ResourceLocation(SkyridersMod.MOD_ID, savedId)
+        } ?: return null
+
+        return id.takeIf { get(it) != null }
     }
 }
 

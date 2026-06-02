@@ -52,13 +52,7 @@ object BikeInteractionHandler {
         }
 
         val target = findBikeInLook(player, USE_RANGE) ?: return
-        if (player.isShiftKeyDown && VehicleInteractionAction.PICK_UP in target.actions) {
-            startHoisting(player, target.vehicle)
-        } else if (VehicleInteractionAction.MOUNT in target.actions) {
-            mountVehicle(player, target.vehicle, notifyPlayer = false, interactionZoneId = target.zoneId)
-        } else {
-            return
-        }
+        dispatchInteraction(player, target)
     }
 
     fun mountBike(
@@ -134,6 +128,27 @@ object BikeInteractionHandler {
             actions = hit.zone.actions,
             distanceSqr = hit.distanceSqr
         )
+    }
+
+    private fun dispatchInteraction(player: ServerPlayer, target: VehicleInteractionHit): Boolean {
+        val level = player.level() as? ServerLevel ?: return false
+        val actions = target.actions
+
+        if (player.isShiftKeyDown && VehicleInteractionAction.PICK_UP in actions) {
+            startHoisting(player, target.vehicle)
+            return true
+        }
+
+        if (VehicleInteractionAction.MOUNT in actions) {
+            return mountVehicle(player, target.vehicle, notifyPlayer = false, interactionZoneId = target.zoneId)
+        }
+
+        if (VehicleInteractionAction.ENGINE_TOGGLE in actions) {
+            VehicleManager.toggleEngine(level, target.vehicle.bodyId)
+            return true
+        }
+
+        return false
     }
 
     @SubscribeEvent

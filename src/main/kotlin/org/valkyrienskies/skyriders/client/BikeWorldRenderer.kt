@@ -17,6 +17,8 @@ import org.joml.Vector3d
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
+import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
 import kotlin.math.exp
 
 object BikeWorldRenderer {
@@ -90,33 +92,25 @@ object BikeWorldRenderer {
 
         renderBakedModel(poseStack, bufferSource, model, packedLight)
 
-        if (render.showWheels) {
-            render.frontWheelModel
-                ?.let(minecraft.modelManager::getModel)
-                ?.takeUnless { it === missingModel }
-                ?.let {
+        render.resolvedWheelParts().forEach { wheelPart ->
+            minecraft.modelManager.getModel(wheelPart.model)
+                .takeUnless { it === missingModel }
+                ?.let { wheelModel ->
+                    val bike = vehicle as? IBike
                     renderWheelPart(
                         poseStack = poseStack,
                         bufferSource = bufferSource,
-                        model = it,
-                        pivot = render.frontWheelPivot,
-                        steerRad = (vehicle as? IBike)?.state?.visualSteerRad ?: 0.0,
-                        spinRad = visualState.frontWheelSpin,
-                        packedLight = packedLight
-                    )
-                }
-
-            render.rearWheelModel
-                ?.let(minecraft.modelManager::getModel)
-                ?.takeUnless { it === missingModel }
-                ?.let {
-                    renderWheelPart(
-                        poseStack = poseStack,
-                        bufferSource = bufferSource,
-                        model = it,
-                        pivot = render.rearWheelPivot,
-                        steerRad = 0.0,
-                        spinRad = visualState.rearWheelSpin,
+                        model = wheelModel,
+                        pivot = wheelPart.pivot,
+                        steerRad = when (wheelPart.steerSource) {
+                            VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad ?: 0.0
+                            VehicleWheelSteerSource.NONE -> 0.0
+                        },
+                        spinRad = when (wheelPart.spinSource) {
+                            VehicleWheelSpinSource.FRONT -> visualState.frontWheelSpin
+                            VehicleWheelSpinSource.REAR -> visualState.rearWheelSpin
+                            VehicleWheelSpinSource.NONE -> 0.0
+                        },
                         packedLight = packedLight
                     )
                 }
