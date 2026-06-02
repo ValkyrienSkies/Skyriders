@@ -29,7 +29,8 @@ object BikeManager {
     val DEBUG_BIKE_ID = ResourceLocation(SkyridersMod.MOD_ID, "debug_bike")
     val registeredBikeIds: Set<ResourceLocation> = setOf(DEBUG_BIKE_ID)
 
-    private val bikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
+    private val serverBikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
+    private val clientBikesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, BikeInput>>()
 
     fun createBike(bikeId: ResourceLocation, level: ServerLevel, position: Vector3dc): IBike {
@@ -43,27 +44,27 @@ object BikeManager {
     }
 
     fun addBike(dimensionId: DimensionId, bike: IBike) {
-        bikesByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
+        serverBikesByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
         inputsByDimension.getOrPut(dimensionId) { ConcurrentHashMap() }[bike.bodyId] = BikeInput.EMPTY
     }
 
     fun replaceBikes(dimensionId: DimensionId, bikes: Iterable<IBike>) {
-        bikesByDimension[dimensionId] = ConcurrentHashMap<BodyId, IBike>().apply {
+        serverBikesByDimension[dimensionId] = ConcurrentHashMap<BodyId, IBike>().apply {
             bikes.forEach { bike -> put(bike.bodyId, bike) }
         }
         inputsByDimension[dimensionId] = ConcurrentHashMap<BodyId, BikeInput>().apply {
-            bikesByDimension[dimensionId]?.keys?.forEach { bodyId -> put(bodyId, BikeInput.EMPTY) }
+            serverBikesByDimension[dimensionId]?.keys?.forEach { bodyId -> put(bodyId, BikeInput.EMPTY) }
         }
     }
 
     fun clearBikes(dimensionId: DimensionId) {
-        bikesByDimension.remove(dimensionId)
+        serverBikesByDimension.remove(dimensionId)
         inputsByDimension.remove(dimensionId)
     }
 
     fun removeBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
         inputsByDimension[dimensionId]?.remove(bodyId)
-        return bikesByDimension[dimensionId]?.remove(bodyId)
+        return serverBikesByDimension[dimensionId]?.remove(bodyId)
     }
 
     fun removeBike(level: ServerLevel, bodyId: BodyId, deleteBody: Boolean = true): IBike? {
@@ -80,19 +81,23 @@ object BikeManager {
     }
 
     fun getBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
-        return bikesByDimension[dimensionId]?.get(bodyId)
+        return serverBikesByDimension[dimensionId]?.get(bodyId)
+    }
+
+    fun getBike(level: Level, bodyId: BodyId): IBike? {
+        return bikeMap(level)[level.dimensionId]?.get(bodyId)
     }
 
     fun getBikes(dimensionId: DimensionId): List<IBike> {
-        return bikesByDimension[dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
+        return serverBikesByDimension[dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
     }
 
     fun tick(dimensionId: DimensionId) {
-        bikesByDimension[dimensionId]?.values?.forEach(IBike::tick)
+        serverBikesByDimension[dimensionId]?.values?.forEach(IBike::tick)
     }
 
     fun physTick(physLevel: PhysLevel, dt: Double) {
-        bikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
+        serverBikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
             val body = physLevel.getBodyById(bike.bodyId) ?: return@forEach
             bike.physTick(physLevel, body, getInput(physLevel.dimension, bike.bodyId), dt)
         }
@@ -113,7 +118,7 @@ object BikeManager {
 
     fun save(dimensionId: DimensionId): CompoundTag = CompoundTag().apply {
         val bikes = ListTag()
-        bikesByDimension[dimensionId]?.values
+        serverBikesByDimension[dimensionId]?.values
             ?.map(IBike::toSaveRecord)
             ?.map(BikeSaveRecord::save)
             ?.forEach(bikes::add)
@@ -132,13 +137,35 @@ object BikeManager {
             else -> null
         } ?: return null
 
-        addBike(level.dimensionId, bike)
+        addBike(level, bike)
         return bike
     }
 
     fun restoreBikes(level: Level, records: Iterable<BikeSaveRecord>) {
-        clearBikes(level.dimensionId)
+        clearBikes(level)
         records.forEach { record -> restoreBike(level, record) }
+    }
+
+    private fun addBike(level: Level, bike: IBike) {
+        if (!level.isClientSide) {
+            addBike(level.dimensionId, bike)
+            return
+        }
+
+        clientBikesByDimension.getOrPut(level.dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
+    }
+
+    private fun clearBikes(level: Level) {
+        if (!level.isClientSide) {
+            clearBikes(level.dimensionId)
+            return
+        }
+
+        clientBikesByDimension.remove(level.dimensionId)
+    }
+
+    private fun bikeMap(level: Level): ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>> {
+        return if (level.isClientSide) clientBikesByDimension else serverBikesByDimension
     }
 
     private fun createDebugBike(level: ServerLevel, position: Vector3dc): IBike {

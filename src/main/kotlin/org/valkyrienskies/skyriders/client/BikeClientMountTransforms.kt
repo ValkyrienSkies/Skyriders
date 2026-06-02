@@ -8,7 +8,6 @@ import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.ClientVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform
-import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
@@ -39,7 +38,7 @@ object BikeClientMountTransforms {
     @JvmStatic
     fun getMountedBikeSeatOffset(entity: Entity?): Double {
         val seat = getBikeSeat(entity) ?: return DEFAULT_SEAT_OFFSET
-        val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
+        val bike = BikeManager.getBike(seat.level(), seat.bodyId)
         return bike?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
     }
 
@@ -107,7 +106,7 @@ object BikeClientMountTransforms {
     @JvmStatic
     fun getMountedBikeWheelTopSpeed(entity: Entity?): Double {
         val seat = getBikeSeat(entity) ?: return DEFAULT_WHEEL_TOP_SPEED
-        val bike = BikeManager.getBike(seat.level().dimensionId, seat.bodyId)
+        val bike = BikeManager.getBike(seat.level(), seat.bodyId)
         val topSpeed = bike?.config?.wheelTopSpeed ?: DEFAULT_WHEEL_TOP_SPEED
         return if (topSpeed.isFinite() && topSpeed > 0.0) topSpeed else DEFAULT_WHEEL_TOP_SPEED
     }

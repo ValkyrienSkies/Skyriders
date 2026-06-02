@@ -45,7 +45,8 @@ object BikeLifecycle {
 
     @SubscribeEvent
     fun onPlayerChangedDimension(event: PlayerEvent.PlayerChangedDimensionEvent) {
-        syncPlayer(event.entity as ServerPlayer)
+        val player = event.entity as? ServerPlayer ?: return
+        syncPlayer(player)
     }
 
     fun saveLevel(level: ServerLevel) {

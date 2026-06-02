@@ -81,7 +81,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     private fun updateSeatPose(): Boolean {
         val body = level().shipWorld?.allBodies?.getById(bodyId) ?: return false
-        val seatOffset = BikeManager.getBike(body.dimension, bodyId)?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
+        val seatOffset = BikeManager.getBike(level(), bodyId)?.getSeatOffset() ?: DEFAULT_SEAT_OFFSET
         val transform = if (level().isClientSide && body is ClientVsBody) body.renderTransform else body.kinematics.transform
         val seatWorld = transform.toWorld.transformPosition(Vector3d(0.0, seatOffset, 0.0))
         val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
