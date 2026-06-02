@@ -4,6 +4,7 @@
   "refmap": "mixins.skyriders.refmap.json",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "MixinEntity",
     "MixinLivingEntity"
   ],
   "client": [
