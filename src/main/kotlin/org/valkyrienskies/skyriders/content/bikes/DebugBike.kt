@@ -17,11 +17,11 @@ import org.valkyrienskies.skyriders.content.BikeRuntimeState
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.util.BikePhysicsSolver
 
-class DebugBike(override val bodyId: BodyId,
-                override val boundingBox: AABB,
-                override val level: Level,
-                val definition: BikeDefinition = BikeDefinitions.DEBUG_BIKE,
-                override val state: BikeRuntimeState = BikeRuntimeState()
+open class DebugBike(override val bodyId: BodyId,
+                     override val boundingBox: AABB,
+                     override val level: Level,
+                     val definition: BikeDefinition = BikeDefinitions.DEBUG_BIKE,
+                     override val state: BikeRuntimeState = BikeRuntimeState()
 ) : IBike {
     override val config: BikePhysicsConfig
         get() = definition.config

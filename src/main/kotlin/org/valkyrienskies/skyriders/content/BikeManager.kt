@@ -20,8 +20,6 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.mod.common.vsCore
-import org.valkyrienskies.skyriders.SkyridersMod
-import org.valkyrienskies.skyriders.content.bikes.DebugBike
 import java.util.concurrent.ConcurrentHashMap
 
 object BikeManager {
@@ -203,7 +201,7 @@ object BikeManager {
                 restitutionCoefficient = 0.05
             )
         )
-        val bike = DebugBike(
+        val bike = definition.factory.create(
             bodyId = body.id,
             boundingBox = AABB.ofSize(
                 Vec3(
@@ -216,7 +214,8 @@ object BikeManager {
                 config.collisionBoxSize.z
             ),
             level = level,
-            definition = definition
+            definition = definition,
+            state = BikeRuntimeState()
         )
         addBike(level.dimensionId, bike)
         return bike
@@ -226,7 +225,7 @@ object BikeManager {
         val config = definition.config
         val body = level.shipWorld?.allBodies?.getById(record.bodyId) ?: return null
         val position = body.kinematics.position
-        return DebugBike(
+        return definition.factory.create(
             bodyId = record.bodyId,
             boundingBox = AABB.ofSize(
                 Vec3(
