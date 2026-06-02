@@ -38,6 +38,7 @@ object BikeInteractionHandler {
 
     private val hoistedByPlayer = ConcurrentHashMap<UUID, HoistedBike>()
     private val hoistedPlayersByBody = ConcurrentHashMap<BodyId, UUID>()
+    private val pendingReleases = ConcurrentHashMap<BodyId, ReleasePose>()
     private val pendingTosses = ConcurrentHashMap<BodyId, PendingToss>()
 
     fun handleUse(player: ServerPlayer) {
@@ -92,6 +93,7 @@ object BikeInteractionHandler {
         seat.moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yaw, 0.0f)
         level.addFreshEntity(seat)
         player.startRiding(seat, true)
+        alignPlayerToBike(player, yaw)
 
         if (notifyPlayer) {
             player.sendSystemMessage(Component.literal("Mounted ${bike.definition.displayName} (${bike.id}) with VS body ${bike.bodyId}"))
@@ -120,6 +122,29 @@ object BikeInteractionHandler {
     }
 
     fun physTick(physLevel: PhysLevel, dt: Double) {
+        hoistedByPlayer.values.forEach { hoisted ->
+            if (hoisted.dimensionId != physLevel.dimension) return@forEach
+
+            val body = physLevel.getBodyById(hoisted.bodyId) ?: return@forEach
+            val pose = hoisted.pose
+            body.isStatic = true
+            body.setTransform(pose.position, pose.rotation, Vector3d(1.0, 1.0, 1.0))
+        }
+
+        val releaseIterator = pendingReleases.entries.iterator()
+        while (releaseIterator.hasNext()) {
+            val entry = releaseIterator.next()
+            val release = entry.value
+            if (release.dimensionId != physLevel.dimension) continue
+
+            val body = physLevel.getBodyById(entry.key)
+            if (body != null) {
+                body.setTransform(release.position, release.rotation, Vector3d(1.0, 1.0, 1.0))
+                body.isStatic = false
+            }
+            releaseIterator.remove()
+        }
+
         val iterator = pendingTosses.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
@@ -164,7 +189,6 @@ object BikeInteractionHandler {
             return
         }
 
-        val body = getServerBody(level, hoisted.bodyId) ?: return clearHoist(player.uuid, hoisted.bodyId)
         val eye = player.eyePosition
         val look = player.lookAngle
         val pos = Vector3d(
@@ -172,7 +196,7 @@ object BikeInteractionHandler {
             eye.y + HOIST_UP_OFFSET,
             eye.z + look.z * HOIST_FORWARD_OFFSET
         )
-        body.setTransform(pos, carriedRotation(player), Vector3d(1.0, 1.0, 1.0))
+        hoisted.pose = CarryPose(pos, carriedRotation(player))
     }
 
     private fun releaseHoistedBike(player: ServerPlayer, hoisted: HoistedBike) {
@@ -189,7 +213,7 @@ object BikeInteractionHandler {
                 loc.y + normal.y * 0.25 + PLACE_UP_OFFSET,
                 loc.z + normal.z * 0.25
             )
-            body.setTransform(pos, carriedRotation(player), Vector3d(1.0, 1.0, 1.0))
+            pendingReleases[hoisted.bodyId] = ReleasePose(level.dimensionId, pos, carriedRotation(player))
         } else {
             val eye = player.eyePosition
             val look = player.lookAngle.normalize()
@@ -198,7 +222,7 @@ object BikeInteractionHandler {
                 eye.y - 0.2 + look.y * 0.5,
                 eye.z + look.z * 1.15
             )
-            body.setTransform(pos, carriedRotation(player), Vector3d(1.0, 1.0, 1.0))
+            pendingReleases[hoisted.bodyId] = ReleasePose(level.dimensionId, pos, carriedRotation(player))
             val mass = bike?.config?.mass ?: 250.0
             val direction = Vector3d(look.x, max(look.y, 0.0) + 0.18, look.z).normalize()
             pendingTosses[hoisted.bodyId] = PendingToss(
@@ -209,7 +233,6 @@ object BikeInteractionHandler {
             )
         }
 
-        body.isStatic = false
         SkyridersNetwork.sendBikeHoistState(player, false)
         clearHoist(player.uuid, hoisted.bodyId)
     }
@@ -220,7 +243,15 @@ object BikeInteractionHandler {
     }
 
     private fun carriedRotation(player: ServerPlayer): Quaterniond {
-        return Quaterniond().rotateY(Math.toRadians(-player.yRot.toDouble()))
+        return Quaterniond().rotateY(Math.toRadians(90.0 - player.yRot.toDouble()))
+    }
+
+    private fun alignPlayerToBike(player: ServerPlayer, yaw: Float) {
+        player.setYRot(yaw)
+        player.yHeadRot = yaw
+        player.yHeadRotO = yaw
+        player.yBodyRot = yaw
+        player.yBodyRotO = yaw
     }
 
     private fun getServerBody(level: ServerLevel, bodyId: BodyId): ServerBaseVsBody? {
@@ -257,7 +288,19 @@ object BikeInteractionHandler {
 
     private data class HoistedBike(
         val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,
-        val bodyId: BodyId
+        val bodyId: BodyId,
+        @Volatile var pose: CarryPose = CarryPose(Vector3d(), Quaterniond())
+    )
+
+    private data class CarryPose(
+        val position: Vector3dc,
+        val rotation: org.joml.Quaterniondc
+    )
+
+    private data class ReleasePose(
+        val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,
+        val position: Vector3dc,
+        val rotation: org.joml.Quaterniondc
     )
 
     private data class PendingToss(
