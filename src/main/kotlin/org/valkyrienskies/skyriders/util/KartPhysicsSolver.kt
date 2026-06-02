@@ -148,7 +148,8 @@ object KartPhysicsSolver {
         val maxLateralForce = (kartContact.normalForce * config.tireFrictionCoefficient * grip)
             .coerceIn(0.0, MAX_FORCE)
         val slip = lateralSpeed / max(abs(forwardSpeed), 1.5)
-        val shapedSlip = slip / (abs(slip) + 0.24)
+        val shape = config.lateralSlipShape.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.5
+        val shapedSlip = slip / (abs(slip) + shape)
         val force = Vector3d(contact.wheelRightWorld).mul((-shapedSlip * maxLateralForce).coerceIn(-MAX_FORCE, MAX_FORCE))
         VehicleWheelPhysics.applyContactForce(body, contact, force)
     }
@@ -165,7 +166,13 @@ object KartPhysicsSolver {
         if (rearContacts.isEmpty()) return
 
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
-        val speedLimitScale = computeSpeedLimitScale(forwardSpeed, throttle, config)
+        val driveLimitSpeed = if (drifting) {
+            val direction = forwardSpeed.signOrZero().takeIf { it != 0.0 } ?: throttle.signOrZero()
+            planarSpeed(body, WORLD_UP) * direction
+        } else {
+            forwardSpeed
+        }
+        val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, if (drifting) config.wheelTopSpeed * config.driftTopSpeedMultiplier else config.wheelTopSpeed, config)
         val driveScale = if (drifting) config.driftDriveScale else 1.0
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
         rearContacts.forEach { kartContact ->
@@ -182,7 +189,8 @@ object KartPhysicsSolver {
         contacts.filter { it.contact.grounded && it.normalForce > 0.0 }.forEach { kartContact ->
             val contact = kartContact.contact
             val wheelForwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
-            val rollingForce = (-wheelForwardSpeed * config.rollingResistance / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
+            val rollingScale = if (drifting) 0.35 else 1.0
+            val rollingForce = (-wheelForwardSpeed * config.rollingResistance * rollingScale / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
             if (rollingForce != 0.0) {
                 VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(rollingForce))
             }
@@ -223,13 +231,14 @@ object KartPhysicsSolver {
 
         val steerBias = input.steer.coerceIn(-1.0, 1.0) * state.driftDirection
         val biasScale = when {
-            steerBias > 0.15 -> 1.22
-            steerBias < -0.15 -> 0.42
-            else -> 0.78
+            steerBias > 0.15 -> 1.05
+            steerBias < -0.15 -> 0.28
+            else -> 0.58
         }
         val speedT = smoothstep(config.driftMinSpeed, config.yawAssistMaxSpeed, speed)
+        val highSpeedSoftening = lerp(1.0, 0.68, smoothstep(config.yawAssistMaxSpeed * 0.7, config.yawAssistMaxSpeed * 1.35, speed))
         val torque = Vector3d(terrainUp).mul(
-            state.driftDirection * forwardSpeed.signOrZero() * config.driftYawAssist * speedT * biasScale
+            state.driftDirection * forwardSpeed.signOrZero() * config.driftYawAssist * speedT * biasScale * highSpeedSoftening
         )
         VehiclePhysicsMath.safeApplyWorldTorque(body, torque)
     }
@@ -274,15 +283,22 @@ object KartPhysicsSolver {
         return state.smoothedSteerRad
     }
 
-    private fun computeSpeedLimitScale(forwardSpeed: Double, throttle: Double, config: KartPhysicsConfig): Double {
+    private fun computeSpeedLimitScale(speed: Double, throttle: Double, topSpeed: Double, config: KartPhysicsConfig): Double {
         if (throttle == 0.0) return 0.0
-        val topSpeed = config.wheelTopSpeed
         if (!topSpeed.isFinite() || topSpeed <= 0.0) return 1.0
 
-        val signedSpeed = forwardSpeed * throttle.signOrZero()
+        val signedSpeed = speed * throttle.signOrZero()
         if (signedSpeed <= topSpeed * (1.0 - config.speedLimitSoftness.coerceIn(0.02, 0.8))) return 1.0
         if (signedSpeed >= topSpeed) return 0.0
         return 1.0 - smoothstep(topSpeed * (1.0 - config.speedLimitSoftness.coerceIn(0.02, 0.8)), topSpeed, signedSpeed)
+    }
+
+    private fun planarSpeed(body: PhysVsBody, terrainUp: Vector3d): Double {
+        val velocity = body.kinematics.velocity
+        if (!VehiclePhysicsMath.isFinite(velocity)) return 0.0
+        val vertical = VehiclePhysicsMath.safeDot(velocity, terrainUp)
+        val planar = Vector3d(velocity).fma(-vertical, terrainUp)
+        return if (VehiclePhysicsMath.isFinite(planar)) planar.length() else 0.0
     }
 
     private fun averageLateralSlip(contacts: List<KartContact>): Double {
