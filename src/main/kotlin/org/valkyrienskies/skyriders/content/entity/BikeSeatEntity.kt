@@ -119,7 +119,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
             BikeInput(
                 steer = passenger.xxa.toDouble(),
                 throttle = passenger.zza.toDouble(),
-                brake = if (passenger.zza < 0.0f) -passenger.zza.toDouble() else 0.0,
+                brake = it.brake,
                 jump = it.jump,
                 pitch = it.pitch,
                 riderPresent = true

@@ -41,7 +41,11 @@ object BikePhysicsSolver {
         val riderPresent = input.riderPresent
         val activeInput = if (riderPresent) input else BikeInput.EMPTY
         val drifting = isDrifting(activeInput, forwardSpeed, config)
-        val frontSteerRad = computeFrontSteerAngle(forwardSpeed, activeInput.steer, config)
+        val frontSteerRad = updateFrontSteerAngle(
+            state,
+            computeFrontSteerAngle(forwardSpeed, activeInput.steer, config),
+            dt
+        )
 
         val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val frontContact = sampleWheelContact(
@@ -370,6 +374,12 @@ object BikePhysicsSolver {
         val speedT = smoothstep(config.steeringLowSpeedEnd, config.steeringHighSpeedStart, speed)
         val maxSteer = lerp(config.maxSteerLowSpeedRad, config.maxSteerHighSpeedRad, speedT)
         return steerInput.coerceIn(-1.0, 1.0) * maxSteer
+    }
+
+    private fun updateFrontSteerAngle(state: BikeRuntimeState, targetSteerRad: Double, dt: Double): Double {
+        val alpha = 1.0 - exp(-dt / 0.12)
+        state.frontSteerRad = lerp(state.frontSteerRad, targetSteerRad, alpha)
+        return state.frontSteerRad
     }
 
     private fun applyBalanceController(
