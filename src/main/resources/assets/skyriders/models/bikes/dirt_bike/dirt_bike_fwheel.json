@@ -1,0 +1,89 @@
+{
+	"credit": "Made with Blockbench",
+	"loader": "framework:open_model",
+	"texture_size": [64, 64],
+	"textures": {
+		"dirt_bike": "skyriders:bikes/dirt_bike"
+	},
+	"components": [
+		{
+			"from": [7, 0.25, -4.5],
+			"to": [9, 7.25, 2.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 3.75, -1]},
+			"faces": {
+				"north": {"uv": [4, 5.5, 4.5, 7.25], "texture": "#dirt_bike"},
+				"east": {"uv": [0, 0, 1.75, 1.75], "texture": "#dirt_bike"},
+				"south": {"uv": [2, 6.25, 2.5, 8], "texture": "#dirt_bike"},
+				"west": {"uv": [0, 1.75, 1.75, 3.5], "texture": "#dirt_bike"},
+				"up": {"uv": [3, 8, 2.5, 6.25], "texture": "#dirt_bike"},
+				"down": {"uv": [5, 6.25, 4.5, 8], "texture": "#dirt_bike"}
+			}
+		}
+	],
+	"display": {
+		"thirdperson_righthand": {
+			"translation": [0, 3, 1],
+			"scale": [0.55, 0.55, 0.55]
+		},
+		"thirdperson_lefthand": {
+			"translation": [0, 3, 1],
+			"scale": [0.55, 0.55, 0.55]
+		},
+		"firstperson_righthand": {
+			"rotation": [0, 90, 25],
+			"translation": [1.13, 3.2, 1.13],
+			"scale": [0.68, 0.68, 0.68]
+		},
+		"firstperson_lefthand": {
+			"rotation": [0, 90, 25],
+			"translation": [1.13, 3.2, 1.13],
+			"scale": [0.68, 0.68, 0.68]
+		},
+		"ground": {
+			"translation": [0, 2, 0],
+			"scale": [0.5, 0.5, 0.5]
+		},
+		"gui": {
+			"rotation": [30, -135, 0],
+			"scale": [0.625, 0.625, 0.625]
+		},
+		"fixed": {
+			"rotation": [0, -90, 0],
+			"scale": [0.5, 0.5, 0.5]
+		}
+	},
+	"groups": [
+		{
+			"uuid": "fa24a30e-95ce-477c-b998-44509db954e6",
+			"isOpen": true,
+			"children": [
+				"f441c5ab-77ec-c2b0-1b81-797c5f3e74e0",
+				"0ed58de4-01a2-a946-fe26-b158b3402cd2",
+				"6846b22f-6fbd-2c80-fac5-936e68978fe5",
+				"8749a945-06c1-092d-1af7-a023369a8e3b",
+				"647a57a6-afa3-da60-324b-9ae0cb5ffa26",
+				"ed6adaef-7d21-7484-f8f4-a7e7cb68685d",
+				"cdf40d2c-468c-eb69-2dd5-14536e342097",
+				"0b12f27d-2579-b886-26ae-777cdbebcd88",
+				"9d42f197-2c3b-70c4-2576-8d48dd4f28a8",
+				"fe8b8d85-a63f-277e-8f89-fa8e45150979",
+				"fa49a2db-5aa8-c6f4-14f1-a9197d605683",
+				"bcc3ba40-d8e9-66d0-fdc1-7c32bf11f292",
+				"8ddbec28-f24f-b3b5-cef3-97f58537d493",
+				"b35997d5-e076-ede0-3019-81c118b81c1e",
+				"d8099b45-7d9e-9a42-90f0-ca89e3e5f6fa",
+				"43845d5c-ca46-38ad-9fa1-dee9892cbb2b",
+				"af3c0d12-4a62-1408-7571-72a8fb68a4c2",
+				"9ff80b12-b67e-3147-f453-ee5e85b58ee6",
+				"295f11c1-7558-1db8-f920-cf33e638c499",
+				"04bb5aaf-ba96-ca98-7cb3-ea9b08ebb906",
+				"39dfb16d-730d-1273-067f-71886e663f9d"
+			]
+		},
+		{
+			"uuid": "a948990d-2030-0ce9-af52-4a4813411c8c",
+			"isOpen": true,
+			"children": ["1123eb0b-4a85-0deb-a494-c983cb68e5e6", "a31bd6d9-2a78-20c2-6663-0e838a0b16cf"]
+		}
+	]
+}

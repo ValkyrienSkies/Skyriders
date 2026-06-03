@@ -24,6 +24,7 @@ data class BikeDefinition(
     val displayName: String,
     val config: BikePhysicsConfig,
     val seatOffset: Double,
+    val seatLocalPos: Vector3d = Vector3d(0.0, seatOffset, 0.0),
     val render: BikeRenderDefinition = BikeRenderDefinition.DEFAULT_BIKE,
     val sounds: BikeSoundDefinition = BikeSoundDefinition.DEFAULT_ENGINE,
     val interactions: BikeInteractionDefinition = BikeInteractionDefinition.DEFAULT_BIKE,
@@ -58,6 +59,19 @@ data class BikeInteractionDefinition(
                     size = Vector3d(0.45, 0.25, 0.45)
                 )
             )
+        )
+
+        val DIRT_BIKE = DEFAULT_BIKE.copy(
+            zones = DEFAULT_BIKE.zones.map { zone ->
+                if (zone.id == SEAT) {
+                    zone.copy(
+                        center = Vector3d(0.0, 0.36, -0.35),
+                        size = Vector3d(0.85, 0.55, 0.85)
+                    )
+                } else {
+                    zone
+                }
+            }
         )
     }
 }
@@ -111,7 +125,8 @@ data class BikeRenderDefinition(
     val wheelSpinVisualScale: Double = 0.35,
     val wheelSpinSmoothingTime: Double = 0.08,
     val exhaustLocalPos: Vector3d = Vector3d(0.0, 0.35, -0.85),
-    val tireParticleLocalYOffset: Double = -0.45
+    val tireParticleLocalYOffset: Double = -0.45,
+    val wheelParts: List<VehicleWheelRenderDefinition> = emptyList()
 ) {
     companion object {
         val DEFAULT_BIKE = BikeRenderDefinition(
@@ -119,6 +134,39 @@ data class BikeRenderDefinition(
             texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/bikes/debug_bike.png"),
             frontWheelModel = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike_front_wheel"),
             rearWheelModel = ResourceLocation(SkyridersMod.MOD_ID, "bikes/debug_bike_rear_wheel")
+        )
+
+        val DIRT_BIKE = BikeRenderDefinition(
+            model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_body"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/bikes/dirt_bike.png"),
+            frontWheelModel = null,
+            rearWheelModel = null,
+            modelOffset = Vector3d(-0.625, -0.413, -0.605),
+            modelScale = 1.25,
+            wheelSpinVisualScale = 0.35,
+            wheelParts = listOf(
+                VehicleWheelRenderDefinition(
+                    id = "front_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_fwheel"),
+                    pivot = Vector3d(0.5, 0.234375, -0.0625),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_bwheel"),
+                    pivot = Vector3d(0.5, 0.234375, 1.03125),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "steering_assembly",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_steer"),
+                    pivot = Vector3d(0.5, 0.87272625, 0.289041875),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.NONE
+                )
+            )
         )
 
         val HOVER_BIKE = DEFAULT_BIKE.copy(
@@ -141,7 +189,10 @@ object BikeDefinitions {
         id = ResourceLocation(SkyridersMod.MOD_ID, "dirt_bike"),
         displayName = "Dirt Bike",
         config = BikePhysicsConfig.DIRT_BIKE,
-        seatOffset = 0.24
+        seatOffset = 0.24,
+        seatLocalPos = Vector3d(0.0, 0.15, -0.35),
+        render = BikeRenderDefinition.DIRT_BIKE,
+        interactions = BikeInteractionDefinition.DIRT_BIKE
     )
 
     val CRUISER = BikeDefinition(

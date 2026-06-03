@@ -3,6 +3,10 @@
     {
       "type": "single",
       "resource": "skyriders:bikes/debug_bike"
+    },
+    {
+      "type": "single",
+      "resource": "skyriders:bikes/dirt_bike"
     }
   ]
 }

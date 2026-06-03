@@ -154,8 +154,14 @@ data class BikePhysicsConfig(
 
         val DIRT_BIKE = MOTORCYCLE.copy(
             mass = 210.0,
-            suspensionRestLength = 0.32,
-            suspensionTravel = 0.62,
+            collisionBoxSize = Vector3d(0.5, 0.62, 1.38),
+            collisionBoxOffset = Vector3d(0.0, 0.27, 0.0),
+            frontWheelLocalPos = Vector3d(0.0, -0.15, 0.69),
+            rearWheelLocalPos = Vector3d(0.0, -0.15, -0.69),
+            wheelRadius = 0.275,
+            wheelWidth = 0.175,
+            suspensionRestLength = 0.225,
+            suspensionTravel = 0.25,
             suspensionStrength = 39000.0,
             suspensionDamping = 5200.0,
             wheelTopSpeed = 20.0,

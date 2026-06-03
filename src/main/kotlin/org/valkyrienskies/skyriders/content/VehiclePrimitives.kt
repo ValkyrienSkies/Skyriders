@@ -335,7 +335,7 @@ fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
     seats = listOf(
         VehicleSeatDefinition(
             id = VehicleInteractionDefinition.SEAT,
-            localPos = Vector3d(0.0, seatOffset, 0.0),
+            localPos = Vector3d(seatLocalPos),
             role = VehicleSeatRole.DRIVER,
             interactionZone = VehicleInteractionDefinition.SEAT
         )
@@ -359,7 +359,16 @@ fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = 
     wheelSpinVisualScale = wheelSpinVisualScale,
     wheelSpinSmoothingTime = wheelSpinSmoothingTime,
     exhaustLocalPos = Vector3d(exhaustLocalPos),
-    tireParticleLocalYOffset = tireParticleLocalYOffset
+    tireParticleLocalYOffset = tireParticleLocalYOffset,
+    wheelParts = wheelParts.map { part ->
+        VehicleWheelRenderDefinition(
+            id = part.id,
+            model = part.model,
+            pivot = Vector3d(part.pivot),
+            steerSource = part.steerSource,
+            spinSource = part.spinSource
+        )
+    }
 )
 
 fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = VehicleSoundDefinition(
