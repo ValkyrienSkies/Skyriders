@@ -178,11 +178,10 @@ object BikeWorldRenderer {
     }
 
     private fun wheelSpin(vehicle: IVehicle): WheelPair {
-        val bike = vehicle as? IBike
-        return if (bike != null) {
-            WheelPair(bike.state.frontWheelSpin, bike.state.rearWheelSpin)
-        } else {
-            WheelPair(0.0, 0.0)
+        return when (vehicle) {
+            is IBike -> WheelPair(vehicle.state.frontWheelSpin, vehicle.state.rearWheelSpin)
+            is KartVehicle -> WheelPair(vehicle.kartState.frontWheelSpin, vehicle.kartState.rearWheelSpin)
+            else -> WheelPair(0.0, 0.0)
         }
     }
 

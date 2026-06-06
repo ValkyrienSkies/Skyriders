@@ -162,7 +162,13 @@ object VehicleManager {
                 bodyId = bodyId,
                 level = level,
                 vehicleDefinition = definition,
-                kartState = KartRuntimeState(engineOn = record.engineOn)
+                kartState = KartRuntimeState(
+                    engineOn = record.engineOn,
+                    frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
+                    rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
+                    frontWheelAngularVelocity = record.behaviorTag.getDouble("front_wheel_angular_velocity"),
+                    rearWheelAngularVelocity = record.behaviorTag.getDouble("rear_wheel_angular_velocity")
+                )
             )
             is BikeVehicleBehaviorDefinition -> throw IllegalArgumentException("Bike vehicles are created through BikeManager")
         }
@@ -293,18 +299,30 @@ object VehicleManager {
         return vehicle
     }
 
-    fun applyVisualSuspensionState(
+    fun applyVisualWheelState(
         level: Level,
         bodyId: BodyId,
+        frontWheelSpin: Double,
+        rearWheelSpin: Double,
+        frontWheelAngularVelocity: Double,
+        rearWheelAngularVelocity: Double,
         frontWheelSuspensionOffset: Double,
         rearWheelSuspensionOffset: Double
     ) {
         when (val vehicle = getVehicle(level, bodyId)) {
             is IBike -> {
+                vehicle.state.frontWheelSpin = frontWheelSpin
+                vehicle.state.rearWheelSpin = rearWheelSpin
+                vehicle.state.frontWheelAngularVelocity = frontWheelAngularVelocity
+                vehicle.state.rearWheelAngularVelocity = rearWheelAngularVelocity
                 vehicle.state.frontWheelSuspensionOffset = frontWheelSuspensionOffset
                 vehicle.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
             is KartVehicle -> {
+                vehicle.kartState.frontWheelSpin = frontWheelSpin
+                vehicle.kartState.rearWheelSpin = rearWheelSpin
+                vehicle.kartState.frontWheelAngularVelocity = frontWheelAngularVelocity
+                vehicle.kartState.rearWheelAngularVelocity = rearWheelAngularVelocity
                 vehicle.kartState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
                 vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }

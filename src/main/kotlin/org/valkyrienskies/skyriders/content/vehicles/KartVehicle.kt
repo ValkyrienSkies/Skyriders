@@ -49,6 +49,10 @@ class KartVehicle(
         engineOn = kartState.engineOn,
         behaviorTag = CompoundTag().apply {
             putString("behavior_type", "kart")
+            putDouble("front_wheel_spin", kartState.frontWheelSpin)
+            putDouble("rear_wheel_spin", kartState.rearWheelSpin)
+            putDouble("front_wheel_angular_velocity", kartState.frontWheelAngularVelocity)
+            putDouble("rear_wheel_angular_velocity", kartState.rearWheelAngularVelocity)
         }
     )
 
