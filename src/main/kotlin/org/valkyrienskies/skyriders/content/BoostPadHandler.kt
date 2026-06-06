@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.content
 
 import net.minecraft.core.BlockPos
+import net.minecraft.sounds.SoundSource
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import org.joml.Vector3d
@@ -21,7 +22,9 @@ object BoostPadHandler {
     private const val BOOST_FADE_RANGE = 6.0
     private const val MIN_TRIGGER_SPEED = 0.35
     private const val PROBE_STEP = 0.25
+    private const val SOUND_COOLDOWN_TICKS = 20L
     private val boostPadsByDimension = ConcurrentHashMap<DimensionId, MutableSet<Long>>()
+    private val nextSoundTickByBody = ConcurrentHashMap<Long, Long>()
 
     fun physTick(physLevel: PhysLevel, vehicles: Iterable<IVehicle>, dt: Double) {
         vehicles.forEach { vehicle ->
@@ -36,6 +39,7 @@ object BoostPadHandler {
             if (vehicle.level.dimensionId != level.dimensionId) return@forEach
             val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
             refreshCacheNearVehicle(level, vehicle, body)
+            playBoostSoundIfNeeded(level, vehicle, body)
         }
     }
 
@@ -55,7 +59,7 @@ object BoostPadHandler {
     }
 
     private fun applyBoostIfOnPad(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
-        if (dt <= 0.0 || !isOnBoostPad(vehicle, body)) return
+        if (dt <= 0.0 || !isOnCachedBoostPad(vehicle, body)) return
 
         val velocity = body.kinematics.velocity
         val planarVelocity = Vector3d(velocity.x(), 0.0, velocity.z())
@@ -72,7 +76,34 @@ object BoostPadHandler {
         VehiclePhysicsMath.safeApplyWorldForce(body, force, body.kinematics.position)
     }
 
-    private fun isOnBoostPad(vehicle: IVehicle, body: PhysVsBody): Boolean {
+    private fun playBoostSoundIfNeeded(level: ServerLevel, vehicle: IVehicle, body: VsBody) {
+        if (!isOnCachedBoostPad(vehicle, body) || !isMovingFastEnoughForBoost(body)) return
+
+        val now = level.gameTime
+        val nextSoundTick = nextSoundTickByBody[vehicle.bodyId] ?: 0L
+        if (now < nextSoundTick) return
+
+        val position = body.kinematics.position
+        level.playSound(
+            null,
+            position.x(),
+            position.y(),
+            position.z(),
+            SkyridersMod.BOOST_SOUND.get(),
+            SoundSource.BLOCKS,
+            0.75f,
+            1.0f
+        )
+        nextSoundTickByBody[vehicle.bodyId] = now + SOUND_COOLDOWN_TICKS
+    }
+
+    private fun isMovingFastEnoughForBoost(body: VsBody): Boolean {
+        val velocity = body.kinematics.velocity
+        val planarVelocity = Vector3d(velocity.x(), 0.0, velocity.z())
+        return VehiclePhysicsMath.isFinite(planarVelocity) && planarVelocity.lengthSquared() >= MIN_TRIGGER_SPEED * MIN_TRIGGER_SPEED
+    }
+
+    private fun isOnCachedBoostPad(vehicle: IVehicle, body: VsBody): Boolean {
         val probes = wheelProbeLocalPositions(vehicle)
         val maxDrop = boostProbeDrop(vehicle)
         return probes.any { local ->

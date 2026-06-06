@@ -28,5 +28,15 @@
       }
     ],
     "subtitle": "skyriders.subtitle.bike_engine_stop"
+  },
+  "boost": {
+    "sounds": [
+      {
+        "name": "skyriders:boost",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.boost"
   }
 }

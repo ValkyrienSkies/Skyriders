@@ -78,6 +78,9 @@ object SkyridersMod {
     val BIKE_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine_stop") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine_stop"))
     }
+    val BOOST_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boost") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "boost"))
+    }
 
     // end of RegistryObjects
 
