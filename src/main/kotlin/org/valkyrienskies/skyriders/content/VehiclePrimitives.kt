@@ -309,6 +309,8 @@ fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
         putDouble("visual_lean", visualLeanRad)
         putDouble("front_wheel_spin", frontWheelSpin)
         putDouble("rear_wheel_spin", rearWheelSpin)
+        putDouble("front_wheel_angular_velocity", frontWheelAngularVelocity)
+        putDouble("rear_wheel_angular_velocity", rearWheelAngularVelocity)
     }
 )
 
@@ -318,7 +320,9 @@ fun VehicleSaveRecord.toBikeSaveRecord(): BikeSaveRecord = BikeSaveRecord(
     engineOn = engineOn,
     visualLeanRad = behaviorTag.getDouble("visual_lean"),
     frontWheelSpin = behaviorTag.getDouble("front_wheel_spin"),
-    rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin")
+    rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin"),
+    frontWheelAngularVelocity = behaviorTag.getDouble("front_wheel_angular_velocity"),
+    rearWheelAngularVelocity = behaviorTag.getDouble("rear_wheel_angular_velocity")
 )
 
 fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(

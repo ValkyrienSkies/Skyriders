@@ -9,7 +9,9 @@ data class BikeSaveRecord(
     val engineOn: Boolean = false,
     val visualLeanRad: Double = 0.0,
     val frontWheelSpin: Double = 0.0,
-    val rearWheelSpin: Double = 0.0
+    val rearWheelSpin: Double = 0.0,
+    val frontWheelAngularVelocity: Double = 0.0,
+    val rearWheelAngularVelocity: Double = 0.0
 ) {
     fun save(): CompoundTag = CompoundTag().apply {
         putLong(BODY_ID_KEY, bodyId)
@@ -18,6 +20,8 @@ data class BikeSaveRecord(
         putDouble(VISUAL_LEAN_KEY, visualLeanRad)
         putDouble(FRONT_WHEEL_SPIN_KEY, frontWheelSpin)
         putDouble(REAR_WHEEL_SPIN_KEY, rearWheelSpin)
+        putDouble(FRONT_WHEEL_ANGULAR_VELOCITY_KEY, frontWheelAngularVelocity)
+        putDouble(REAR_WHEEL_ANGULAR_VELOCITY_KEY, rearWheelAngularVelocity)
     }
 
     companion object {
@@ -27,6 +31,8 @@ data class BikeSaveRecord(
         private const val VISUAL_LEAN_KEY = "visual_lean"
         private const val FRONT_WHEEL_SPIN_KEY = "front_wheel_spin"
         private const val REAR_WHEEL_SPIN_KEY = "rear_wheel_spin"
+        private const val FRONT_WHEEL_ANGULAR_VELOCITY_KEY = "front_wheel_angular_velocity"
+        private const val REAR_WHEEL_ANGULAR_VELOCITY_KEY = "rear_wheel_angular_velocity"
 
         fun load(tag: CompoundTag): BikeSaveRecord = BikeSaveRecord(
             bodyId = tag.getLong(BODY_ID_KEY),
@@ -34,7 +40,9 @@ data class BikeSaveRecord(
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
             visualLeanRad = tag.getDouble(VISUAL_LEAN_KEY),
             frontWheelSpin = tag.getDouble(FRONT_WHEEL_SPIN_KEY),
-            rearWheelSpin = tag.getDouble(REAR_WHEEL_SPIN_KEY)
+            rearWheelSpin = tag.getDouble(REAR_WHEEL_SPIN_KEY),
+            frontWheelAngularVelocity = tag.getDouble(FRONT_WHEEL_ANGULAR_VELOCITY_KEY),
+            rearWheelAngularVelocity = tag.getDouble(REAR_WHEEL_ANGULAR_VELOCITY_KEY)
         )
     }
 }

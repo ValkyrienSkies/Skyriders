@@ -230,8 +230,11 @@ private object HoverBikePhysics {
         val targetSteer = input.steer.coerceIn(-1.0, 1.0) * config.maxSteerHighSpeedRad
         state.visualLeanRad = lerp(state.visualLeanRad, targetLean, alpha)
         state.visualSteerRad = lerp(state.visualSteerRad, targetSteer, alpha)
-        state.frontWheelSpin += forwardSpeed / max(config.wheelRadius, 0.05) * dt
-        state.rearWheelSpin += forwardSpeed / max(config.wheelRadius, 0.05) * dt
+        val visualWheelAngularVelocity = forwardSpeed / max(config.wheelRadius, 0.05)
+        state.frontWheelAngularVelocity = visualWheelAngularVelocity
+        state.rearWheelAngularVelocity = visualWheelAngularVelocity
+        state.frontWheelSpin += state.frontWheelAngularVelocity * dt
+        state.rearWheelSpin += state.rearWheelAngularVelocity * dt
         if (!grounded && input.jump <= 0.0) {
             state.jumpCharge = 0.0
         }

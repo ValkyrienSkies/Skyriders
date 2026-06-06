@@ -168,6 +168,8 @@ object BikeManager {
         visualSteerRad: Double,
         frontWheelSpin: Double,
         rearWheelSpin: Double,
+        frontWheelAngularVelocity: Double,
+        rearWheelAngularVelocity: Double,
         frontWheelSuspensionOffset: Double,
         rearWheelSuspensionOffset: Double
     ) {
@@ -177,6 +179,8 @@ object BikeManager {
         bike.state.visualSteerRad = visualSteerRad
         bike.state.frontWheelSpin = frontWheelSpin
         bike.state.rearWheelSpin = rearWheelSpin
+        bike.state.frontWheelAngularVelocity = frontWheelAngularVelocity
+        bike.state.rearWheelAngularVelocity = rearWheelAngularVelocity
         bike.state.frontWheelSuspensionOffset = frontWheelSuspensionOffset
         bike.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
     }
@@ -279,7 +283,9 @@ object BikeManager {
                 engineOn = record.engineOn,
                 visualLeanRad = record.visualLeanRad,
                 frontWheelSpin = record.frontWheelSpin,
-                rearWheelSpin = record.rearWheelSpin
+                rearWheelSpin = record.rearWheelSpin,
+                frontWheelAngularVelocity = record.frontWheelAngularVelocity,
+                rearWheelAngularVelocity = record.rearWheelAngularVelocity
             )
         )
     }

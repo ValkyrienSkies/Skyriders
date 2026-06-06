@@ -259,6 +259,8 @@ object SkyridersNetwork {
                         visualSteerRad = state.visualSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
                         rearWheelSpin = state.rearWheelSpin,
+                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
                         frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
                         rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
                     )
@@ -436,6 +438,8 @@ object SkyridersNetwork {
                 buf.writeDouble(record.visualLeanRad)
                 buf.writeDouble(record.frontWheelSpin)
                 buf.writeDouble(record.rearWheelSpin)
+                buf.writeDouble(record.frontWheelAngularVelocity)
+                buf.writeDouble(record.rearWheelAngularVelocity)
             }
         }
 
@@ -463,7 +467,9 @@ object SkyridersNetwork {
                         engineOn = buf.readBoolean(),
                         visualLeanRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
-                        rearWheelSpin = buf.readDouble()
+                        rearWheelSpin = buf.readDouble(),
+                        frontWheelAngularVelocity = buf.readDouble(),
+                        rearWheelAngularVelocity = buf.readDouble()
                     )
                 }
                 return BikeSyncPacket(records)
@@ -695,6 +701,8 @@ object SkyridersNetwork {
                 buf.writeDouble(state.visualSteerRad)
                 buf.writeDouble(state.frontWheelSpin)
                 buf.writeDouble(state.rearWheelSpin)
+                buf.writeDouble(state.frontWheelAngularVelocity)
+                buf.writeDouble(state.rearWheelAngularVelocity)
                 buf.writeDouble(state.frontWheelSuspensionOffset)
                 buf.writeDouble(state.rearWheelSuspensionOffset)
             }
@@ -715,6 +723,8 @@ object SkyridersNetwork {
                                 visualSteerRad = state.visualSteerRad,
                                 frontWheelSpin = state.frontWheelSpin,
                                 rearWheelSpin = state.rearWheelSpin,
+                                frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                                rearWheelAngularVelocity = state.rearWheelAngularVelocity,
                                 frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
                                 rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
                             )
@@ -740,6 +750,8 @@ object SkyridersNetwork {
                         visualSteerRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
                         rearWheelSpin = buf.readDouble(),
+                        frontWheelAngularVelocity = buf.readDouble(),
+                        rearWheelAngularVelocity = buf.readDouble(),
                         frontWheelSuspensionOffset = buf.readDouble(),
                         rearWheelSuspensionOffset = buf.readDouble()
                     )
@@ -760,6 +772,8 @@ object SkyridersNetwork {
         val visualSteerRad: Double,
         val frontWheelSpin: Double,
         val rearWheelSpin: Double,
+        val frontWheelAngularVelocity: Double,
+        val rearWheelAngularVelocity: Double,
         val frontWheelSuspensionOffset: Double,
         val rearWheelSuspensionOffset: Double
     )

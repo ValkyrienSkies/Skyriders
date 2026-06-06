@@ -49,6 +49,8 @@ interface IBike : IVehicle {
         engineOn = state.engineOn,
         visualLeanRad = state.visualLeanRad,
         frontWheelSpin = state.frontWheelSpin,
-        rearWheelSpin = state.rearWheelSpin
+        rearWheelSpin = state.rearWheelSpin,
+        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+        rearWheelAngularVelocity = state.rearWheelAngularVelocity
     )
 }
