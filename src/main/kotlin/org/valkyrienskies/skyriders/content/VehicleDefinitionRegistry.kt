@@ -15,9 +15,43 @@ object KartDefinitions {
             centerOfMassOffset = Vector3d(0.0, -0.18, 0.0)
         ),
         render = BikeRenderDefinition.DEFAULT_BIKE.toVehicleRenderDefinition().copy(
-            showWheels = false,
+            model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_body"),
+            showWheels = true,
+            frontWheelModel = null,
+            rearWheelModel = null,
+            modelYawRad = 0.0,
             modelScale = 1.45,
             modelOffset = Vector3d(-0.72, -0.58, -0.72),
+            wheelParts = listOf(
+                VehicleWheelRenderDefinition(
+                    id = "front_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_left_wheel"),
+                    pivot = Vector3d(0.1175, 0.3175, 0.9244),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "front_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_right_wheel"),
+                    pivot = Vector3d(0.8756, 0.3175, 0.9244),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_left_wheel"),
+                    pivot = Vector3d(0.1175, 0.3175, 0.0688),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_right_wheel"),
+                    pivot = Vector3d(0.8756, 0.3175, 0.0688),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                )
+            ),
             exhaustPoints = listOf(
                 VehicleEffectPointDefinition("rear_exhaust", Vector3d(0.0, 0.22, -0.78))
             )
