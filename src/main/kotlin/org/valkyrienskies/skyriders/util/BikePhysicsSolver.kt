@@ -99,6 +99,7 @@ object BikePhysicsSolver {
             applyJumpChargeAndRelease(body, contacts, forward, terrainUp, activeInput, config, state, dt)
             applyPendingJumpRelease(body, contacts, state, dt)
             applyStepAssist(body, physLevel, frontContact, forward, terrainUp, activeInput, config)
+            applyStepAssist(body, physLevel, rearContact, forward, terrainUp, activeInput, config)
         } else {
             applyPendingJumpRelease(body, contacts, state, dt)
         }
@@ -723,24 +724,25 @@ object BikePhysicsSolver {
     private fun applyStepAssist(
         body: PhysVsBody,
         physLevel: PhysLevel,
-        frontContact: WheelContact,
+        contact: WheelContact,
         forward: Vector3d,
         terrainUp: Vector3d,
         input: BikeInput,
         config: BikePhysicsConfig
     ) {
-        if (!frontContact.grounded || input.throttle <= 0.0) return
+        if (!contact.grounded || input.throttle <= 0.0) return
         if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
 
-        val terrainForward = Vector3d(forward).sub(Vector3d(terrainUp).mul(safeDot(forward, terrainUp)))
+        val terrainForward = computeStepApproachDirection(body, forward, terrainUp)
         if (terrainForward.lengthSquared() < 1.0e-6) return
-        terrainForward.set(safeNormalize(terrainForward, forward))
 
         val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
+        if (speedIntoStep < 0.35) return
+
         val speedLookahead = smoothstep(4.0, config.wheelTopSpeed, speedIntoStep)
         val probeLength = (config.wheelRadius + 0.45 + speedIntoStep * 0.065)
             .coerceIn(config.wheelRadius + 0.35, config.wheelRadius + 1.35)
-        val lowProbeStart = Vector3d(frontContact.contactPointWorld)
+        val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(config.wheelRadius * 0.45, terrainUp)
             .fma(0.06 + speedLookahead * 0.14, terrainForward)
         val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
@@ -749,7 +751,7 @@ object BikePhysicsSolver {
         val step = findStepLandingSurface(
             physLevel = physLevel,
             body = body,
-            frontContact = frontContact,
+            contact = contact,
             lowProbeStart = lowProbeStart,
             obstacleDistance = obstacle.distance,
             terrainForward = terrainForward,
@@ -759,17 +761,52 @@ object BikePhysicsSolver {
         ) ?: return
 
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
-        val assistAmount = 0.75 + speedLookahead * 0.45 + heightAmount * 0.65
-        val liftForce = Vector3d(terrainUp).mul(config.stepAssistStrength * assistAmount)
-        val forwardForce = Vector3d(terrainForward).mul(config.stepAssistStrength * (0.055 + speedLookahead * 0.045))
+        val approachDistance = max(0.25, step.approachDistance)
+        val targetUpSpeed = (speedIntoStep * step.rise / approachDistance * 0.55)
+            .coerceIn(0.0, 3.5 + speedLookahead * 3.0)
+        val currentUpSpeed = safeDot(contact.wheelVelocityWorld, terrainUp)
+        val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
+        val velocityLiftForce = config.mass * missingUpSpeed * (18.0 + speedLookahead * 12.0)
+        val baseLiftForce = config.stepAssistStrength * (0.65 + heightAmount * 0.45)
+        val maxLiftForce = min(
+            config.mass * (55.0 + speedLookahead * 45.0),
+            config.stepAssistStrength * (2.0 + heightAmount * 1.2 + speedLookahead * 3.0)
+        )
+        val liftForce = Vector3d(terrainUp)
+            .mul((baseLiftForce + velocityLiftForce).coerceIn(0.0, maxLiftForce))
 
-        applyContactForce(body, frontContact, liftForce.add(forwardForce), frontContact.contactPointWorld)
+        val speedLimitScale = 1.0 - smoothstep(config.wheelTopSpeed, config.wheelTopSpeed * 1.18, speedIntoStep)
+        val carryForceMag = config.stepAssistStrength *
+            (0.08 + speedLookahead * 0.42 + heightAmount * 0.12) *
+            speedLimitScale.coerceIn(0.0, 1.0)
+        val forwardForce = Vector3d(terrainForward).mul(carryForceMag)
+
+        applyContactForce(body, contact, liftForce.add(forwardForce), contact.contactPointWorld)
+    }
+
+    private fun computeStepApproachDirection(body: PhysVsBody, forward: Vector3d, terrainUp: Vector3d): Vector3d {
+        val projectedForward = projectOntoPlane(forward, terrainUp, forward)
+        val velocity = body.kinematics.velocity
+        if (!isFinite(velocity)) return projectedForward
+
+        val planarVelocity = Vector3d(velocity).fma(-safeDot(velocity, terrainUp), terrainUp)
+        if (planarVelocity.lengthSquared() < 1.0) return projectedForward
+
+        val velocityDirection = safeNormalize(planarVelocity, projectedForward)
+        if (safeDot(velocityDirection, projectedForward) < 0.35) return projectedForward
+
+        val speed = planarVelocity.length()
+        val velocityWeight = smoothstep(4.0, 14.0, speed) * 0.45
+        return safeNormalize(
+            Vector3d(projectedForward).mul(1.0 - velocityWeight).fma(velocityWeight, velocityDirection),
+            projectedForward
+        )
     }
 
     private fun findStepLandingSurface(
         physLevel: PhysLevel,
         body: PhysVsBody,
-        frontContact: WheelContact,
+        contact: WheelContact,
         lowProbeStart: Vector3d,
         obstacleDistance: Double,
         terrainForward: Vector3d,
@@ -799,12 +836,12 @@ object BikePhysicsSolver {
                 if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
 
                 val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
-                val rise = safeDot(Vector3d(topPoint).sub(frontContact.contactPointWorld), terrainUp)
+                val rise = safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
                 val normalDot = safeDot(topHit.hitNormal, terrainUp)
                 if (rise < 0.05 || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
                 if (normalDot < 0.48) return@mapNotNull null
 
-                StepOpportunity(rise = rise)
+                StepOpportunity(rise = rise, approachDistance = forwardDistance)
             }
             .minByOrNull { it.rise }
     }
@@ -1062,6 +1099,7 @@ object BikePhysicsSolver {
     )
 
     private data class StepOpportunity(
-        val rise: Double
+        val rise: Double,
+        val approachDistance: Double
     )
 }
