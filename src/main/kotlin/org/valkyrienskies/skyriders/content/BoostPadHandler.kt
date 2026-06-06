@@ -5,12 +5,14 @@ import net.minecraft.sounds.SoundSource
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import org.joml.Vector3d
+import org.joml.primitives.AABBd
 import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.bodies.VsBody
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.core.api.world.properties.DimensionId
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
+import org.valkyrienskies.mod.common.getShipsIntersecting
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.util.VehiclePhysicsMath
 import java.util.concurrent.ConcurrentHashMap
@@ -22,6 +24,7 @@ object BoostPadHandler {
     private const val BOOST_FADE_RANGE = 6.0
     private const val MIN_TRIGGER_SPEED = 0.35
     private const val PROBE_STEP = 0.25
+    private const val SHIP_SAMPLE_RADIUS = 0.35
     private const val SOUND_COOLDOWN_TICKS = 20L
     private val boostPadsByDimension = ConcurrentHashMap<DimensionId, MutableSet<Long>>()
     private val nextSoundTickByBody = ConcurrentHashMap<Long, Long>()
@@ -142,15 +145,38 @@ object BoostPadHandler {
     private fun refreshCacheBelow(level: ServerLevel, worldPos: Vector3d, maxDrop: Double) {
         var drop = 0.0
         while (drop <= maxDrop) {
-            val blockPos = BlockPos.containing(worldPos.x, worldPos.y - drop, worldPos.z)
-            val state = level.getBlockState(blockPos)
-            if (isBoostPad(state.block)) {
+            val sample = Vector3d(worldPos.x, worldPos.y - drop, worldPos.z)
+            val blockPos = BlockPos.containing(sample.x, sample.y, sample.z)
+            if (hasBoostPadAtSample(level, sample, blockPos)) {
                 cacheBoostPad(level, blockPos)
             } else {
                 uncacheBoostPad(level, blockPos)
             }
             drop += PROBE_STEP
         }
+    }
+
+    private fun hasBoostPadAtSample(level: ServerLevel, worldSample: Vector3d, worldBlockPos: BlockPos): Boolean {
+        if (isBoostPad(level.getBlockState(worldBlockPos).block)) {
+            return true
+        }
+
+        val probe = AABBd(
+            worldSample.x - SHIP_SAMPLE_RADIUS,
+            worldSample.y - SHIP_SAMPLE_RADIUS,
+            worldSample.z - SHIP_SAMPLE_RADIUS,
+            worldSample.x + SHIP_SAMPLE_RADIUS,
+            worldSample.y + SHIP_SAMPLE_RADIUS,
+            worldSample.z + SHIP_SAMPLE_RADIUS
+        )
+        for (ship in level.getShipsIntersecting(probe)) {
+            val local = ship.transform.worldToShip.transformPosition(worldSample, Vector3d())
+            val shipyardPos = BlockPos.containing(local.x, local.y, local.z)
+            if (isBoostPad(level.getBlockState(shipyardPos).block)) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun hasCachedBoostPadBelow(dimensionId: DimensionId, worldPos: Vector3d, maxDrop: Double): Boolean {
