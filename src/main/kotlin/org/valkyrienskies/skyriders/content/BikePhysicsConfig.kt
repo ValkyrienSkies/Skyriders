@@ -154,8 +154,8 @@ data class BikePhysicsConfig(
 
         val DIRT_BIKE = MOTORCYCLE.copy(
             mass = 210.0,
-            collisionBoxSize = Vector3d(0.5, 0.62, 1.38),
-            collisionBoxOffset = Vector3d(0.0, 0.27, 0.0),
+            collisionBoxSize = Vector3d(0.5, 0.62, 1.16),
+            collisionBoxOffset = Vector3d(0.0, 0.27, -0.03),
             frontWheelLocalPos = Vector3d(0.0, -0.15, 0.69),
             rearWheelLocalPos = Vector3d(0.0, -0.15, -0.69),
             wheelRadius = 0.275,
@@ -173,8 +173,8 @@ data class BikePhysicsConfig(
             balanceStrength = 6500.0,
             balanceDamping = 1900.0,
             highSpeedYawAssist = 2600.0,
-            maxStepHeight = 1.0,
-            stepAssistStrength = 2600.0,
+            maxStepHeight = 1.25,
+            stepAssistStrength = 5800.0,
             landingDampingDuration = 0.12,
             landingVerticalDamping = 32.0,
             landingAngularDamping = 650.0,
