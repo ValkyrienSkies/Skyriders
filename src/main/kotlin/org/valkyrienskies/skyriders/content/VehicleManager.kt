@@ -280,6 +280,7 @@ object VehicleManager {
             val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
             vehicle.physTick(physLevel, body, getInput(physLevel.dimension, vehicle.bodyId), dt)
         }
+        BoostPadHandler.physTick(physLevel, getVehicles(physLevel.dimension), dt)
     }
 
     fun removeVehicle(level: ServerLevel, bodyId: BodyId, deleteBody: Boolean = true): IVehicle? {

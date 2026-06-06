@@ -5,6 +5,9 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.SoundType
+import net.minecraft.world.level.block.state.BlockBehaviour
+import net.minecraft.world.level.material.MapColor
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.fml.common.Mod
@@ -22,6 +25,7 @@ import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeLifecycle
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
@@ -39,6 +43,16 @@ object SkyridersMod {
     private val SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID)
 
     // Put RegistryObjects here:
+    val BOOST_PAD_BLOCK: RegistryObject<Block> = registerBlockAndItem("boost_pad") {
+        BoostPadBlock(
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_CYAN)
+                .strength(0.8f)
+                .sound(SoundType.METAL)
+                .noOcclusion()
+        )
+    }
+
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
             .sized(0.05f, 0.05f)
