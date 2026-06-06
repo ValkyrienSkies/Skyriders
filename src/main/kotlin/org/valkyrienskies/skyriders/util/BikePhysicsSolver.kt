@@ -508,13 +508,13 @@ object BikePhysicsSolver {
             input.throttle < -0.05 -> -1.0
             else -> 1.0
         }
-        val speedAmount = smoothstep(config.driftMinSpeed, config.wheelTopSpeed, abs(speed))
+        val speedAmount = smoothstep(config.driftMinSpeed, config.wheelTopSpeed * 0.72, abs(speed))
         val driftDirection = state.driftDirection.takeIf { abs(it) > 0.05 } ?: input.steer.coerceIn(-1.0, 1.0)
         val bias = input.steer.coerceIn(-1.0, 1.0) * driftDirection
         val turnBias = when {
-            bias > 0.15 -> 1.28
-            bias < -0.15 -> 0.12
-            else -> 0.62
+            bias > 0.15 -> 1.45
+            bias < -0.15 -> 0.18
+            else -> 0.78
         }
         val yawTorque = driftDirection * direction * config.driftYawAssist * speedAmount * turnBias * input.brake.coerceIn(0.0, 1.0)
         if (yawTorque != 0.0) {
