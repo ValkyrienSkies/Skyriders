@@ -1,13 +1,18 @@
 package org.valkyrienskies.skyriders.content
 
 import net.minecraft.core.BlockPos
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.PhysVsBody
+import org.valkyrienskies.core.api.bodies.VsBody
 import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.core.api.world.properties.DimensionId
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.util.VehiclePhysicsMath
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
 object BoostPadHandler {
@@ -16,6 +21,7 @@ object BoostPadHandler {
     private const val BOOST_FADE_RANGE = 6.0
     private const val MIN_TRIGGER_SPEED = 0.35
     private const val PROBE_STEP = 0.25
+    private val boostPadsByDimension = ConcurrentHashMap<DimensionId, MutableSet<Long>>()
 
     fun physTick(physLevel: PhysLevel, vehicles: Iterable<IVehicle>, dt: Double) {
         vehicles.forEach { vehicle ->
@@ -23,6 +29,29 @@ object BoostPadHandler {
             val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
             applyBoostIfOnPad(vehicle, body, dt)
         }
+    }
+
+    fun gameTick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
+        vehicles.forEach { vehicle ->
+            if (vehicle.level.dimensionId != level.dimensionId) return@forEach
+            val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
+            refreshCacheNearVehicle(level, vehicle, body)
+        }
+    }
+
+    fun cacheBoostPad(level: Level, pos: BlockPos) {
+        if (level.isClientSide) return
+        boostPadsByDimension.getOrPut(level.dimensionId) { ConcurrentHashMap.newKeySet() }.add(pos.asLong())
+    }
+
+    fun uncacheBoostPad(level: Level, pos: BlockPos) {
+        if (level.isClientSide) return
+        boostPadsByDimension[level.dimensionId]?.remove(pos.asLong())
+    }
+
+    fun clear(level: Level) {
+        if (level.isClientSide) return
+        boostPadsByDimension.remove(level.dimensionId)
     }
 
     private fun applyBoostIfOnPad(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
@@ -44,12 +73,11 @@ object BoostPadHandler {
     }
 
     private fun isOnBoostPad(vehicle: IVehicle, body: PhysVsBody): Boolean {
-        val level = vehicle.level
         val probes = wheelProbeLocalPositions(vehicle)
         val maxDrop = boostProbeDrop(vehicle)
         return probes.any { local ->
             val world = body.kinematics.transform.toWorld.transformPosition(Vector3d(local))
-            hasBoostPadBelow(level, world, maxDrop)
+            hasCachedBoostPadBelow(vehicle.level.dimensionId, world, maxDrop)
         }
     }
 
@@ -72,16 +100,43 @@ object BoostPadHandler {
         }.coerceAtLeast(0.5)
     }
 
-    private fun hasBoostPadBelow(level: Level, worldPos: Vector3d, maxDrop: Double): Boolean {
+    private fun refreshCacheNearVehicle(level: ServerLevel, vehicle: IVehicle, body: VsBody) {
+        val maxDrop = boostProbeDrop(vehicle)
+        wheelProbeLocalPositions(vehicle).forEach { local ->
+            val world = body.kinematics.transform.toWorld.transformPosition(Vector3d(local))
+            refreshCacheBelow(level, world, maxDrop)
+        }
+    }
+
+    private fun refreshCacheBelow(level: ServerLevel, worldPos: Vector3d, maxDrop: Double) {
         var drop = 0.0
         while (drop <= maxDrop) {
             val blockPos = BlockPos.containing(worldPos.x, worldPos.y - drop, worldPos.z)
-            if (level.getBlockState(blockPos).`is`(SkyridersMod.BOOST_PAD_BLOCK.get())) {
+            val state = level.getBlockState(blockPos)
+            if (isBoostPad(state.block)) {
+                cacheBoostPad(level, blockPos)
+            } else {
+                uncacheBoostPad(level, blockPos)
+            }
+            drop += PROBE_STEP
+        }
+    }
+
+    private fun hasCachedBoostPadBelow(dimensionId: DimensionId, worldPos: Vector3d, maxDrop: Double): Boolean {
+        val pads = boostPadsByDimension[dimensionId] ?: return false
+        var drop = 0.0
+        while (drop <= maxDrop) {
+            val blockPos = BlockPos.containing(worldPos.x, worldPos.y - drop, worldPos.z)
+            if (pads.contains(blockPos.asLong())) {
                 return true
             }
             drop += PROBE_STEP
         }
         return false
+    }
+
+    private fun isBoostPad(block: net.minecraft.world.level.block.Block): Boolean {
+        return block == SkyridersMod.BOOST_PAD_BLOCK.get() || block == SkyridersMod.BOOST_PAD_FLOOR_BLOCK.get()
     }
 
     private fun smoothstep(edge0: Double, edge1: Double, value: Double): Double {

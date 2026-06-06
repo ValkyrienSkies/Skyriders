@@ -25,6 +25,13 @@ object BikeLifecycle {
     }
 
     @SubscribeEvent
+    fun onLevelUnload(event: LevelEvent.Unload) {
+        val level = event.level as? ServerLevel ?: return
+        pendingRestoreLevels.remove(level)
+        BoostPadHandler.clear(level)
+    }
+
+    @SubscribeEvent
     fun onServerTick(event: TickEvent.ServerTickEvent) {
         if (event.phase != TickEvent.Phase.END) return
 
@@ -38,7 +45,11 @@ object BikeLifecycle {
             }
         }
 
-        event.server.allLevels.forEach(::syncVisualState)
+        event.server.allLevels.forEach { level ->
+            VehicleManager.tick(level.dimensionId)
+            BoostPadHandler.gameTick(level, VehicleManager.getVehicles(level.dimensionId))
+            syncVisualState(level)
+        }
     }
 
     @SubscribeEvent

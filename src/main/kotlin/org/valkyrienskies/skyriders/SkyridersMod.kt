@@ -52,6 +52,15 @@ object SkyridersMod {
                 .noOcclusion()
         )
     }
+    val BOOST_PAD_FLOOR_BLOCK: RegistryObject<Block> = registerBlockAndItem("boost_pad_floor") {
+        BoostPadBlock(
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_CYAN)
+                .strength(1.2f)
+                .sound(SoundType.METAL),
+            fullBlock = true
+        )
+    }
 
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
