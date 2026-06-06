@@ -89,8 +89,20 @@ object BikePhysicsSolver {
         if (riderPresent) {
             applyDriveAndBrakes(body, frontContact, rearContact, activeInput, drifting, config, state, dt)
         } else {
-            applyParkingBrake(body, frontContact, config)
-            applyParkingBrake(body, rearContact, config)
+            state.frontWheelAngularVelocity = applyParkingBrake(
+                body,
+                frontContact,
+                state.frontWheelAngularVelocity,
+                config,
+                dt
+            )
+            state.rearWheelAngularVelocity = applyParkingBrake(
+                body,
+                rearContact,
+                state.rearWheelAngularVelocity,
+                config,
+                dt
+            )
         }
 
         val targetLean = updateSmoothedTargetLean(
@@ -358,6 +370,8 @@ object BikePhysicsSolver {
         val driveScale = if (drifting) config.driftDriveForceScale else 1.0
         val frontBrake = if (!drifting) input.brake * 0.65 else 0.0
         val rearBrake = if (!drifting) input.brake * 0.35 else input.brake * config.driftBrakeStrengthScale
+        val frontForceScale = if (frontBrake > 0.0) 1.0 else FRONT_STEP_TRACTION_SCALE * driveScale
+        val rearForceScale = if (rearBrake > 0.0 && !drifting) 1.0 else driveScale
 
         state.frontWheelAngularVelocity = applyWheelLongitudinalPhysics(
             body = body,
@@ -366,7 +380,7 @@ object BikePhysicsSolver {
             throttle = if (!rear.grounded && front.grounded) throttle.coerceAtLeast(0.0) else 0.0,
             brakeInput = frontBrake,
             driven = !rear.grounded && front.grounded && throttle > 0.0,
-            forceScale = FRONT_STEP_TRACTION_SCALE * driveScale,
+            forceScale = frontForceScale,
             config = config,
             dt = dt
         )
@@ -377,7 +391,7 @@ object BikePhysicsSolver {
             throttle = throttle,
             brakeInput = rearBrake,
             driven = true,
-            forceScale = driveScale,
+            forceScale = rearForceScale,
             config = config,
             dt = dt
         )
@@ -420,10 +434,16 @@ object BikePhysicsSolver {
             val slipVelocity = surfaceSpeed - groundSpeed
             val slipRatio = slipVelocity / max(abs(groundSpeed), 1.5)
             val gripFactor = pacejkaLongitudinalGrip(slipRatio, config)
+            val brakeForceScale = if (brake > 0.0) {
+                lerp(1.0, config.brakeStrength, brake)
+            } else {
+                1.0
+            }
             val maxLongitudinalForce = contact.normalForceEstimate *
                 config.frictionCoefficient *
                 config.longitudinalGrip *
-                forceScale
+                forceScale *
+                brakeForceScale
             val forceMag = gripFactor * maxLongitudinalForce
 
             applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
@@ -443,8 +463,24 @@ object BikePhysicsSolver {
         return omega.coerceIn(-maxOmega, maxOmega)
     }
 
-    private fun applyParkingBrake(body: PhysVsBody, contact: WheelContact, config: BikePhysicsConfig) {
-        if (!contact.grounded) return
+    private fun applyParkingBrake(
+        body: PhysVsBody,
+        contact: WheelContact,
+        angularVelocity: Double,
+        config: BikePhysicsConfig,
+        dt: Double
+    ): Double {
+        val stepDt = dt.coerceIn(0.0, 0.1)
+        val radius = max(config.wheelRadius, 0.05)
+        val maxOmega = max(config.wheelTopSpeed, 1.0) * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
+        var omega = if (angularVelocity.isFinite()) angularVelocity else 0.0
+
+        val brakeAlpha = 1.0 - exp(-stepDt * WHEEL_BRAKE_RESPONSE * config.parkingBrakeStrength / 3.0)
+        omega = lerp(omega, 0.0, brakeAlpha)
+
+        if (!contact.grounded) {
+            return (omega * exp(-WHEEL_AIR_DRAG * stepDt)).coerceIn(-maxOmega, maxOmega)
+        }
 
         val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val maxBrakeForce = contact.normalForceEstimate *
@@ -453,6 +489,12 @@ object BikePhysicsSolver {
             config.parkingBrakeStrength
         val forceMag = (-forwardVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
         applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+
+        val rollingOmega = forwardVel / radius
+        if (abs(forwardVel) > 0.2) {
+            omega = lerp(omega, rollingOmega, 1.0 - exp(-stepDt * 5.0))
+        }
+        return omega.coerceIn(-maxOmega, maxOmega)
     }
 
     private fun computeTargetLean(
