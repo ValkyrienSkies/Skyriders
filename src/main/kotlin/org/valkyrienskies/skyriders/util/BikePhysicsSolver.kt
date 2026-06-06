@@ -730,10 +730,10 @@ object BikePhysicsSolver {
         input: BikeInput,
         config: BikePhysicsConfig
     ) {
-        if (!contact.grounded || input.throttle <= 0.0) return
+        if (!contact.grounded) return
         if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
 
-        val terrainForward = computeStepApproachDirection(body, forward, terrainUp)
+        val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
         if (terrainForward.lengthSquared() < 1.0e-6) return
 
         val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
@@ -784,23 +784,40 @@ object BikePhysicsSolver {
         applyContactForce(body, contact, liftForce.add(forwardForce), contact.contactPointWorld)
     }
 
-    private fun computeStepApproachDirection(body: PhysVsBody, forward: Vector3d, terrainUp: Vector3d): Vector3d {
+    private fun computeStepApproachDirection(
+        body: PhysVsBody,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        throttle: Double
+    ): Vector3d {
         val projectedForward = projectOntoPlane(forward, terrainUp, forward)
         val velocity = body.kinematics.velocity
-        if (!isFinite(velocity)) return projectedForward
+        if (!isFinite(velocity)) return throttleStepDirection(projectedForward, throttle)
 
         val planarVelocity = Vector3d(velocity).fma(-safeDot(velocity, terrainUp), terrainUp)
-        if (planarVelocity.lengthSquared() < 1.0) return projectedForward
+        if (planarVelocity.lengthSquared() < 0.35 * 0.35) {
+            return throttleStepDirection(projectedForward, throttle)
+        }
 
         val velocityDirection = safeNormalize(planarVelocity, projectedForward)
-        if (safeDot(velocityDirection, projectedForward) < 0.35) return projectedForward
+        val alignment = safeDot(velocityDirection, projectedForward)
+        if (abs(alignment) < 0.25) return Vector3d()
 
+        val bikeAxisDirection = Vector3d(projectedForward).mul(if (alignment < 0.0) -1.0 else 1.0)
         val speed = planarVelocity.length()
-        val velocityWeight = smoothstep(4.0, 14.0, speed) * 0.45
+        val velocityWeight = smoothstep(2.0, 12.0, speed) * 0.65
         return safeNormalize(
-            Vector3d(projectedForward).mul(1.0 - velocityWeight).fma(velocityWeight, velocityDirection),
-            projectedForward
+            Vector3d(bikeAxisDirection).mul(1.0 - velocityWeight).fma(velocityWeight, velocityDirection),
+            bikeAxisDirection
         )
+    }
+
+    private fun throttleStepDirection(projectedForward: Vector3d, throttle: Double): Vector3d {
+        return when {
+            throttle > 0.05 -> Vector3d(projectedForward)
+            throttle < -0.05 -> Vector3d(projectedForward).negate()
+            else -> Vector3d()
+        }
     }
 
     private fun findStepLandingSurface(
