@@ -38,6 +38,8 @@ object KartPhysicsSolver {
         updateDriftBoost(body, state, input.riderPresent, state.drifting, forward, config, dt)
         val steerRad = updateSteerAngle(
             state,
+            input.steer,
+            forwardSpeed,
             computeTargetSteerRad(input.steer, forwardSpeed, config),
             dt,
             config
@@ -252,11 +254,12 @@ object KartPhysicsSolver {
         val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, topSpeed, config)
         val driveScale = if (drifting) config.driftDriveScale else 1.0
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
+        val driveNormalForce = rearContacts.sumOf(KartContact::normalForce) / rearContacts.size
+        val maxDriveForce = driveNormalForce * config.tireFrictionCoefficient * config.longitudinalGrip
         rearContacts.forEach { kartContact ->
             if (driveForce != 0.0) {
                 val contact = kartContact.contact
-                val maxLongitudinalForce = kartContact.normalForce * config.tireFrictionCoefficient * config.longitudinalGrip
-                val limitedDriveForce = driveForce.coerceIn(-maxLongitudinalForce, maxLongitudinalForce)
+                val limitedDriveForce = driveForce.coerceIn(-maxDriveForce, maxDriveForce)
                 VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(limitedDriveForce))
             }
         }
@@ -382,13 +385,23 @@ object KartPhysicsSolver {
 
     private fun updateSteerAngle(
         state: KartRuntimeState,
+        steerInput: Double,
+        forwardSpeed: Double,
         targetSteerRad: Double,
         dt: Double,
         config: KartPhysicsConfig
     ): Double {
+        if (abs(steerInput) < 0.03 && abs(forwardSpeed) < config.yawAssistMinSpeed) {
+            state.smoothedSteerRad = 0.0
+            return 0.0
+        }
+
         val smoothingTime = config.steerSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.1
         val alpha = 1.0 - exp(-dt.coerceIn(0.0, 0.1) / smoothingTime)
         state.smoothedSteerRad = lerp(state.smoothedSteerRad, targetSteerRad, alpha)
+        if (targetSteerRad == 0.0 && abs(state.smoothedSteerRad) < 0.002) {
+            state.smoothedSteerRad = 0.0
+        }
         return state.smoothedSteerRad
     }
 
