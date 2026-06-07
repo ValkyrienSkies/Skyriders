@@ -203,7 +203,7 @@ object BikeClientEffects {
 
         if (drifting && level.random.nextDouble() < 0.35) {
             level.addParticle(
-                ParticleTypes.CLOUD,
+                ParticleTypes.CAMPFIRE_COSY_SMOKE,
                 position.x,
                 position.y + 0.015,
                 position.z,
@@ -266,7 +266,7 @@ object BikeClientEffects {
         playEngineTransitionSound(minecraft, vehicle)
 
         val soundDefinition = vehicle.vehicleDefinition.sounds
-        val soundId = soundDefinition.engineLoop
+        val soundId = if (vehicleTelemetry?.drifting == true || bikeTelemetry?.drifting == true) soundDefinition.driftLoop else soundDefinition.engineLoop
         if (soundId == null || !vehicle.vehicleState.engineOn) {
             engineSoundsByBodyId.remove(vehicle.bodyId)?.stopNow()
             return

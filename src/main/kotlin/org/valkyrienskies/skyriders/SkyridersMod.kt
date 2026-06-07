@@ -81,6 +81,12 @@ object SkyridersMod {
     val BOOST_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boost") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "boost"))
     }
+    val KART_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_engine"))
+    }
+    val KART_ENGINE_DRIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine_drift") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_drift"))
+    }
 
     // end of RegistryObjects
 

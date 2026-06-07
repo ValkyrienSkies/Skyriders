@@ -140,6 +140,7 @@ data class VehicleEffectPointDefinition(
 
 data class VehicleSoundDefinition(
     val engineLoop: ResourceLocation? = null,
+    val driftLoop: ResourceLocation? = null,
     val engineStart: ResourceLocation? = null,
     val engineStop: ResourceLocation? = null,
     val idleVolume: Double = 0.18,
@@ -151,7 +152,25 @@ data class VehicleSoundDefinition(
     val minPitch: Double = 0.7,
     val maxPitch: Double = 1.45,
     val referenceSpeed: Double = 18.0
-)
+) {
+    companion object {
+        val KART_ENGINE = VehicleSoundDefinition(
+            engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "kart_engine"),
+            driftLoop = ResourceLocation(SkyridersMod.MOD_ID, "kart_drift"),
+            engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
+            engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop"),
+            idleVolume = 0.2,
+            speedVolume = 0.2,
+            throttleVolume = 0.2,
+            idlePitch = 0.8,
+            speedPitch = 0.5,
+            throttlePitch = 0.4,
+            minPitch = 0.75,
+            maxPitch = 1.5,
+            referenceSpeed = 18.0
+        )
+    }
+}
 
 data class VehicleInteractionDefinition(
     val zones: List<VehicleInteractionZone>
@@ -379,6 +398,7 @@ fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = 
 
 fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = VehicleSoundDefinition(
     engineLoop = engineLoop,
+    driftLoop = engineLoop,
     engineStart = engineStart,
     engineStop = engineStop,
     idleVolume = idleVolume,

@@ -5,8 +5,10 @@
   "key.skyriders.bike_engine_toggle": "Toggle Bike Engine",
   "block.skyriders.boost_pad": "Boost Pad",
   "block.skyriders.boost_pad_floor": "Boost Pad Floor",
-  "skyriders.subtitle.bike_engine": "Bike engine",
+  "skyriders.subtitle.bike_engine": "Bike engine revs",
   "skyriders.subtitle.bike_engine_start": "Bike engine starts",
   "skyriders.subtitle.bike_engine_stop": "Bike engine stops",
-  "skyriders.subtitle.boost": "Boost pad activates"
+  "skyriders.subtitle.boost": "Boost pad activates",
+  "skyriders.subtitle.kart_engine": "Kart engine revs",
+  "skyriders.subtitle.kart_drift": "Kart drifts"
 }
