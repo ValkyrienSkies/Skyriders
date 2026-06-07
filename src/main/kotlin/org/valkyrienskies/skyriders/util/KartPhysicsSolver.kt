@@ -280,11 +280,17 @@ object KartPhysicsSolver {
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
         val driveNormalForce = rearContacts.sumOf(KartContact::normalForce) / rearContacts.size
         val maxDriveForce = driveNormalForce * config.tireFrictionCoefficient * config.longitudinalGrip
+        val launchForcePoint = launchDriveForcePoint(body, rearContacts, terrainUp)
         rearContacts.forEach { kartContact ->
             if (driveForce != 0.0) {
                 val contact = kartContact.contact
                 val limitedDriveForce = driveForce.coerceIn(-maxDriveForce, maxDriveForce)
-                VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(limitedDriveForce))
+                VehicleWheelPhysics.applyContactForce(
+                    body,
+                    contact,
+                    Vector3d(contact.wheelForwardWorld).mul(limitedDriveForce),
+                    launchForcePoint ?: contact.contactPointWorld
+                )
             }
         }
 
@@ -305,6 +311,23 @@ object KartPhysicsSolver {
                 VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(brakeForce))
             }
         }
+    }
+
+    private fun launchDriveForcePoint(
+        body: PhysVsBody,
+        rearContacts: List<KartContact>,
+        terrainUp: Vector3d
+    ): Vector3d? {
+        if (rearContacts.isEmpty()) return null
+        val planarSpeed = planarSpeed(body, terrainUp)
+        val launchBlend = 1.0 - smoothstep(0.5, 2.4, planarSpeed)
+        if (launchBlend <= 0.0) return null
+
+        val rearCenter = Vector3d()
+        rearContacts.forEach { rearCenter.add(it.contact.contactPointWorld) }
+        rearCenter.div(rearContacts.size.toDouble())
+
+        return rearCenter.lerp(Vector3d(body.kinematics.position), launchBlend.coerceIn(0.0, 1.0))
     }
 
     private fun updateWheelAngularVelocities(

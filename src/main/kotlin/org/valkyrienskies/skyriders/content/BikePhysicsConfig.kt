@@ -74,7 +74,8 @@ data class BikePhysicsConfig(
     val jumpCompressionForce: Double,
     val jumpReleaseForce: Double,
     val jumpForwardBoostForce: Double,
-    val jumpReleaseDuration: Double
+    val jumpReleaseDuration: Double,
+    val driftLeanScale: Double = 1.0
 ) {
     companion object {
         val MOTORCYCLE = BikePhysicsConfig(
@@ -181,6 +182,7 @@ data class BikePhysicsConfig(
             maxWheelieAngleRad = Math.toRadians(34.0),
             maxStoppieAngleRad = Math.toRadians(24.0),
             driftYawAssist = 1500.0,
+            driftLeanScale = 0.62,
             jumpCompressionForce = 23000.0,
             jumpReleaseForce = 38000.0,
             jumpForwardBoostForce = 7600.0,

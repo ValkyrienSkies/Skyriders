@@ -515,7 +515,7 @@ object BikePhysicsSolver {
             steerBias < -0.15 -> 0.45
             else -> 0.7
         }
-        return -state.driftDirection * config.maxLeanAngleRad * speedLeanAmount * leanBias
+        return -state.driftDirection * config.maxLeanAngleRad * speedLeanAmount * leanBias * config.driftLeanScale
     }
 
     private fun updateSmoothedTargetLean(state: BikeRuntimeState, targetLean: Double, dt: Double): Double {
