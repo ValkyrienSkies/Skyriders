@@ -117,6 +117,7 @@ data class VehicleWheelRenderDefinition(
     val id: String,
     val model: ResourceLocation,
     val pivot: Vector3d,
+    val visualOffset: Vector3d = Vector3d(),
     val steerSource: VehicleWheelSteerSource = VehicleWheelSteerSource.NONE,
     val spinSource: VehicleWheelSpinSource = VehicleWheelSpinSource.NONE
 )
@@ -369,6 +370,7 @@ fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = 
             id = part.id,
             model = part.model,
             pivot = Vector3d(part.pivot),
+            visualOffset = Vector3d(part.visualOffset),
             steerSource = part.steerSource,
             spinSource = part.spinSource
         )

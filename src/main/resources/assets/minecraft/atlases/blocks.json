@@ -11,6 +11,10 @@
     {
       "type": "single",
       "resource": "skyriders:karts/kart"
+    },
+    {
+      "type": "single",
+      "resource": "skyriders:karts/speedster"
     }
   ]
 }

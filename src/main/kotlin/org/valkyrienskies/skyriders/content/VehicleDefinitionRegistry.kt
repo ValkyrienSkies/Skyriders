@@ -4,6 +4,7 @@ import net.minecraft.resources.ResourceLocation
 import org.joml.Vector3d
 import org.valkyrienskies.skyriders.SkyridersMod
 
+@Suppress("DEPRECATION", "DEPRECATION_ERROR")
 object KartDefinitions {
     private val KART_PHYSICS = KartPhysicsConfig.DEBUG_KART.copy(
         collisionBoxSize = Vector3d(1.5, 0.58, 2.0),
@@ -41,7 +42,14 @@ object KartDefinitions {
         render = kartRender()
     )
 
-    private val definitionsById = listOf(DEBUG_KART, KART).associateBy(VehicleDefinition::id)
+    val SPEEDSTER = createKartDefinition(
+        id = ResourceLocation(SkyridersMod.MOD_ID, "speedster"),
+        displayName = "Speedster",
+        physics = KART_PHYSICS,
+        render = speedsterRender()
+    )
+
+    private val definitionsById = listOf(DEBUG_KART, KART, SPEEDSTER).associateBy(VehicleDefinition::id)
 
     val ids: Set<ResourceLocation>
         get() = definitionsById.keys
@@ -69,7 +77,7 @@ object KartDefinitions {
         seats = listOf(
             VehicleSeatDefinition(
                 id = VehicleInteractionDefinition.SEAT,
-                localPos = Vector3d(0.0, 0.2, -0.15),
+                localPos = Vector3d(0.0, 0.0, -0.15),
                 role = VehicleSeatRole.DRIVER,
                 interactionZone = VehicleInteractionDefinition.SEAT
             )
@@ -180,6 +188,56 @@ object KartDefinitions {
             ),
             exhaustPoints = listOf(
                 VehicleEffectPointDefinition("rear_exhaust", Vector3d(0.0, 0.22, -1.0))
+            )
+        )
+    }
+
+    private fun speedsterRender(): VehicleRenderDefinition {
+        val wheelVisualOffset = Vector3d(0.0, -0.16, 0.0)
+        return debugKartRender().copy(
+            model = ResourceLocation(SkyridersMod.MOD_ID, "karts/speedster/kart_frame"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/speedster.png"),
+            seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/speedster.png"),
+            modelYawRad = Math.PI,
+            modelScale = 1.45,
+            modelOffset = Vector3d(-0.725, -0.256, -0.770),
+            wheelParts = listOf(
+                VehicleWheelRenderDefinition(
+                    id = "front_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/speedster/kart_flw"),
+                    pivot = Vector3d(0.0625, 0.09375, -0.03125),
+                    visualOffset = wheelVisualOffset,
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "front_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/speedster/kart_frw"),
+                    pivot = Vector3d(0.90625, 0.09375, -0.03125),
+                    visualOffset = wheelVisualOffset,
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/speedster/kart_blw"),
+                    pivot = Vector3d(0.0625, 0.09375, 1.09375),
+                    visualOffset = wheelVisualOffset,
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/speedster/kart_brw"),
+                    pivot = Vector3d(0.90625, 0.09375, 1.09375),
+                    visualOffset = wheelVisualOffset,
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                )
+            ),
+            exhaustPoints = listOf(
+                VehicleEffectPointDefinition("left_engine_exhaust", Vector3d(-0.335, 0.37, -1.02)),
+                VehicleEffectPointDefinition("right_engine_exhaust", Vector3d(0.291, 0.37, -1.055))
             )
         )
     }

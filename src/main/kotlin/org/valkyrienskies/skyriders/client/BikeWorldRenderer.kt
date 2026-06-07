@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.resources.model.BakedModel
 import net.minecraft.core.BlockPos
+import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.event.RenderLevelStageEvent
 import net.minecraftforge.client.model.data.ModelData
 import net.minecraftforge.eventbus.api.SubscribeEvent
@@ -72,9 +73,9 @@ object BikeWorldRenderer {
         if (!bodyPosition.isFinite()) return
 
         val render = vehicle.vehicleDefinition.render
-        val model = minecraft.modelManager.getModel(render.model)
         val missingModel = minecraft.modelManager.missingModel
-        if (model === missingModel) return
+        val model = minecraft.modelManager.getModel(render.model)
+            .takeUnless { it === missingModel }
         val visualState = updateRenderVisualState(vehicle)
 
         val packedLight = LevelRenderer.getLightColor(
@@ -91,38 +92,43 @@ object BikeWorldRenderer {
         poseStack.translate(render.modelOffset.x, render.modelOffset.y, render.modelOffset.z)
         poseStack.scale(render.modelScale.toFloat(), render.modelScale.toFloat(), render.modelScale.toFloat())
 
-        renderBakedModel(poseStack, bufferSource, model, packedLight)
+        if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight)) {
+            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) } ?: run {
+                poseStack.popPose()
+                return
+            }
+        }
 
         render.resolvedWheelParts().forEach { wheelPart ->
-            minecraft.modelManager.getModel(wheelPart.model)
+            val wheelModel = minecraft.modelManager.getModel(wheelPart.model)
                 .takeUnless { it === missingModel }
-                ?.let { wheelModel ->
-                    val bike = vehicle as? IBike
-                    val kart = vehicle as? KartVehicle
-                    renderWheelPart(
-                        poseStack = poseStack,
-                        bufferSource = bufferSource,
-                        model = wheelModel,
-                        pivot = wheelPart.pivot,
-                        steerRad = when (wheelPart.steerSource) {
-                            VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad
-                                ?: kart?.kartState?.debugSteerRad
-                                ?: 0.0
-                            VehicleWheelSteerSource.NONE -> 0.0
-                        },
-                        spinRad = when (wheelPart.spinSource) {
-                            VehicleWheelSpinSource.FRONT -> visualState.frontWheelSpin
-                            VehicleWheelSpinSource.REAR -> visualState.rearWheelSpin
-                            VehicleWheelSpinSource.NONE -> 0.0
-                        },
-                        suspensionOffset = when (wheelPart.spinSource) {
-                            VehicleWheelSpinSource.FRONT -> visualState.frontWheelSuspensionOffset
-                            VehicleWheelSpinSource.REAR -> visualState.rearWheelSuspensionOffset
-                            VehicleWheelSpinSource.NONE -> 0.0
-                        },
-                        packedLight = packedLight
-                    )
-                }
+            val bike = vehicle as? IBike
+            val kart = vehicle as? KartVehicle
+            renderWheelPart(
+                poseStack = poseStack,
+                bufferSource = bufferSource,
+                modelLocation = wheelPart.model,
+                model = wheelModel,
+                pivot = wheelPart.pivot,
+                visualOffset = wheelPart.visualOffset,
+                steerRad = when (wheelPart.steerSource) {
+                    VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad
+                        ?: kart?.kartState?.debugSteerRad
+                        ?: 0.0
+                    VehicleWheelSteerSource.NONE -> 0.0
+                },
+                spinRad = when (wheelPart.spinSource) {
+                    VehicleWheelSpinSource.FRONT -> visualState.frontWheelSpin
+                    VehicleWheelSpinSource.REAR -> visualState.rearWheelSpin
+                    VehicleWheelSpinSource.NONE -> 0.0
+                },
+                suspensionOffset = when (wheelPart.spinSource) {
+                    VehicleWheelSpinSource.FRONT -> visualState.frontWheelSuspensionOffset
+                    VehicleWheelSpinSource.REAR -> visualState.rearWheelSuspensionOffset
+                    VehicleWheelSpinSource.NONE -> 0.0
+                },
+                packedLight = packedLight
+            )
         }
 
         poseStack.popPose()
@@ -199,8 +205,10 @@ object BikeWorldRenderer {
     private fun renderWheelPart(
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
-        model: BakedModel,
+        modelLocation: ResourceLocation,
+        model: BakedModel?,
         pivot: Vector3d,
+        visualOffset: Vector3d,
         steerRad: Double,
         spinRad: Double,
         suspensionOffset: Double,
@@ -210,6 +218,9 @@ object BikeWorldRenderer {
         if (suspensionOffset.isFinite() && suspensionOffset != 0.0) {
             poseStack.translate(0.0, suspensionOffset, 0.0)
         }
+        if (visualOffset.isFinite()) {
+            poseStack.translate(visualOffset.x, visualOffset.y, visualOffset.z)
+        }
         poseStack.translate(pivot.x, pivot.y, pivot.z)
         if (steerRad.isFinite() && steerRad != 0.0) {
             poseStack.mulPose(Axis.YP.rotation(steerRad.toFloat()))
@@ -218,7 +229,9 @@ object BikeWorldRenderer {
             poseStack.mulPose(Axis.XP.rotation((-spinRad).toFloat()))
         }
         poseStack.translate(-pivot.x, -pivot.y, -pivot.z)
-        renderBakedModel(poseStack, bufferSource, model, packedLight)
+        if (!VehicleOpenModelRenderer.renderIfNeeded(modelLocation, poseStack, bufferSource, packedLight)) {
+            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
+        }
         poseStack.popPose()
     }
 
