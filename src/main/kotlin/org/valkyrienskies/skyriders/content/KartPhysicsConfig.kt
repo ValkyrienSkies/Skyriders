@@ -48,7 +48,10 @@ data class KartPhysicsConfig(
     val driftBoostMaxLevel: Int = 3,
     val driftBoostChargeTimes: List<Double> = listOf(0.8, 1.6, 2.6),
     val driftBoostForces: List<Double> = listOf(5200.0, 7600.0, 10400.0),
-    val driftBoostDurations: List<Double> = listOf(0.35, 0.55, 0.8)
+    val driftBoostDurations: List<Double> = listOf(0.35, 0.55, 0.8),
+    val maxStepHeight: Double = 1.0,
+    val stepAssistStrength: Double = 7200.0,
+    val groundNormalSmoothingTime: Double = 0.12
 ) {
     companion object {
         val DEBUG_KART = KartPhysicsConfig(
@@ -74,8 +77,8 @@ data class KartPhysicsConfig(
             maxSteerRad = Math.toRadians(32.0),
             wheelTopSpeed = 19.0,
             yawAssist = 2600.0,
-            uprightStrength = 12000.0,
-            uprightDamping = 1900.0,
+            uprightStrength = 6200.0,
+            uprightDamping = 1050.0,
             maxSteerHighSpeedRad = Math.toRadians(18.0),
             steeringHighSpeedStart = 6.0,
             steeringFullSpeed = 18.0,
@@ -102,7 +105,10 @@ data class KartPhysicsConfig(
             driftBoostMaxLevel = 3,
             driftBoostChargeTimes = listOf(0.75, 1.5, 2.45),
             driftBoostForces = listOf(4600.0, 6800.0, 9200.0),
-            driftBoostDurations = listOf(0.32, 0.5, 0.72)
+            driftBoostDurations = listOf(0.32, 0.5, 0.72),
+            maxStepHeight = 1.0,
+            stepAssistStrength = 7200.0,
+            groundNormalSmoothingTime = 0.12
         )
     }
 }
@@ -128,5 +134,6 @@ data class KartRuntimeState(
     var frontWheelAngularVelocity: Double = 0.0,
     var rearWheelAngularVelocity: Double = 0.0,
     var frontWheelSuspensionOffset: Double = 0.0,
-    var rearWheelSuspensionOffset: Double = 0.0
+    var rearWheelSuspensionOffset: Double = 0.0,
+    val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0)
 )

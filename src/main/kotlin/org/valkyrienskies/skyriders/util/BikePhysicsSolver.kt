@@ -75,7 +75,7 @@ object BikePhysicsSolver {
         val stabilizedGrounded = grounded || state.groundedGraceTimeRemaining > 0.0
 
         if (grounded) {
-            smoothGroundNormal(state, contacts, dt, config)
+            smoothGroundNormal(state, contacts, right, dt, config)
         }
         val terrainUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         updateLandingDampingWindow(state, grounded, config)
@@ -1092,6 +1092,7 @@ object BikePhysicsSolver {
     private fun smoothGroundNormal(
         state: BikeRuntimeState,
         contacts: List<WheelContact>,
+        right: Vector3d,
         dt: Double,
         config: BikePhysicsConfig
     ) {
@@ -1102,8 +1103,35 @@ object BikePhysicsSolver {
         groundedContacts.forEach { rawNormal.add(it.contactNormalWorld) }
         rawNormal.set(safeNormalize(rawNormal, state.smoothedGroundNormal))
 
+        val supportNormal = computeBikeSupportGroundNormal(contacts, right, rawNormal)
+        if (supportNormal != null) {
+            rawNormal.set(safeNormalize(Vector3d(rawNormal).mul(0.35).fma(0.65, supportNormal), rawNormal))
+        }
+
         val alpha = 1.0 - exp(-dt / config.groundNormalSmoothingTime)
         state.smoothedGroundNormal.set(safeNormalize(Vector3d(state.smoothedGroundNormal).lerp(rawNormal, alpha), WORLD_UP))
+    }
+
+    private fun computeBikeSupportGroundNormal(
+        contacts: List<WheelContact>,
+        right: Vector3d,
+        fallbackNormal: Vector3d
+    ): Vector3d? {
+        val front = contacts.getOrNull(0)?.takeIf { it.hasSupportHit() } ?: return null
+        val rear = contacts.getOrNull(1)?.takeIf { it.hasSupportHit() } ?: return null
+        val forwardSpan = Vector3d(front.contactPointWorld).sub(rear.contactPointWorld)
+        if (!isFinite(forwardSpan) || forwardSpan.lengthSquared() < 1.0e-6) return null
+
+        val supportNormal = Vector3d(forwardSpan).cross(right)
+        if (!isFinite(supportNormal) || supportNormal.lengthSquared() < 1.0e-6) return null
+        if (safeDot(supportNormal, fallbackNormal) < 0.0) {
+            supportNormal.negate()
+        }
+        return safeNormalize(supportNormal, fallbackNormal)
+    }
+
+    private fun WheelContact.hasSupportHit(): Boolean {
+        return hitBody != null && isFinite(contactPointWorld) && hitDistance.isFinite()
     }
 
     private fun velocityAtWorldPoint(body: PhysVsBody, pointWorld: Vector3d): Vector3d {

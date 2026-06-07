@@ -44,11 +44,16 @@ object KartPhysicsSolver {
             dt,
             config
         )
+        val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val contacts = config.wheelLocalPositions.mapIndexed { index, localPos ->
-            sampleWheel(body, physLevel, localPos, index < 2, steerRad, config, dt)
+            sampleWheel(body, physLevel, localPos, index < 2, contactUp, steerRad, config, dt)
         }
         val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
         val grounded = groundedContacts.isNotEmpty()
+        if (grounded) {
+            smoothGroundNormal(state, contacts, right, dt, config)
+        }
+        val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val speed = body.kinematics.velocity.length()
 
         state.debugSpeed = if (speed.isFinite()) speed else 0.0
@@ -71,18 +76,21 @@ object KartPhysicsSolver {
         }
 
         if (input.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, input, driftGripActive, steerRad, config)
+            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, input, driftGripActive, steerRad, config)
             if (grounded) {
+                contacts.forEach { contact ->
+                    applyStepAssist(body, physLevel, contact, forward, terrainUp, input, config)
+                }
                 if (state.drifting) {
-                    applyDriftAssist(body, input, forwardSpeed, WORLD_UP, state, config)
+                    applyDriftAssist(body, input, forwardSpeed, terrainUp, state, config)
                 } else {
-                    applySteeringAssist(body, steerRad, forwardSpeed, WORLD_UP, config)
+                    applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
                 }
             }
         }
 
         if (grounded) {
-            applyUpright(body, up, WORLD_UP, config)
+            applyUpright(body, up, terrainUp, config)
         }
         dampAngularVelocity(body)
         updateWheelAngularVelocities(state, appliedContacts, input, driftGripActive, config, dt)
@@ -94,30 +102,36 @@ object KartPhysicsSolver {
         physLevel: PhysLevel,
         wheelLocalPos: Vector3dc,
         front: Boolean,
+        contactUp: Vector3d,
         steerRad: Double,
         config: KartPhysicsConfig,
         dt: Double
     ): VehicleWheelContact {
         val mountWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(wheelLocalPos))
-        val castDir = Vector3d(WORLD_UP).negate()
+        val suspensionUp = VehiclePhysicsMath.safeNormalize(contactUp, WORLD_UP)
+        val castDir = Vector3d(suspensionUp).negate()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
         val groundedMaxDistance = config.suspensionRestLength + config.wheelRadius - 1.0e-4
+        val bodyForward = VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val baseForward = VehiclePhysicsMath.projectOntoPlane(
-            VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD),
-            WORLD_UP,
-            LOCAL_FORWARD
+            bodyForward,
+            suspensionUp,
+            bodyForward
         )
         val wheelForward = if (front && steerRad != 0.0) {
-            VehiclePhysicsMath.safeNormalize(Vector3d(baseForward).rotateAxis(steerRad, WORLD_UP.x, WORLD_UP.y, WORLD_UP.z), baseForward)
+            VehiclePhysicsMath.safeNormalize(
+                Vector3d(baseForward).rotateAxis(steerRad, suspensionUp.x, suspensionUp.y, suspensionUp.z),
+                baseForward
+            )
         } else {
             baseForward
         }
         val wheelRight = VehiclePhysicsMath.safeNormalize(
-            Vector3d(WORLD_UP).cross(wheelForward),
+            Vector3d(suspensionUp).cross(wheelForward),
             VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         )
         val sweepOffset = Vector3d(body.kinematics.velocity)
-            .sub(Vector3d(WORLD_UP).mul(VehiclePhysicsMath.safeDot(body.kinematics.velocity, WORLD_UP)))
+            .sub(Vector3d(suspensionUp).mul(VehiclePhysicsMath.safeDot(body.kinematics.velocity, suspensionUp)))
             .mul(dt.coerceIn(0.0, config.wheelSweepTime))
         val sweepSamples = if (VehiclePhysicsMath.isFinite(sweepOffset) && sweepOffset.lengthSquared() > 1.0e-6) {
             listOf(
@@ -167,10 +181,11 @@ object KartPhysicsSolver {
         val compression = (config.suspensionRestLength - springLength).coerceIn(0.0, config.suspensionTravel)
         if (compression <= 0.0) return 0.0
 
-        val springVelocity = -VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, WORLD_UP)
+        val suspensionUp = VehiclePhysicsMath.safeNormalize(Vector3d(contact.suspensionDirWorld).negate(), WORLD_UP)
+        val springVelocity = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.suspensionDirWorld)
         val forceMag = compression * config.suspensionStrength + springVelocity * config.suspensionDamping
         val normalForce = forceMag.coerceAtLeast(0.0)
-        VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(WORLD_UP).mul(normalForce))
+        VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(suspensionUp).mul(normalForce))
         return normalForce
     }
 
@@ -234,6 +249,7 @@ object KartPhysicsSolver {
         body: PhysVsBody,
         contacts: List<KartContact>,
         forwardSpeed: Double,
+        terrainUp: Vector3d,
         input: VehicleInput,
         drifting: Boolean,
         steerRad: Double,
@@ -246,7 +262,7 @@ object KartPhysicsSolver {
         val usePlanarLimit = drifting || abs(input.steer) > 0.05 || abs(steerRad) > Math.toRadians(1.0)
         val driveLimitSpeed = if (usePlanarLimit) {
             val direction = forwardSpeed.signOrZero().takeIf { it != 0.0 } ?: throttle.signOrZero()
-            planarSpeed(body, WORLD_UP) * direction
+            planarSpeed(body, terrainUp) * direction
         } else {
             forwardSpeed
         }
@@ -363,6 +379,228 @@ object KartPhysicsSolver {
         val correction = axis.mul(config.uprightStrength)
         val damping = Vector3d(body.kinematics.angularVelocity).mul(-config.uprightDamping)
         VehiclePhysicsMath.safeApplyWorldTorque(body, correction.add(damping))
+    }
+
+    private fun applyStepAssist(
+        body: PhysVsBody,
+        physLevel: PhysLevel,
+        contact: VehicleWheelContact,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        input: VehicleInput,
+        config: KartPhysicsConfig
+    ) {
+        if (!contact.grounded) return
+        if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
+
+        val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
+        if (terrainForward.lengthSquared() < 1.0e-6) return
+
+        val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
+        val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
+        val throttleIntoStep = max(0.0, input.throttle.coerceIn(-1.0, 1.0) * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
+        val crawlAmount = throttleIntoStep * (1.0 - smoothstep(0.8, 3.5, speedIntoStep))
+        val effectiveStepSpeed = max(speedIntoStep, crawlAmount * 1.8)
+        if (effectiveStepSpeed < 0.35) return
+
+        val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveStepSpeed)
+        val probeLength = (config.wheelRadius + 0.45 + effectiveStepSpeed * 0.09)
+            .coerceIn(config.wheelRadius + 0.35, config.wheelRadius + 1.75)
+        val lowProbeStart = Vector3d(contact.contactPointWorld)
+            .fma(config.wheelRadius * 0.45, terrainUp)
+            .fma(0.06 + speedLookahead * 0.24, terrainForward)
+        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
+        if (obstacle.hitBody.id == body.id) return
+
+        val step = findStepLandingSurface(
+            physLevel = physLevel,
+            body = body,
+            contact = contact,
+            lowProbeStart = lowProbeStart,
+            obstacleDistance = obstacle.distance,
+            terrainForward = terrainForward,
+            terrainUp = terrainUp,
+            config = config,
+            speedLookahead = speedLookahead
+        ) ?: return
+
+        val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
+        val approachDistance = max(0.25, step.approachDistance)
+        val targetUpSpeed = (effectiveStepSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
+            .coerceIn(0.0, 3.5 + speedLookahead * 4.6)
+        val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, terrainUp)
+        val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
+        val velocityLiftForce = config.mass * missingUpSpeed * (18.0 + speedLookahead * 22.0)
+        val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.35 + heightAmount * 0.3)
+        val baseLiftForce = config.stepAssistStrength * (0.65 + heightAmount * 0.45)
+        val maxLiftForce = min(
+            config.mass * (55.0 + speedLookahead * 80.0),
+            config.stepAssistStrength * (2.0 + heightAmount * 1.2 + speedLookahead * 4.4)
+        )
+        val liftForce = Vector3d(terrainUp)
+            .mul((baseLiftForce + velocityLiftForce + crawlLiftForce).coerceIn(0.0, maxLiftForce))
+
+        val speedLimitScale = 1.0 - smoothstep(config.wheelTopSpeed, config.wheelTopSpeed * 1.18, speedIntoStep)
+        val crawlCarryForce = config.stepAssistStrength * crawlAmount * (0.32 + heightAmount * 0.18)
+        val carryForceMag = config.stepAssistStrength *
+            (0.08 + speedLookahead * 0.58 + heightAmount * 0.12) *
+            speedLimitScale.coerceIn(0.0, 1.0) + crawlCarryForce
+        val forwardForce = Vector3d(terrainForward).mul(carryForceMag)
+
+        VehicleWheelPhysics.applyContactForce(body, contact, liftForce.add(forwardForce))
+    }
+
+    private fun computeStepApproachDirection(
+        body: PhysVsBody,
+        forward: Vector3d,
+        terrainUp: Vector3d,
+        throttle: Double
+    ): Vector3d {
+        val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
+        val velocity = body.kinematics.velocity
+        if (!VehiclePhysicsMath.isFinite(velocity)) return throttleStepDirection(projectedForward, throttle)
+
+        val planarVelocity = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, terrainUp), terrainUp)
+        if (planarVelocity.lengthSquared() < 0.35 * 0.35) {
+            return throttleStepDirection(projectedForward, throttle)
+        }
+
+        val velocityDirection = VehiclePhysicsMath.safeNormalize(planarVelocity, projectedForward)
+        val alignment = VehiclePhysicsMath.safeDot(velocityDirection, projectedForward)
+        if (abs(alignment) < 0.25) return Vector3d()
+
+        val vehicleAxisDirection = Vector3d(projectedForward).mul(if (alignment < 0.0) -1.0 else 1.0)
+        val speed = planarVelocity.length()
+        val velocityWeight = smoothstep(2.0, 12.0, speed) * 0.65
+        return VehiclePhysicsMath.safeNormalize(
+            Vector3d(vehicleAxisDirection).mul(1.0 - velocityWeight).fma(velocityWeight, velocityDirection),
+            vehicleAxisDirection
+        )
+    }
+
+    private fun throttleStepDirection(projectedForward: Vector3d, throttle: Double): Vector3d {
+        return when {
+            throttle > 0.05 -> Vector3d(projectedForward)
+            throttle < -0.05 -> Vector3d(projectedForward).negate()
+            else -> Vector3d()
+        }
+    }
+
+    private fun findStepLandingSurface(
+        physLevel: PhysLevel,
+        body: PhysVsBody,
+        contact: VehicleWheelContact,
+        lowProbeStart: Vector3d,
+        obstacleDistance: Double,
+        terrainForward: Vector3d,
+        terrainUp: Vector3d,
+        config: KartPhysicsConfig,
+        speedLookahead: Double
+    ): StepOpportunity? {
+        if (!obstacleDistance.isFinite()) return null
+
+        val down = Vector3d(terrainUp).negate()
+        val stepProbeHeight = config.maxStepHeight + config.wheelRadius * 1.25
+        val downProbeLength = stepProbeHeight + config.wheelRadius * 1.4
+        val forwardDistances = listOf(
+            obstacleDistance + config.wheelRadius * 0.45,
+            obstacleDistance + 0.35 + speedLookahead * 0.15,
+            obstacleDistance + 0.65 + speedLookahead * 0.65
+        )
+
+        return forwardDistances
+            .asSequence()
+            .filter { it.isFinite() && it > 0.0 }
+            .mapNotNull { forwardDistance ->
+                val topProbeStart = Vector3d(lowProbeStart)
+                    .fma(forwardDistance, terrainForward)
+                    .fma(stepProbeHeight, terrainUp)
+                val topHit = physLevel.rayCast(topProbeStart, down, downProbeLength, body.id) ?: return@mapNotNull null
+                if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
+
+                val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
+                val rise = VehiclePhysicsMath.safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
+                val normalDot = VehiclePhysicsMath.safeDot(topHit.hitNormal, terrainUp)
+                if (rise < 0.05 || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
+                if (normalDot < 0.48) return@mapNotNull null
+
+                StepOpportunity(rise = rise, approachDistance = forwardDistance)
+            }
+            .minByOrNull { it.rise }
+    }
+
+    private fun smoothGroundNormal(
+        state: KartRuntimeState,
+        contacts: List<VehicleWheelContact>,
+        bodyRight: Vector3d,
+        dt: Double,
+        config: KartPhysicsConfig
+    ) {
+        val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
+        if (groundedContacts.isEmpty()) return
+
+        val normalAverage = Vector3d()
+        groundedContacts.forEach { normalAverage.add(it.contactNormalWorld) }
+        var rawNormal = VehiclePhysicsMath.safeNormalize(normalAverage, state.smoothedGroundNormal)
+        val supportNormal = computeSupportGroundNormal(contacts, bodyRight, rawNormal)
+        if (supportNormal != null) {
+            rawNormal = VehiclePhysicsMath.safeNormalize(Vector3d(rawNormal).mul(0.35).fma(0.65, supportNormal), rawNormal)
+        }
+
+        val smoothingTime = config.groundNormalSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.12
+        val alpha = 1.0 - exp(dt.coerceIn(0.0, 0.1) / -smoothingTime)
+        state.smoothedGroundNormal.set(
+            VehiclePhysicsMath.safeNormalize(Vector3d(state.smoothedGroundNormal).lerp(rawNormal, alpha), WORLD_UP)
+        )
+    }
+
+    private fun computeSupportGroundNormal(
+        contacts: List<VehicleWheelContact>,
+        bodyRight: Vector3d,
+        fallbackNormal: Vector3d
+    ): Vector3d? {
+        if (contacts.size < 4) return null
+
+        val frontPoints = contacts.take(2).filter { it.hasSupportHit() }.map(VehicleWheelContact::contactPointWorld)
+        val rearPoints = contacts.drop(2).filter { it.hasSupportHit() }.map(VehicleWheelContact::contactPointWorld)
+        if (frontPoints.isEmpty() || rearPoints.isEmpty()) return null
+
+        val frontCenter = averagePoint(frontPoints)
+        val rearCenter = averagePoint(rearPoints)
+        val forwardSpan = Vector3d(frontCenter).sub(rearCenter)
+        if (forwardSpan.lengthSquared() < 1.0e-6) return null
+
+        val leftPoints = listOfNotNull(
+            contacts.getOrNull(0)?.takeIf { it.hasSupportHit() }?.contactPointWorld,
+            contacts.getOrNull(2)?.takeIf { it.hasSupportHit() }?.contactPointWorld
+        )
+        val rightPoints = listOfNotNull(
+            contacts.getOrNull(1)?.takeIf { it.hasSupportHit() }?.contactPointWorld,
+            contacts.getOrNull(3)?.takeIf { it.hasSupportHit() }?.contactPointWorld
+        )
+        val rightSpan = if (leftPoints.isNotEmpty() && rightPoints.isNotEmpty()) {
+            Vector3d(averagePoint(rightPoints)).sub(averagePoint(leftPoints))
+        } else {
+            Vector3d(bodyRight)
+        }
+        if (rightSpan.lengthSquared() < 1.0e-6) return null
+
+        val supportNormal = Vector3d(forwardSpan).cross(rightSpan)
+        if (!VehiclePhysicsMath.isFinite(supportNormal) || supportNormal.lengthSquared() < 1.0e-6) return null
+        if (VehiclePhysicsMath.safeDot(supportNormal, fallbackNormal) < 0.0) {
+            supportNormal.negate()
+        }
+        return VehiclePhysicsMath.safeNormalize(supportNormal, fallbackNormal)
+    }
+
+    private fun averagePoint(points: List<Vector3d>): Vector3d {
+        val average = Vector3d()
+        points.forEach(average::add)
+        return average.div(points.size.toDouble())
+    }
+
+    private fun VehicleWheelContact.hasSupportHit(): Boolean {
+        return hitBody != null && VehiclePhysicsMath.isFinite(contactPointWorld) && hitDistance.isFinite()
     }
 
     private fun dampAngularVelocity(body: PhysVsBody) {
@@ -591,5 +829,10 @@ object KartPhysicsSolver {
         val contact: VehicleWheelContact,
         val front: Boolean,
         val normalForce: Double
+    )
+
+    private data class StepOpportunity(
+        val rise: Double,
+        val approachDistance: Double
     )
 }
