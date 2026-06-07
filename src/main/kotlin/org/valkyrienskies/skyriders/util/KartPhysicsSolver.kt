@@ -34,7 +34,9 @@ object KartPhysicsSolver {
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
-        val driftGripActive = updateDriftState(state, input, forwardSpeed, dt, config)
+        val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        val driftSpeed = planarSpeed(body, contactUp)
+        val driftGripActive = updateDriftState(state, input, driftSpeed, dt, config)
         updateDriftBoost(body, state, input.riderPresent, state.drifting, forward, config, dt)
         val steerRad = updateSteerAngle(
             state,
@@ -44,12 +46,17 @@ object KartPhysicsSolver {
             dt,
             config
         )
-        val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val contacts = config.wheelLocalPositions.mapIndexed { index, localPos ->
             sampleWheel(body, physLevel, localPos, index < 2, contactUp, steerRad, config, dt)
         }
         val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
         val grounded = groundedContacts.isNotEmpty()
+        if (grounded) {
+            state.groundedGraceTimeRemaining = config.groundedGraceTime
+        } else {
+            state.groundedGraceTimeRemaining = max(0.0, state.groundedGraceTimeRemaining - dt)
+        }
+        val stabilizedGrounded = grounded || state.groundedGraceTimeRemaining > 0.0
         if (grounded) {
             smoothGroundNormal(state, contacts, right, dt, config)
         }
@@ -77,7 +84,7 @@ object KartPhysicsSolver {
 
         if (input.riderPresent) {
             applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, input, driftGripActive, steerRad, config)
-            if (grounded) {
+            if (stabilizedGrounded) {
                 val activeStepWheels = contacts.count(VehicleWheelContact::grounded).coerceAtLeast(1)
                 contacts.forEach { contact ->
                     applyStepAssist(body, physLevel, contact, forward, terrainUp, input, config, activeStepWheels)
@@ -90,8 +97,8 @@ object KartPhysicsSolver {
             }
         }
 
-        if (grounded) {
-            applyUpright(body, up, terrainUp, config)
+        if (stabilizedGrounded) {
+            applyUpright(body, up, terrainUp, state.drifting, config)
         }
         dampAngularVelocity(body)
         updateWheelAngularVelocities(state, appliedContacts, input, driftGripActive, config, dt)
@@ -374,11 +381,13 @@ object KartPhysicsSolver {
         VehiclePhysicsMath.safeApplyWorldTorque(body, torque)
     }
 
-    private fun applyUpright(body: PhysVsBody, up: Vector3d, terrainUp: Vector3d, config: KartPhysicsConfig) {
+    private fun applyUpright(body: PhysVsBody, up: Vector3d, terrainUp: Vector3d, drifting: Boolean, config: KartPhysicsConfig) {
         val axis = Vector3d(up).cross(terrainUp)
         if (!VehiclePhysicsMath.isFinite(axis) || axis.lengthSquared() < VehiclePhysicsMath.MIN_DIRECTION_LENGTH_SQUARED) return
-        val correction = axis.mul(config.uprightStrength)
-        val damping = Vector3d(body.kinematics.angularVelocity).mul(-config.uprightDamping)
+        val strengthScale = if (drifting) config.driftUprightStrengthScale else 1.0
+        val dampingScale = if (drifting) config.driftUprightDampingScale else 1.0
+        val correction = axis.mul(config.uprightStrength * strengthScale)
+        val damping = Vector3d(body.kinematics.angularVelocity).mul(-config.uprightDamping * dampingScale)
         VehiclePhysicsMath.safeApplyWorldTorque(body, correction.add(damping))
     }
 
@@ -725,13 +734,13 @@ object KartPhysicsSolver {
     private fun updateDriftState(
         state: KartRuntimeState,
         input: VehicleInput,
-        forwardSpeed: Double,
+        driftSpeed: Double,
         dt: Double,
         config: KartPhysicsConfig
     ): Boolean {
         val brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
         val steer = input.steer.coerceIn(-1.0, 1.0)
-        val speed = abs(forwardSpeed)
+        val speed = abs(driftSpeed)
 
         if (brake <= 0.05 || speed < config.driftMinSpeed) {
             if (state.drifting) {

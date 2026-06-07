@@ -44,6 +44,9 @@ data class KartPhysicsConfig(
     val driftDriveScale: Double = 0.82,
     val driftExitSmoothingTime: Double = 0.18,
     val driftTopSpeedMultiplier: Double = 1.08,
+    val driftUprightStrengthScale: Double = 1.45,
+    val driftUprightDampingScale: Double = 1.35,
+    val groundedGraceTime: Double = 0.1,
     val driftBoostEnabled: Boolean = true,
     val driftBoostMaxLevel: Int = 3,
     val driftBoostChargeTimes: List<Double> = listOf(0.8, 1.6, 2.6),
@@ -101,6 +104,9 @@ data class KartPhysicsConfig(
             driftDriveScale = 0.92,
             driftExitSmoothingTime = 0.2,
             driftTopSpeedMultiplier = 1.08,
+            driftUprightStrengthScale = 1.45,
+            driftUprightDampingScale = 1.35,
+            groundedGraceTime = 0.1,
             driftBoostEnabled = true,
             driftBoostMaxLevel = 3,
             driftBoostChargeTimes = listOf(0.75, 1.5, 2.45),
@@ -135,5 +141,6 @@ data class KartRuntimeState(
     var rearWheelAngularVelocity: Double = 0.0,
     var frontWheelSuspensionOffset: Double = 0.0,
     var rearWheelSuspensionOffset: Double = 0.0,
+    var groundedGraceTimeRemaining: Double = 0.0,
     val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0)
 )
