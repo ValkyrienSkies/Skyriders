@@ -75,7 +75,7 @@ object BikePhysicsSolver {
         val stabilizedGrounded = grounded || state.groundedGraceTimeRemaining > 0.0
 
         if (grounded) {
-            smoothGroundNormal(state, contacts, right, dt, config)
+            smoothGroundNormal(state, contacts, forward, right, drifting, dt, config)
         }
         val terrainUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         updateLandingDampingWindow(state, grounded, config)
@@ -1092,7 +1092,9 @@ object BikePhysicsSolver {
     private fun smoothGroundNormal(
         state: BikeRuntimeState,
         contacts: List<WheelContact>,
+        forward: Vector3d,
         right: Vector3d,
+        drifting: Boolean,
         dt: Double,
         config: BikePhysicsConfig
     ) {
@@ -1103,31 +1105,67 @@ object BikePhysicsSolver {
         groundedContacts.forEach { rawNormal.add(it.contactNormalWorld) }
         rawNormal.set(safeNormalize(rawNormal, state.smoothedGroundNormal))
 
-        val supportNormal = computeBikeSupportGroundNormal(contacts, right, rawNormal)
+        val supportNormal = computeBikeSupportGroundNormal(contacts, forward, right, rawNormal)
         if (supportNormal != null) {
-            rawNormal.set(safeNormalize(Vector3d(rawNormal).mul(0.35).fma(0.65, supportNormal), rawNormal))
+            val supportWeight = computeBikeSupportNormalWeight(supportNormal, drifting)
+            if (supportWeight > 0.0) {
+                rawNormal.set(
+                    safeNormalize(
+                        Vector3d(rawNormal).mul(1.0 - supportWeight).fma(supportWeight, supportNormal.normal),
+                        rawNormal
+                    )
+                )
+            }
         }
 
-        val alpha = 1.0 - exp(-dt / config.groundNormalSmoothingTime)
+        val smoothingTime = config.groundNormalSmoothingTime * if (drifting) 1.35 else 1.0
+        val alpha = 1.0 - exp(-dt / smoothingTime)
         state.smoothedGroundNormal.set(safeNormalize(Vector3d(state.smoothedGroundNormal).lerp(rawNormal, alpha), WORLD_UP))
     }
 
     private fun computeBikeSupportGroundNormal(
         contacts: List<WheelContact>,
+        forward: Vector3d,
         right: Vector3d,
         fallbackNormal: Vector3d
-    ): Vector3d? {
+    ): SupportGroundNormal? {
         val front = contacts.getOrNull(0)?.takeIf { it.hasSupportHit() } ?: return null
         val rear = contacts.getOrNull(1)?.takeIf { it.hasSupportHit() } ?: return null
         val forwardSpan = Vector3d(front.contactPointWorld).sub(rear.contactPointWorld)
         if (!isFinite(forwardSpan) || forwardSpan.lengthSquared() < 1.0e-6) return null
 
-        val supportNormal = Vector3d(forwardSpan).cross(right)
+        val terrainForward = projectOntoPlane(forward, fallbackNormal, forward)
+        val projectedSpan = Vector3d(forwardSpan).sub(Vector3d(fallbackNormal).mul(safeDot(forwardSpan, fallbackNormal)))
+        if (!isFinite(projectedSpan) || projectedSpan.lengthSquared() < 1.0e-6) return null
+
+        val spanDirection = safeNormalize(projectedSpan, terrainForward)
+        val forwardAlignment = abs(safeDot(spanDirection, terrainForward))
+        if (forwardAlignment < 0.55) return null
+
+        val rise = abs(safeDot(forwardSpan, fallbackNormal))
+        if (rise < 0.06) return null
+
+        val stableRight = safeNormalize(Vector3d(fallbackNormal).cross(terrainForward), right)
+        val supportNormal = Vector3d(forwardSpan).cross(stableRight)
         if (!isFinite(supportNormal) || supportNormal.lengthSquared() < 1.0e-6) return null
         if (safeDot(supportNormal, fallbackNormal) < 0.0) {
             supportNormal.negate()
         }
-        return safeNormalize(supportNormal, fallbackNormal)
+        val normalizedSupport = safeNormalize(supportNormal, fallbackNormal)
+        if (safeDot(normalizedSupport, fallbackNormal) < 0.48) return null
+
+        return SupportGroundNormal(
+            normal = normalizedSupport,
+            rise = rise,
+            bothGrounded = front.grounded && rear.grounded
+        )
+    }
+
+    private fun computeBikeSupportNormalWeight(supportNormal: SupportGroundNormal, drifting: Boolean): Double {
+        val riseAmount = smoothstep(0.06, 0.45, supportNormal.rise)
+        val loadScale = if (supportNormal.bothGrounded) 1.0 else 0.35
+        val driftScale = if (drifting) 0.65 else 1.0
+        return (0.34 * riseAmount * loadScale * driftScale).coerceIn(0.0, 0.34)
     }
 
     private fun WheelContact.hasSupportHit(): Boolean {
@@ -1240,6 +1278,12 @@ object BikePhysicsSolver {
     private data class WheelRayHit(
         val mountWorld: Vector3d,
         val result: org.valkyrienskies.core.api.physics.RayCastResult?
+    )
+
+    private data class SupportGroundNormal(
+        val normal: Vector3d,
+        val rise: Double,
+        val bothGrounded: Boolean
     )
 
     private data class StepOpportunity(
