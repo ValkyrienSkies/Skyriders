@@ -55,7 +55,9 @@ data class KartPhysicsConfig(
     val driftBoostDurations: List<Double> = listOf(0.35, 0.55, 0.8),
     val maxStepHeight: Double = 1.0,
     val stepAssistStrength: Double = 7200.0,
-    val groundNormalSmoothingTime: Double = 0.12
+    val groundNormalSmoothingTime: Double = 0.12,
+    val suspensionDroopGroundedFraction: Double = 0.45,
+    val suspensionDroopPreloadFraction: Double = 0.16
 ) {
     companion object {
         val DEBUG_KART = KartPhysicsConfig(

@@ -124,7 +124,8 @@ object KartPhysicsSolver {
         val suspensionUp = VehiclePhysicsMath.safeNormalize(contactUp, WORLD_UP)
         val castDir = Vector3d(suspensionUp).negate()
         val maxLength = config.suspensionRestLength + config.suspensionTravel + config.wheelRadius
-        val groundedMaxDistance = config.suspensionRestLength + config.wheelRadius - 1.0e-4
+        val droopGroundedRange = config.suspensionTravel * config.suspensionDroopGroundedFraction.coerceIn(0.0, 1.0)
+        val groundedMaxDistance = config.suspensionRestLength + config.wheelRadius + droopGroundedRange
         val bodyForward = VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val baseForward = VehiclePhysicsMath.projectOntoPlane(
             bodyForward,
@@ -191,12 +192,23 @@ object KartPhysicsSolver {
     private fun applySuspension(body: PhysVsBody, contact: VehicleWheelContact, config: KartPhysicsConfig): Double {
         if (!contact.grounded) return 0.0
         val springLength = contact.hitDistance - config.wheelRadius
-        val compression = (config.suspensionRestLength - springLength).coerceIn(0.0, config.suspensionTravel)
-        if (compression <= 0.0) return 0.0
+        val compression = config.suspensionRestLength - springLength
+        val compressed = compression.coerceIn(0.0, config.suspensionTravel)
+        val droop = (springLength - config.suspensionRestLength).coerceAtLeast(0.0)
+        val droopRange = config.suspensionTravel * config.suspensionDroopGroundedFraction.coerceIn(0.0, 1.0)
+        val droopLoad = if (compressed <= 0.0 && droopRange > 1.0e-4) {
+            val droopT = (droop / droopRange).coerceIn(0.0, 1.0)
+            val preload = config.mass * 9.81 * 0.25 * config.suspensionDroopPreloadFraction.coerceIn(0.0, 1.0)
+            preload * (1.0 - droopT)
+        } else {
+            0.0
+        }
+        if (compressed <= 0.0 && droopLoad <= 0.0) return 0.0
 
         val suspensionUp = VehiclePhysicsMath.safeNormalize(Vector3d(contact.suspensionDirWorld).negate(), WORLD_UP)
         val springVelocity = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.suspensionDirWorld)
-        val forceMag = compression * config.suspensionStrength + springVelocity * config.suspensionDamping
+        val dampingScale = if (compressed > 0.0) 1.0 else 0.35
+        val forceMag = compressed * config.suspensionStrength + droopLoad + springVelocity * config.suspensionDamping * dampingScale
         val normalForce = forceMag.coerceAtLeast(0.0)
         VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(suspensionUp).mul(normalForce))
         return normalForce
