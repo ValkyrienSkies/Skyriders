@@ -17,6 +17,9 @@ commands:
   checkout_and_cache:
     steps:
       - checkout
+      - run:
+          name: Ensure Gradle wrapper is executable
+          command: chmod +x gradlew
       - run: git submodule sync
       - run: git submodule update --init
 
