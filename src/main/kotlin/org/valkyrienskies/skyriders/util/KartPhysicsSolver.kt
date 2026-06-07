@@ -21,6 +21,7 @@ object KartPhysicsSolver {
     private const val WHEEL_AIR_DRAG = 0.35
     private const val WHEEL_GROUND_DRAG = 0.04
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
+    private const val PARKING_BRAKE_DEAD_SPEED = 0.025
 
     fun updateKartPhysics(
         body: PhysVsBody,
@@ -59,7 +60,7 @@ object KartPhysicsSolver {
         }
         val stabilizedGrounded = grounded || state.groundedGraceTimeRemaining > 0.0
         if (grounded) {
-            smoothGroundNormal(state, contacts, right, dt, config)
+            smoothGroundNormal(state, contacts, forward, right, state.drifting, dt, config)
         }
         val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val speed = body.kinematics.velocity.length()
@@ -97,14 +98,15 @@ object KartPhysicsSolver {
                 }
             }
         } else {
-            applyParkingBrake(body, appliedContacts, config)
+            applyParkingBrake(body, appliedContacts, terrainUp, config)
         }
 
         if (stabilizedGrounded) {
             applyUpright(body, up, terrainUp, state.drifting, config)
         }
         dampAngularVelocity(body)
-        updateWheelAngularVelocities(state, appliedContacts, activeInput, driftGripActive && activeInput.riderPresent, config, dt)
+        val wheelInput = if (activeInput.riderPresent) activeInput else VehicleInput(handbrake = 1.0)
+        updateWheelAngularVelocities(state, appliedContacts, wheelInput, driftGripActive && activeInput.riderPresent, config, dt)
         updateVisualWheelState(state, contacts, config, dt)
     }
 
@@ -283,7 +285,6 @@ object KartPhysicsSolver {
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
         val driveNormalForce = rearContacts.sumOf(KartContact::normalForce) / rearContacts.size
         val maxDriveForce = driveNormalForce * config.tireFrictionCoefficient * config.longitudinalGrip
-        val launchForcePoint = launchDriveForcePoint(body, rearContacts, terrainUp)
         rearContacts.forEach { kartContact ->
             if (driveForce != 0.0) {
                 val contact = kartContact.contact
@@ -291,8 +292,7 @@ object KartPhysicsSolver {
                 VehicleWheelPhysics.applyContactForce(
                     body,
                     contact,
-                    Vector3d(contact.wheelForwardWorld).mul(limitedDriveForce),
-                    launchForcePoint ?: contact.contactPointWorld
+                    Vector3d(contact.wheelForwardWorld).mul(limitedDriveForce)
                 )
             }
         }
@@ -316,43 +316,53 @@ object KartPhysicsSolver {
         }
     }
 
-    private fun launchDriveForcePoint(
-        body: PhysVsBody,
-        rearContacts: List<KartContact>,
-        terrainUp: Vector3d
-    ): Vector3d? {
-        if (rearContacts.isEmpty()) return null
-        val planarSpeed = planarSpeed(body, terrainUp)
-        val launchBlend = 1.0 - smoothstep(0.5, 2.4, planarSpeed)
-        if (launchBlend <= 0.0) return null
-
-        val rearCenter = Vector3d()
-        rearContacts.forEach { rearCenter.add(it.contact.contactPointWorld) }
-        rearCenter.div(rearContacts.size.toDouble())
-
-        return rearCenter.lerp(Vector3d(body.kinematics.position), launchBlend.coerceIn(0.0, 1.0))
-    }
-
     private fun applyParkingBrake(
         body: PhysVsBody,
         contacts: List<KartContact>,
+        terrainUp: Vector3d,
         config: KartPhysicsConfig
     ) {
         val groundedContacts = contacts.filter { it.contact.grounded && it.normalForce > 0.0 }
         if (groundedContacts.isEmpty()) return
 
-        groundedContacts.forEach { kartContact ->
-            val contact = kartContact.contact
-            val wheelForwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
-            if (abs(wheelForwardSpeed) <= 1.0e-4) return@forEach
+        val planarVelocity = Vector3d(body.kinematics.velocity)
+            .fma(-VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainUp), terrainUp)
+        if (!VehiclePhysicsMath.isFinite(planarVelocity)) return
 
-            val maxBrakeForce = kartContact.normalForce *
-                config.tireFrictionCoefficient *
-                config.longitudinalGrip *
-                config.parkingBrakeStrength
-            val brakeForce = (-wheelForwardSpeed * config.brakeForce * config.parkingBrakeStrength)
-                .coerceIn(-maxBrakeForce, maxBrakeForce)
-            VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(brakeForce))
+        val planarSpeed = planarVelocity.length()
+        if (!planarSpeed.isFinite() || planarSpeed <= PARKING_BRAKE_DEAD_SPEED) return
+
+        val maxBrakeForce = groundedContacts.sumOf(KartContact::normalForce) *
+            config.tireFrictionCoefficient *
+            config.longitudinalGrip *
+            config.parkingBrakeStrength
+        val damping = (config.brakeForce / max(config.mass, 1.0) * config.parkingBrakeStrength * 0.18)
+            .coerceIn(3.0, 18.0)
+        val brakeForce = VehiclePhysicsMath.safeNormalize(planarVelocity, Vector3d())
+            .mul((-planarSpeed * config.mass * damping).coerceIn(-maxBrakeForce, 0.0))
+
+        VehiclePhysicsMath.safeApplyWorldForce(body, brakeForce, body.kinematics.position)
+        applyGroundReactionForSharedForce(body, groundedContacts, brakeForce)
+    }
+
+    private fun applyGroundReactionForSharedForce(
+        body: PhysVsBody,
+        contacts: List<KartContact>,
+        force: Vector3dc
+    ) {
+        val dynamicContacts = contacts.filter { kartContact ->
+            val hitBody = kartContact.contact.hitBody
+            hitBody != null && hitBody.id != body.id && !hitBody.isStatic
+        }
+        if (dynamicContacts.isEmpty()) return
+
+        val sharedReaction = Vector3d(force).negate().div(dynamicContacts.size.toDouble())
+        dynamicContacts.forEach { kartContact ->
+            VehiclePhysicsMath.safeApplyWorldForce(
+                kartContact.contact.hitBody!!,
+                sharedReaction,
+                kartContact.contact.contactPointWorld
+            )
         }
     }
 
@@ -601,7 +611,9 @@ object KartPhysicsSolver {
     private fun smoothGroundNormal(
         state: KartRuntimeState,
         contacts: List<VehicleWheelContact>,
+        bodyForward: Vector3d,
         bodyRight: Vector3d,
+        drifting: Boolean,
         dt: Double,
         config: KartPhysicsConfig
     ) {
@@ -611,12 +623,19 @@ object KartPhysicsSolver {
         val normalAverage = Vector3d()
         groundedContacts.forEach { normalAverage.add(it.contactNormalWorld) }
         var rawNormal = VehiclePhysicsMath.safeNormalize(normalAverage, state.smoothedGroundNormal)
-        val supportNormal = computeSupportGroundNormal(contacts, bodyRight, rawNormal)
+        val supportNormal = computeSupportGroundNormal(contacts, bodyForward, bodyRight, rawNormal)
         if (supportNormal != null) {
-            rawNormal = VehiclePhysicsMath.safeNormalize(Vector3d(rawNormal).mul(0.35).fma(0.65, supportNormal), rawNormal)
+            val supportWeight = computeSupportNormalWeight(supportNormal, drifting)
+            if (supportWeight > 0.0) {
+                rawNormal = VehiclePhysicsMath.safeNormalize(
+                    Vector3d(rawNormal).mul(1.0 - supportWeight).fma(supportWeight, supportNormal.normal),
+                    rawNormal
+                )
+            }
         }
 
-        val smoothingTime = config.groundNormalSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.12
+        val baseSmoothingTime = config.groundNormalSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.12
+        val smoothingTime = baseSmoothingTime * if (drifting) 1.25 else 1.0
         val alpha = 1.0 - exp(dt.coerceIn(0.0, 0.1) / -smoothingTime)
         state.smoothedGroundNormal.set(
             VehiclePhysicsMath.safeNormalize(Vector3d(state.smoothedGroundNormal).lerp(rawNormal, alpha), WORLD_UP)
@@ -625,41 +644,86 @@ object KartPhysicsSolver {
 
     private fun computeSupportGroundNormal(
         contacts: List<VehicleWheelContact>,
+        bodyForward: Vector3d,
         bodyRight: Vector3d,
         fallbackNormal: Vector3d
-    ): Vector3d? {
+    ): SupportGroundNormal? {
         if (contacts.size < 4) return null
 
-        val frontPoints = contacts.take(2).filter { it.hasSupportHit() }.map(VehicleWheelContact::contactPointWorld)
-        val rearPoints = contacts.drop(2).filter { it.hasSupportHit() }.map(VehicleWheelContact::contactPointWorld)
+        val frontContacts = contacts.take(2).filter { it.hasSupportHit() }
+        val rearContacts = contacts.drop(2).filter { it.hasSupportHit() }
+        val frontPoints = frontContacts.map(VehicleWheelContact::contactPointWorld)
+        val rearPoints = rearContacts.map(VehicleWheelContact::contactPointWorld)
         if (frontPoints.isEmpty() || rearPoints.isEmpty()) return null
+
+        val terrainForward = VehiclePhysicsMath.projectOntoPlane(bodyForward, fallbackNormal, bodyForward)
+        val stableRight = VehiclePhysicsMath.safeNormalize(Vector3d(fallbackNormal).cross(terrainForward), bodyRight)
 
         val frontCenter = averagePoint(frontPoints)
         val rearCenter = averagePoint(rearPoints)
         val forwardSpan = Vector3d(frontCenter).sub(rearCenter)
         if (forwardSpan.lengthSquared() < 1.0e-6) return null
+        val projectedForwardSpan = Vector3d(forwardSpan)
+            .sub(Vector3d(fallbackNormal).mul(VehiclePhysicsMath.safeDot(forwardSpan, fallbackNormal)))
+        if (
+            VehiclePhysicsMath.isFinite(projectedForwardSpan) &&
+            projectedForwardSpan.lengthSquared() > 1.0e-6 &&
+            abs(VehiclePhysicsMath.safeDot(VehiclePhysicsMath.safeNormalize(projectedForwardSpan, terrainForward), terrainForward)) < 0.55
+        ) {
+            return null
+        }
 
-        val leftPoints = listOfNotNull(
-            contacts.getOrNull(0)?.takeIf { it.hasSupportHit() }?.contactPointWorld,
-            contacts.getOrNull(2)?.takeIf { it.hasSupportHit() }?.contactPointWorld
+        val leftContacts = listOfNotNull(
+            contacts.getOrNull(0)?.takeIf { it.hasSupportHit() },
+            contacts.getOrNull(2)?.takeIf { it.hasSupportHit() }
         )
-        val rightPoints = listOfNotNull(
-            contacts.getOrNull(1)?.takeIf { it.hasSupportHit() }?.contactPointWorld,
-            contacts.getOrNull(3)?.takeIf { it.hasSupportHit() }?.contactPointWorld
+        val rightContacts = listOfNotNull(
+            contacts.getOrNull(1)?.takeIf { it.hasSupportHit() },
+            contacts.getOrNull(3)?.takeIf { it.hasSupportHit() }
         )
+        val leftPoints = leftContacts.map(VehicleWheelContact::contactPointWorld)
+        val rightPoints = rightContacts.map(VehicleWheelContact::contactPointWorld)
         val rightSpan = if (leftPoints.isNotEmpty() && rightPoints.isNotEmpty()) {
             Vector3d(averagePoint(rightPoints)).sub(averagePoint(leftPoints))
         } else {
-            Vector3d(bodyRight)
+            Vector3d(stableRight)
         }
         if (rightSpan.lengthSquared() < 1.0e-6) return null
+        val projectedRightSpan = Vector3d(rightSpan)
+            .sub(Vector3d(fallbackNormal).mul(VehiclePhysicsMath.safeDot(rightSpan, fallbackNormal)))
+        if (
+            VehiclePhysicsMath.isFinite(projectedRightSpan) &&
+            projectedRightSpan.lengthSquared() > 1.0e-6 &&
+            abs(VehiclePhysicsMath.safeDot(VehiclePhysicsMath.safeNormalize(projectedRightSpan, stableRight), stableRight)) < 0.45
+        ) {
+            return null
+        }
+
+        val forwardRise = abs(VehiclePhysicsMath.safeDot(forwardSpan, fallbackNormal))
+        val rightRise = abs(VehiclePhysicsMath.safeDot(rightSpan, fallbackNormal))
+        val supportRise = max(forwardRise, rightRise)
+        if (supportRise < 0.06) return null
 
         val supportNormal = Vector3d(forwardSpan).cross(rightSpan)
         if (!VehiclePhysicsMath.isFinite(supportNormal) || supportNormal.lengthSquared() < 1.0e-6) return null
         if (VehiclePhysicsMath.safeDot(supportNormal, fallbackNormal) < 0.0) {
             supportNormal.negate()
         }
-        return VehiclePhysicsMath.safeNormalize(supportNormal, fallbackNormal)
+        val normalizedSupport = VehiclePhysicsMath.safeNormalize(supportNormal, fallbackNormal)
+        if (VehiclePhysicsMath.safeDot(normalizedSupport, fallbackNormal) < 0.48) return null
+
+        return SupportGroundNormal(
+            normal = normalizedSupport,
+            rise = supportRise,
+            allGrounded = contacts.all(VehicleWheelContact::grounded)
+        )
+    }
+
+    private fun computeSupportNormalWeight(supportNormal: SupportGroundNormal, drifting: Boolean): Double {
+        val riseAmount = smoothstep(0.06, 0.5, supportNormal.rise)
+        val loadScale = if (supportNormal.allGrounded) 1.0 else 0.45
+        val driftScale = if (drifting) 0.75 else 1.0
+        return (0.34 * riseAmount * loadScale * driftScale).coerceIn(0.0, 0.34)
     }
 
     private fun averagePoint(points: List<Vector3d>): Vector3d {
@@ -898,6 +962,12 @@ object KartPhysicsSolver {
         val contact: VehicleWheelContact,
         val front: Boolean,
         val normalForce: Double
+    )
+
+    private data class SupportGroundNormal(
+        val normal: Vector3d,
+        val rise: Double,
+        val allGrounded: Boolean
     )
 
     private data class StepOpportunity(
