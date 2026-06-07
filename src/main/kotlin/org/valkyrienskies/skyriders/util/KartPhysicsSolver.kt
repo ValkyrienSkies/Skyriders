@@ -78,8 +78,9 @@ object KartPhysicsSolver {
         if (input.riderPresent) {
             applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, input, driftGripActive, steerRad, config)
             if (grounded) {
+                val activeStepWheels = contacts.count(VehicleWheelContact::grounded).coerceAtLeast(1)
                 contacts.forEach { contact ->
-                    applyStepAssist(body, physLevel, contact, forward, terrainUp, input, config)
+                    applyStepAssist(body, physLevel, contact, forward, terrainUp, input, config, activeStepWheels)
                 }
                 if (state.drifting) {
                     applyDriftAssist(body, input, forwardSpeed, terrainUp, state, config)
@@ -388,7 +389,8 @@ object KartPhysicsSolver {
         forward: Vector3d,
         terrainUp: Vector3d,
         input: VehicleInput,
-        config: KartPhysicsConfig
+        config: KartPhysicsConfig,
+        activeStepWheels: Int
     ) {
         if (!contact.grounded) return
         if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
@@ -427,24 +429,33 @@ object KartPhysicsSolver {
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
         val approachDistance = max(0.25, step.approachDistance)
         val targetUpSpeed = (effectiveStepSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
-            .coerceIn(0.0, 3.5 + speedLookahead * 4.6)
+            .coerceIn(0.0, 2.4 + speedLookahead * 2.8)
         val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, terrainUp)
         val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
-        val velocityLiftForce = config.mass * missingUpSpeed * (18.0 + speedLookahead * 22.0)
-        val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.35 + heightAmount * 0.3)
-        val baseLiftForce = config.stepAssistStrength * (0.65 + heightAmount * 0.45)
+        val liftDemand = if (targetUpSpeed > 1.0e-4) {
+            (missingUpSpeed / targetUpSpeed).coerceIn(0.0, 1.0)
+        } else {
+            0.0
+        }
+        val wheelShare = (2.0 / activeStepWheels.toDouble()).coerceIn(0.35, 1.0)
+        val velocityLiftForce = config.mass * missingUpSpeed * (12.0 + speedLookahead * 12.0)
+        val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.22 + heightAmount * 0.16)
+        val baseLiftForce = config.stepAssistStrength * (0.22 + heightAmount * 0.2) * liftDemand
         val maxLiftForce = min(
-            config.mass * (55.0 + speedLookahead * 80.0),
-            config.stepAssistStrength * (2.0 + heightAmount * 1.2 + speedLookahead * 4.4)
+            config.mass * (28.0 + speedLookahead * 40.0),
+            config.stepAssistStrength * (0.85 + heightAmount * 0.55 + speedLookahead * 1.65)
         )
         val liftForce = Vector3d(terrainUp)
-            .mul((baseLiftForce + velocityLiftForce + crawlLiftForce).coerceIn(0.0, maxLiftForce))
+            .mul((baseLiftForce + velocityLiftForce + crawlLiftForce).coerceIn(0.0, maxLiftForce) * wheelShare)
 
         val speedLimitScale = 1.0 - smoothstep(config.wheelTopSpeed, config.wheelTopSpeed * 1.18, speedIntoStep)
-        val crawlCarryForce = config.stepAssistStrength * crawlAmount * (0.32 + heightAmount * 0.18)
-        val carryForceMag = config.stepAssistStrength *
-            (0.08 + speedLookahead * 0.58 + heightAmount * 0.12) *
-            speedLimitScale.coerceIn(0.0, 1.0) + crawlCarryForce
+        val obstacleProximityScale = 1.0 - smoothstep(probeLength * 0.45, probeLength, obstacle.distance)
+        val crawlCarryForce = config.stepAssistStrength * crawlAmount * (0.18 + heightAmount * 0.08)
+        val rawCarryForce = config.stepAssistStrength *
+            (0.025 + speedLookahead * 0.18 + heightAmount * 0.05) *
+            speedLimitScale.coerceIn(0.0, 1.0) * obstacleProximityScale.coerceIn(0.0, 1.0) + crawlCarryForce
+        val maxCarryForce = config.mass * (1.8 + speedLookahead * 3.8 + heightAmount * 1.2)
+        val carryForceMag = rawCarryForce.coerceIn(0.0, maxCarryForce) * wheelShare
         val forwardForce = Vector3d(terrainForward).mul(carryForceMag)
 
         VehicleWheelPhysics.applyContactForce(body, contact, liftForce.add(forwardForce))
