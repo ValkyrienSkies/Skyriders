@@ -324,9 +324,11 @@ object KartPhysicsSolver {
     ) {
         val steer = (steerRad / config.maxSteerRad).coerceIn(-1.0, 1.0)
         val speed = abs(forwardSpeed)
-        if (abs(steer) < 1.0e-4 || speed < config.yawAssistMinSpeed) return
+        if (abs(steer) < 1.0e-4 || speed < 0.05) return
         val speedT = smoothstep(config.yawAssistMinSpeed, config.yawAssistMaxSpeed, speed)
-        val torque = Vector3d(terrainUp).mul(steer * forwardSpeed.signOrZero() * config.yawAssist * speedT)
+        val lowSpeedT = smoothstep(0.05, config.yawAssistMinSpeed.coerceAtLeast(0.06), speed)
+        val assist = max(speedT, lowSpeedT * 0.22)
+        val torque = Vector3d(terrainUp).mul(steer * forwardSpeed.signOrZero() * config.yawAssist * assist)
         VehiclePhysicsMath.safeApplyWorldTorque(body, torque)
     }
 

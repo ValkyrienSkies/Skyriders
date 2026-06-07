@@ -7,6 +7,10 @@
     {
       "type": "single",
       "resource": "skyriders:bikes/dirt_bike"
+    },
+    {
+      "type": "single",
+      "resource": "skyriders:karts/kart"
     }
   ]
 }

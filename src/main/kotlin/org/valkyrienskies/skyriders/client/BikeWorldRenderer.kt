@@ -98,13 +98,16 @@ object BikeWorldRenderer {
                 .takeUnless { it === missingModel }
                 ?.let { wheelModel ->
                     val bike = vehicle as? IBike
+                    val kart = vehicle as? KartVehicle
                     renderWheelPart(
                         poseStack = poseStack,
                         bufferSource = bufferSource,
                         model = wheelModel,
                         pivot = wheelPart.pivot,
                         steerRad = when (wheelPart.steerSource) {
-                            VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad ?: 0.0
+                            VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad
+                                ?: kart?.kartState?.debugSteerRad
+                                ?: 0.0
                             VehicleWheelSteerSource.NONE -> 0.0
                         },
                         spinRad = when (wheelPart.spinSource) {
