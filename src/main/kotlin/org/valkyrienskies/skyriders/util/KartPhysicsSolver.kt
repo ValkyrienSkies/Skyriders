@@ -33,16 +33,17 @@ object KartPhysicsSolver {
         val forward = VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
+        val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val driftSpeed = planarSpeed(body, contactUp)
-        val driftGripActive = updateDriftState(state, input, driftSpeed, dt, config)
-        updateDriftBoost(body, state, input.riderPresent, state.drifting, forward, config, dt)
+        val driftGripActive = updateDriftState(state, activeInput, driftSpeed, dt, config)
+        updateDriftBoost(body, state, activeInput.riderPresent, state.drifting, forward, config, dt)
         val steerRad = updateSteerAngle(
             state,
-            input.steer,
+            activeInput.steer,
             forwardSpeed,
-            computeTargetSteerRad(input.steer, forwardSpeed, config),
+            computeTargetSteerRad(activeInput.steer, forwardSpeed, config),
             dt,
             config
         )
@@ -67,7 +68,7 @@ object KartPhysicsSolver {
         state.debugForwardSpeed = if (forwardSpeed.isFinite()) forwardSpeed else 0.0
         state.debugGroundedWheels = groundedContacts.size
         state.debugSteerRad = steerRad
-        state.debugThrottle = input.throttle
+        state.debugThrottle = activeInput.throttle
 
         val appliedContacts = contacts.mapIndexed { index, contact ->
             KartContact(
@@ -82,26 +83,28 @@ object KartPhysicsSolver {
             applyLateralGrip(body, contact, driftGripActive, config)
         }
 
-        if (input.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, input, driftGripActive, steerRad, config)
+        if (activeInput.riderPresent) {
+            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, activeInput, driftGripActive, steerRad, config)
             if (stabilizedGrounded) {
                 val activeStepWheels = contacts.count(VehicleWheelContact::grounded).coerceAtLeast(1)
                 contacts.forEach { contact ->
-                    applyStepAssist(body, physLevel, contact, forward, terrainUp, input, config, activeStepWheels)
+                    applyStepAssist(body, physLevel, contact, forward, terrainUp, activeInput, config, activeStepWheels)
                 }
                 if (state.drifting) {
-                    applyDriftAssist(body, input, forwardSpeed, terrainUp, state, config)
+                    applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, state, config)
                 } else {
                     applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
                 }
             }
+        } else {
+            applyParkingBrake(body, appliedContacts, config)
         }
 
         if (stabilizedGrounded) {
             applyUpright(body, up, terrainUp, state.drifting, config)
         }
         dampAngularVelocity(body)
-        updateWheelAngularVelocities(state, appliedContacts, input, driftGripActive, config, dt)
+        updateWheelAngularVelocities(state, appliedContacts, activeInput, driftGripActive && activeInput.riderPresent, config, dt)
         updateVisualWheelState(state, contacts, config, dt)
     }
 
@@ -328,6 +331,29 @@ object KartPhysicsSolver {
         rearCenter.div(rearContacts.size.toDouble())
 
         return rearCenter.lerp(Vector3d(body.kinematics.position), launchBlend.coerceIn(0.0, 1.0))
+    }
+
+    private fun applyParkingBrake(
+        body: PhysVsBody,
+        contacts: List<KartContact>,
+        config: KartPhysicsConfig
+    ) {
+        val groundedContacts = contacts.filter { it.contact.grounded && it.normalForce > 0.0 }
+        if (groundedContacts.isEmpty()) return
+
+        groundedContacts.forEach { kartContact ->
+            val contact = kartContact.contact
+            val wheelForwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+            if (abs(wheelForwardSpeed) <= 1.0e-4) return@forEach
+
+            val maxBrakeForce = kartContact.normalForce *
+                config.tireFrictionCoefficient *
+                config.longitudinalGrip *
+                config.parkingBrakeStrength
+            val brakeForce = (-wheelForwardSpeed * config.brakeForce * config.parkingBrakeStrength)
+                .coerceIn(-maxBrakeForce, maxBrakeForce)
+            VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(brakeForce))
+        }
     }
 
     private fun updateWheelAngularVelocities(
