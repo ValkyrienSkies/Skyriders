@@ -263,7 +263,7 @@ jobs:
       - discord/status:
           success_message: ${DISCORD_MSG}
           success_only: true
-          webhook: ${HZ_120_WEBHOOK}
+          webhook: ${SKYRIDERS_120_WEBHOOK}
 
   deploy_to_lilypad:
     executor: java_large
