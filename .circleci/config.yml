@@ -20,9 +20,35 @@ commands:
           name: Install Java 17 toolchain
           command: |
             set -euo pipefail
-            sudo apt-get update
-            sudo apt-get install -y openjdk-17-jdk
-            /usr/lib/jvm/java-17-openjdk-amd64/bin/java -version
+            JDK17_DIR="${HOME}/.jdks/temurin-17"
+            JDK17_ARCHIVE="/tmp/temurin-17.tar.gz"
+            JDK17_URL="https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
+            if [ -n "${JAVA_HOME:-}" ]; then
+              JDK21_DIR="${JAVA_HOME}"
+            else
+              JAVA_BIN="$(readlink -f "$(command -v java)")"
+              JDK21_DIR="$(dirname "$(dirname "${JAVA_BIN}")")"
+            fi
+
+            if [ ! -x "${JDK17_DIR}/bin/java" ]; then
+              rm -rf "${JDK17_DIR}" "${JDK17_ARCHIVE}"
+              mkdir -p "${JDK17_DIR}"
+              curl --fail --location --retry 3 --output "${JDK17_ARCHIVE}" "${JDK17_URL}"
+              tar -xzf "${JDK17_ARCHIVE}" --strip-components=1 -C "${JDK17_DIR}"
+            fi
+
+            "${JDK17_DIR}/bin/java" -version
+
+            mkdir -p "${HOME}/.gradle"
+            if [ -f "${HOME}/.gradle/gradle.properties" ]; then
+              sed -i '/^org.gradle.java.installations.paths=/d;/^org.gradle.java.installations.auto-detect=/d' "${HOME}/.gradle/gradle.properties"
+            fi
+            {
+              echo "org.gradle.java.installations.paths=${JDK17_DIR},${JDK21_DIR}"
+              echo "org.gradle.java.installations.auto-detect=true"
+            } >> "${HOME}/.gradle/gradle.properties"
+
+            echo "export JDK17_HOME='${JDK17_DIR}'" >> "${BASH_ENV}"
 
   checkout_and_cache:
     steps:
@@ -30,7 +56,6 @@ commands:
       - run:
           name: Ensure Gradle wrapper is executable
           command: chmod +x gradlew
-      - install_jdk17
       - run: git submodule sync
       - run: git submodule update --init
 
@@ -41,6 +66,7 @@ commands:
       - restore_cache:
           keys:
             - v1-{{ checksum "build.gradle" }}-{{ checksum "gradle.properties" }}
+      - install_jdk17
 
   save_artifacts:
     parameters:
@@ -171,7 +197,7 @@ jobs:
       - run:
           name: Use Java 17 for Forge server test
           command: |
-            echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> "$BASH_ENV"
+            echo 'export JAVA_HOME=$JDK17_HOME' >> "$BASH_ENV"
             echo 'export PATH=$JAVA_HOME/bin:$PATH' >> "$BASH_ENV"
       - prepare_server_dir:
           server_root: /tmp/forge-server
