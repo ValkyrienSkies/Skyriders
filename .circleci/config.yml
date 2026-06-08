@@ -14,12 +14,23 @@ executors:
       ORG_GRADLE_PROJECT_block_external_repositories: "true"
 
 commands:
+  install_jdk17:
+    steps:
+      - run:
+          name: Install Java 17 toolchain
+          command: |
+            set -euo pipefail
+            sudo apt-get update
+            sudo apt-get install -y openjdk-17-jdk
+            /usr/lib/jvm/java-17-openjdk-amd64/bin/java -version
+
   checkout_and_cache:
     steps:
       - checkout
       - run:
           name: Ensure Gradle wrapper is executable
           command: chmod +x gradlew
+      - install_jdk17
       - run: git submodule sync
       - run: git submodule update --init
 
@@ -156,6 +167,12 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - install_jdk17
+      - run:
+          name: Use Java 17 for Forge server test
+          command: |
+            echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> "$BASH_ENV"
+            echo 'export PATH=$JAVA_HOME/bin:$PATH' >> "$BASH_ENV"
       - prepare_server_dir:
           server_root: /tmp/forge-server
       - run:
