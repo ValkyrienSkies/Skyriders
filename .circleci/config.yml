@@ -190,6 +190,7 @@ jobs:
       MC_VERSION: "1.20.1"
       FORGE_VERSION: "47.2.0"
       KFF_URL: "https://cdn.modrinth.com/data/ordsPcFz/versions/hmeyC41q/kotlinforforge-4.11.0-all.jar"
+      VS2_URL: "https://maven.valkyrienskies.org/org/valkyrienskies/valkyrienskies-120-forge/2.4.13+c805b0b2ab/valkyrienskies-120-forge-2.4.13+c805b0b2ab.jar"
     steps:
       - attach_workspace:
           at: .
@@ -232,6 +233,12 @@ jobs:
             set -euo pipefail
             cd /tmp/forge-server
             curl -L "${KFF_URL}" -o mods/kff.jar
+      - run:
+          name: Download Valkyrien Skies 2
+          command: |
+            set -euo pipefail
+            cd /tmp/forge-server
+            curl -L "${VS2_URL}" -o mods/vs2.jar
       - run_test_server:
           cmd: "./run.sh nogui"
           workdir: "/tmp/forge-server"
