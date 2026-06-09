@@ -255,10 +255,25 @@ object WheeledVehicleDefinitions {
         id = ResourceLocation(SkyridersMod.MOD_ID, "atv"),
         displayName = "ATV",
         physics = WheeledVehiclePhysicsConfig.ATV,
-        render = atvRender()
+        render = atvRender(),
+        seatLocalPos = Vector3d(0.0, 0.04, -0.18),
+        seatZoneCenter = Vector3d(0.0, 0.48, -0.2),
+        seatZoneSize = Vector3d(0.95, 0.58, 0.9),
+        fuelCapCenter = Vector3d(-0.56, 0.46, -0.48)
     )
 
-    private val definitionsById = listOf(ATV).associateBy(VehicleDefinition::id)
+    val CAR = createWheeledDefinition(
+        id = ResourceLocation(SkyridersMod.MOD_ID, "car"),
+        displayName = "Generic Car",
+        physics = WheeledVehiclePhysicsConfig.CAR,
+        render = carRender(),
+        seatLocalPos = Vector3d(0.0, 0.1, -0.55),
+        seatZoneCenter = Vector3d(0.0, 0.62, -0.55),
+        seatZoneSize = Vector3d(1.15, 0.72, 1.05),
+        fuelCapCenter = Vector3d(-0.92, 0.55, -1.16)
+    )
+
+    private val definitionsById = listOf(ATV, CAR).associateBy(VehicleDefinition::id)
 
     val ids: Set<ResourceLocation>
         get() = definitionsById.keys
@@ -271,7 +286,11 @@ object WheeledVehicleDefinitions {
         id: ResourceLocation,
         displayName: String,
         physics: WheeledVehiclePhysicsConfig,
-        render: VehicleRenderDefinition
+        render: VehicleRenderDefinition,
+        seatLocalPos: Vector3d,
+        seatZoneCenter: Vector3d,
+        seatZoneSize: Vector3d,
+        fuelCapCenter: Vector3d
     ): VehicleDefinition = VehicleDefinition(
         id = id,
         displayName = displayName,
@@ -282,11 +301,11 @@ object WheeledVehicleDefinitions {
             centerOfMassOffset = Vector3d(0.0, -0.2, 0.0)
         ),
         render = render,
-        sounds = VehicleSoundDefinition.KART_ENGINE,
+        sounds = VehicleSoundDefinition.GENERIC_ENGINE,
         seats = listOf(
             VehicleSeatDefinition(
                 id = VehicleInteractionDefinition.SEAT,
-                localPos = Vector3d(0.0, 0.04, -0.18),
+                localPos = Vector3d(seatLocalPos),
                 role = VehicleSeatRole.DRIVER,
                 interactionZone = VehicleInteractionDefinition.SEAT
             )
@@ -305,13 +324,13 @@ object WheeledVehicleDefinitions {
                 ),
                 VehicleInteractionZone(
                     id = VehicleInteractionDefinition.SEAT,
-                    center = Vector3d(0.0, 0.48, -0.2),
-                    size = Vector3d(0.95, 0.58, 0.9),
+                    center = Vector3d(seatZoneCenter),
+                    size = Vector3d(seatZoneSize),
                     actions = setOf(VehicleInteractionActions.MOUNT)
                 ),
                 VehicleInteractionZone(
                     id = VehicleInteractionDefinition.FUEL_CAP,
-                    center = Vector3d(-0.56, 0.46, -0.48),
+                    center = Vector3d(fuelCapCenter),
                     size = Vector3d(0.32, 0.32, 0.32),
                     actions = setOf(VehicleInteractionActions.TOGGLE),
                     partId = VehicleInteractionDefinition.FUEL_CAP
@@ -372,6 +391,60 @@ object WheeledVehicleDefinitions {
             ),
             exhaustPoints = listOf(
                 VehicleEffectPointDefinition("rear_exhaust", Vector3d(0.0, 0.25, -0.74))
+            )
+        )
+    }
+
+    private fun carRender(): VehicleRenderDefinition {
+        return VehicleRenderDefinition(
+            model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_body"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/kart.png"),
+            seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/kart.png"),
+            showWheels = true,
+            modelYawRad = 0.0,
+            modelScale = 2.15,
+            modelOffset = Vector3d(-1.08, -0.72, -1.08),
+            wheelSpinVisualScale = 0.72,
+            wheelSpinSmoothingTime = 0.1,
+            wheelParts = listOf(
+                VehicleWheelRenderDefinition(
+                    id = "front_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_left_wheel"),
+                    pivot = Vector3d(0.1175, 0.3175, 0.9244),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "front_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_right_wheel"),
+                    pivot = Vector3d(0.8756, 0.3175, 0.9244),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_left_wheel"),
+                    pivot = Vector3d(0.1175, 0.3175, 0.0688),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_right_wheel"),
+                    pivot = Vector3d(0.8756, 0.3175, 0.0688),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                )
+            ),
+            exhaustPoints = listOf(
+                VehicleEffectPointDefinition("left_rear_exhaust", Vector3d(-0.36, 0.25, -1.55)),
+                VehicleEffectPointDefinition("right_rear_exhaust", Vector3d(0.36, 0.25, -1.55))
+            ),
+            tireParticlePoints = listOf(
+                VehicleEffectPointDefinition("front_left_tire", Vector3d(-0.74, -0.57, 1.25)),
+                VehicleEffectPointDefinition("front_right_tire", Vector3d(0.74, -0.57, 1.25)),
+                VehicleEffectPointDefinition("rear_left_tire", Vector3d(-0.74, -0.57, -1.25)),
+                VehicleEffectPointDefinition("rear_right_tire", Vector3d(0.74, -0.57, -1.25))
             )
         )
     }

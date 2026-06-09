@@ -144,6 +144,9 @@ data class VehicleSoundDefinition(
     val driftLoop: ResourceLocation? = null,
     val engineStart: ResourceLocation? = null,
     val engineStop: ResourceLocation? = null,
+    val gearShift: ResourceLocation? = null,
+    val handbrakeEngage: ResourceLocation? = null,
+    val handbrakeDisengage: ResourceLocation? = null,
     val idleVolume: Double = 0.18,
     val speedVolume: Double = 0.18,
     val throttleVolume: Double = 0.16,
@@ -169,6 +172,23 @@ data class VehicleSoundDefinition(
             minPitch = 0.75,
             maxPitch = 1.5,
             referenceSpeed = 18.0
+        )
+        val GENERIC_ENGINE = VehicleSoundDefinition(
+            engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "engine"),
+            engineStart = ResourceLocation(SkyridersMod.MOD_ID, "engine_start"),
+            engineStop = ResourceLocation(SkyridersMod.MOD_ID, "engine_stop"),
+            gearShift = ResourceLocation(SkyridersMod.MOD_ID, "gearshift"),
+            handbrakeEngage = ResourceLocation(SkyridersMod.MOD_ID, "handbrake_engage"),
+            handbrakeDisengage = ResourceLocation(SkyridersMod.MOD_ID, "handbrake_disengage"),
+            idleVolume = 0.22,
+            speedVolume = 0.22,
+            throttleVolume = 0.18,
+            idlePitch = 0.74,
+            speedPitch = 0.36,
+            throttlePitch = 0.28,
+            minPitch = 0.68,
+            maxPitch = 1.35,
+            referenceSpeed = 22.0
         )
     }
 }

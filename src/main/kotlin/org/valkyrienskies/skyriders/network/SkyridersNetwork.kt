@@ -271,6 +271,15 @@ object SkyridersNetwork {
             is IBike -> vehicle.state.rearWheelSuspensionOffset
             else -> 0.0
         }
+        val transmissionGear = when (vehicle) {
+            is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
+            else -> 0
+        }
+        val parkingBrakeEngaged = when (vehicle) {
+            is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
+            else -> false
+        }
+        val hasTransmission = vehicle is WheeledVehicle
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             VehicleDebugPacket(
@@ -294,7 +303,10 @@ object SkyridersNetwork {
                 frontWheelAngularVelocity = frontWheelAngularVelocity,
                 rearWheelAngularVelocity = rearWheelAngularVelocity,
                 frontWheelSuspensionOffset = frontWheelSuspensionOffset,
-                rearWheelSuspensionOffset = rearWheelSuspensionOffset
+                rearWheelSuspensionOffset = rearWheelSuspensionOffset,
+                hasTransmission = hasTransmission,
+                transmissionGear = transmissionGear,
+                parkingBrakeEngaged = parkingBrakeEngaged
             )
         )
     }
@@ -730,7 +742,10 @@ object SkyridersNetwork {
         val frontWheelAngularVelocity: Double,
         val rearWheelAngularVelocity: Double,
         val frontWheelSuspensionOffset: Double,
-        val rearWheelSuspensionOffset: Double
+        val rearWheelSuspensionOffset: Double,
+        val hasTransmission: Boolean,
+        val transmissionGear: Int,
+        val parkingBrakeEngaged: Boolean
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -754,6 +769,9 @@ object SkyridersNetwork {
             buf.writeDouble(rearWheelAngularVelocity)
             buf.writeDouble(frontWheelSuspensionOffset)
             buf.writeDouble(rearWheelSuspensionOffset)
+            buf.writeBoolean(hasTransmission)
+            buf.writeInt(transmissionGear)
+            buf.writeBoolean(parkingBrakeEngaged)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -807,7 +825,10 @@ object SkyridersNetwork {
                     frontWheelAngularVelocity = buf.readDouble(),
                     rearWheelAngularVelocity = buf.readDouble(),
                     frontWheelSuspensionOffset = buf.readDouble(),
-                    rearWheelSuspensionOffset = buf.readDouble()
+                    rearWheelSuspensionOffset = buf.readDouble(),
+                    hasTransmission = buf.readBoolean(),
+                    transmissionGear = buf.readInt(),
+                    parkingBrakeEngaged = buf.readBoolean()
                 )
             }
 

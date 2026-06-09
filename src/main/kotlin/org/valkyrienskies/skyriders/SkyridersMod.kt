@@ -87,6 +87,24 @@ object SkyridersMod {
     val KART_ENGINE_DRIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine_drift") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_drift"))
     }
+    val GENERIC_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine"))
+    }
+    val GENERIC_ENGINE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_start") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_start"))
+    }
+    val GENERIC_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_stop") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_stop"))
+    }
+    val GEARSHIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("gearshift") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "gearshift"))
+    }
+    val HANDBRAKE_ENGAGE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("handbrake_engage") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "handbrake_engage"))
+    }
+    val HANDBRAKE_DISENGAGE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("handbrake_disengage") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "handbrake_disengage"))
+    }
 
     // end of RegistryObjects
 

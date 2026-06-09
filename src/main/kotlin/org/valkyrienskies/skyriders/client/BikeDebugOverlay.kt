@@ -43,6 +43,9 @@ object BikeDebugOverlay {
             forwardSpeed = packet.forwardSpeed,
             steerAngleRad = packet.steerAngleRad,
             driftBoostTimeRemaining = packet.driftBoostTimeRemaining,
+            hasTransmission = packet.hasTransmission,
+            transmissionGear = packet.transmissionGear,
+            parkingBrakeEngaged = packet.parkingBrakeEngaged,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -72,6 +75,10 @@ object BikeDebugOverlay {
             "Throttle: ${formatNumber(currentSnapshot.throttle)}",
             "Steer Input: ${formatNumber(currentSnapshot.steer)}"
         )
+        if (currentSnapshot.hasTransmission) {
+            lines.add("Gear: ${formatGear(currentSnapshot.transmissionGear)}")
+            lines.add("Parking Brake: ${currentSnapshot.parkingBrakeEngaged}")
+        }
         if (currentSnapshot.groundedCount >= 0) {
             lines.add("Grounded Wheels: ${currentSnapshot.groundedCount}")
         }
@@ -118,6 +125,14 @@ object BikeDebugOverlay {
         return String.format(Locale.ROOT, "%.0f%%", percent)
     }
 
+    private fun formatGear(gear: Int): String {
+        return when {
+            gear < 0 -> "R"
+            gear == 0 -> "N"
+            else -> gear.toString()
+        }
+    }
+
     private data class VehicleSnapshot(
         val bodyId: Long,
         val vehicleId: String,
@@ -134,6 +149,9 @@ object BikeDebugOverlay {
         val forwardSpeed: Double,
         val steerAngleRad: Double,
         val driftBoostTimeRemaining: Double,
+        val hasTransmission: Boolean,
+        val transmissionGear: Int,
+        val parkingBrakeEngaged: Boolean,
         val receivedAtMillis: Long
     )
 

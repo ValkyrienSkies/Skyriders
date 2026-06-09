@@ -30,6 +30,8 @@ object BikeClientEffects {
     private val vehicleTelemetryByBodyId = HashMap<Long, TimedVehicleTelemetry>()
     private val engineSoundsByBodyId = HashMap<Long, VehicleEngineSound>()
     private val lastEngineStateByBodyId = HashMap<Long, Boolean>()
+    private val lastGearByBodyId = HashMap<Long, Int>()
+    private val lastParkingBrakeByBodyId = HashMap<Long, Boolean>()
 
     fun updateTelemetry(packet: SkyridersNetwork.BikeDebugPacket) {
         telemetryByBodyId[packet.bodyId] = TimedTelemetry(
@@ -62,6 +64,8 @@ object BikeClientEffects {
         val bikes = vehicles.filterIsInstance<IBike>()
         val activeBodyIds = vehicles.mapTo(HashSet()) { it.bodyId }
         lastEngineStateByBodyId.keys.retainAll(activeBodyIds)
+        lastGearByBodyId.keys.retainAll(activeBodyIds)
+        lastParkingBrakeByBodyId.keys.retainAll(activeBodyIds)
         engineSoundsByBodyId.entries.removeIf { entry ->
             if (entry.value.isStopped() || entry.key !in activeBodyIds) {
                 entry.value.stopNow()
@@ -74,6 +78,7 @@ object BikeClientEffects {
             val bikeTelemetry = telemetryByBodyId[vehicle.bodyId]?.packet
             val vehicleTelemetry = vehicleTelemetryByBodyId[vehicle.bodyId]?.packet
             tickEngineSound(minecraft, vehicle, bikeTelemetry, vehicleTelemetry)
+            playVehicleControlTransitionSounds(minecraft, vehicle, vehicleTelemetry)
             if (vehicle !is IBike) {
                 spawnGenericVehicleEffects(level, vehicle, vehicleTelemetry)
             }
@@ -310,6 +315,58 @@ object BikeClientEffects {
                 SoundSource.NEUTRAL,
                 0.48f,
                 1.0f,
+                SoundInstance.createUnseededRandom(),
+                false,
+                0,
+                SoundInstance.Attenuation.LINEAR,
+                position.x,
+                position.y,
+                position.z,
+                false
+            )
+        )
+    }
+
+    private fun playVehicleControlTransitionSounds(
+        minecraft: Minecraft,
+        vehicle: IVehicle,
+        telemetry: SkyridersNetwork.VehicleDebugPacket?
+    ) {
+        telemetry ?: return
+        if (!telemetry.hasTransmission) return
+        val soundDefinition = vehicle.vehicleDefinition.sounds
+        val previousGear = lastGearByBodyId.put(vehicle.bodyId, telemetry.transmissionGear)
+        if (previousGear != null && previousGear != telemetry.transmissionGear) {
+            val randomPitch = 0.96f + (minecraft.level?.random?.nextFloat() ?: 0.5f) * 0.08f
+            playVehicleOneShot(minecraft, vehicle, soundDefinition.gearShift, volume = 0.52f, pitch = randomPitch)
+        }
+
+        val previousParkingBrake = lastParkingBrakeByBodyId.put(vehicle.bodyId, telemetry.parkingBrakeEngaged)
+        if (previousParkingBrake != null && previousParkingBrake != telemetry.parkingBrakeEngaged) {
+            val soundId = if (telemetry.parkingBrakeEngaged) soundDefinition.handbrakeEngage else soundDefinition.handbrakeDisengage
+            playVehicleOneShot(minecraft, vehicle, soundId, volume = 0.58f, pitch = 1.0f)
+        }
+    }
+
+    private fun playVehicleOneShot(
+        minecraft: Minecraft,
+        vehicle: IVehicle,
+        soundId: net.minecraft.resources.ResourceLocation?,
+        volume: Float,
+        pitch: Float
+    ) {
+        soundId ?: return
+        val position = try {
+            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
+        } catch (_: IllegalStateException) {
+            return
+        }
+        minecraft.soundManager.play(
+            SimpleSoundInstance(
+                soundId,
+                SoundSource.NEUTRAL,
+                volume,
+                pitch,
                 SoundInstance.createUnseededRandom(),
                 false,
                 0,

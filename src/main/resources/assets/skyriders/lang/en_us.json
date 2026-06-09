@@ -13,5 +13,11 @@
   "skyriders.subtitle.bike_engine_stop": "Bike engine stops",
   "skyriders.subtitle.boost": "Boost pad activates",
   "skyriders.subtitle.kart_engine": "Kart engine revs",
-  "skyriders.subtitle.kart_drift": "Kart drifts"
+  "skyriders.subtitle.kart_drift": "Kart drifts",
+  "skyriders.subtitle.engine": "Vehicle engine revs",
+  "skyriders.subtitle.engine_start": "Vehicle engine starts",
+  "skyriders.subtitle.engine_stop": "Vehicle engine stops",
+  "skyriders.subtitle.gearshift": "Vehicle gear shifts",
+  "skyriders.subtitle.handbrake_engage": "Vehicle handbrake engages",
+  "skyriders.subtitle.handbrake_disengage": "Vehicle handbrake disengages"
 }

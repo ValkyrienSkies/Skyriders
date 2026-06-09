@@ -107,6 +107,87 @@ data class WheeledVehiclePhysicsConfig(
             stepAssistStrength = 6400.0,
             transmission = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
         )
+
+        val CAR = WheeledVehiclePhysicsConfig(
+            mass = 1180.0,
+            collisionBoxSize = Vector3d(1.75, 0.72, 3.25),
+            collisionBoxOffset = Vector3d(0.0, 0.34, -0.08),
+            axles = listOf(
+                WheelAxleConfig(
+                    id = "front",
+                    localZ = 1.25,
+                    halfTrackWidth = 0.74,
+                    localY = -0.22,
+                    wheelRadius = 0.34,
+                    wheelWidth = 0.24,
+                    driven = false,
+                    driveBias = 0.0,
+                    steerable = true,
+                    steerScale = 1.0,
+                    brakeBias = 0.58,
+                    suspensionRestLength = 0.34,
+                    suspensionTravel = 0.42,
+                    suspensionStrength = 62000.0,
+                    suspensionDamping = 7600.0,
+                    lateralGrip = 1.02,
+                    longitudinalGrip = 0.95,
+                    stepAssist = true
+                ),
+                WheelAxleConfig(
+                    id = "rear",
+                    localZ = -1.25,
+                    halfTrackWidth = 0.74,
+                    localY = -0.22,
+                    wheelRadius = 0.34,
+                    wheelWidth = 0.24,
+                    driven = true,
+                    driveBias = 1.0,
+                    steerable = false,
+                    brakeBias = 0.42,
+                    suspensionRestLength = 0.34,
+                    suspensionTravel = 0.42,
+                    suspensionStrength = 65000.0,
+                    suspensionDamping = 7900.0,
+                    lateralGrip = 0.98,
+                    longitudinalGrip = 1.08,
+                    stepAssist = true
+                )
+            ),
+            wheelSweepTime = 0.07,
+            wheelTopSpeed = 24.0,
+            maxSteerLowSpeedRad = Math.toRadians(31.0),
+            maxSteerHighSpeedRad = Math.toRadians(12.0),
+            steeringHighSpeedStart = 7.0,
+            steeringFullSpeed = 24.0,
+            steerSmoothingTime = 0.14,
+            tireFrictionCoefficient = 1.35,
+            lateralSlipShape = 0.25,
+            longitudinalSlipShape = 0.22,
+            motorResponse = 12.0,
+            brakeResponse = 26.0,
+            rollingResistance = 34.0,
+            uprightStrength = 19000.0,
+            uprightDamping = 3400.0,
+            yawAssist = 1450.0,
+            yawAssistMinSpeed = 1.0,
+            yawAssistMaxSpeed = 20.0,
+            groundNormalSmoothingTime = 0.16,
+            parkingBrakeStrength = 5.2,
+            maxStepHeight = 1.15,
+            stepAssistStrength = 8200.0,
+            transmission = VehicleTransmissionConfig(
+                automatic = false,
+                forwardGears = listOf(
+                    VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.75),
+                    VehicleTransmissionGearConfig(maxSpeed = 12.0, torqueMultiplier = 1.18),
+                    VehicleTransmissionGearConfig(maxSpeed = 18.0, torqueMultiplier = 0.84),
+                    VehicleTransmissionGearConfig(maxSpeed = 24.0, torqueMultiplier = 0.62)
+                ),
+                reverseTopSpeed = 6.0,
+                reverseTorqueMultiplier = 0.72,
+                shiftCooldownSeconds = 0.32
+            )
+        )
     }
 }
 
