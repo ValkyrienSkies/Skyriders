@@ -28,6 +28,11 @@ object KartDefinitions {
         driftYawAssist = 5200.0
     )
 
+    private val SPEEDSTER_PHYSICS = KART_PHYSICS.copy(
+        collisionBoxSize = Vector3d(1.5, 0.58, 1.72),
+        collisionBoxOffset = Vector3d(0.0, 0.3, -0.14)
+    )
+
     val DEBUG_KART = createKartDefinition(
         id = ResourceLocation(SkyridersMod.MOD_ID, "debug_kart"),
         displayName = "Debug Kart",
@@ -45,7 +50,7 @@ object KartDefinitions {
     val SPEEDSTER = createKartDefinition(
         id = ResourceLocation(SkyridersMod.MOD_ID, "speedster"),
         displayName = "Speedster",
-        physics = KART_PHYSICS,
+        physics = SPEEDSTER_PHYSICS,
         render = speedsterRender()
     )
 

@@ -22,6 +22,8 @@ object KartPhysicsSolver {
     private const val WHEEL_GROUND_DRAG = 0.04
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
     private const val PARKING_BRAKE_DEAD_SPEED = 0.025
+    private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
+    private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
 
     fun updateKartPhysics(
         body: PhysVsBody,
@@ -157,26 +159,41 @@ object KartPhysicsSolver {
         } else {
             listOf(Vector3d())
         }
-        val lateralOffsets = listOf(-config.wheelSampleWidth * 0.5, 0.0, config.wheelSampleWidth * 0.5)
+        val lateralOffsets = listOf(0.0, -config.wheelSampleWidth * 0.5, config.wheelSampleWidth * 0.5)
         val samples = lateralOffsets.flatMap { lateralOffset ->
             val base = Vector3d(mountWorld).fma(lateralOffset, wheelRight)
-            sweepSamples.map { sweep -> Vector3d(base).add(sweep) }
-        }
-        return samples
-            .map { samplePos ->
-                VehicleWheelPhysics.sampleRaycastWheel(
-                    body = body,
-                    physLevel = physLevel,
-                    mountWorld = samplePos,
-                    suspensionDirWorld = castDir,
-                    maxLength = maxLength,
-                    wheelForwardWorld = wheelForward,
-                    wheelRightWorld = wheelRight,
-                    groundedMaxDistance = groundedMaxDistance
+            sweepSamples.map { sweep ->
+                WheelSample(
+                    position = Vector3d(base).add(sweep),
+                    lateralOffset = abs(lateralOffset),
+                    sweepOffset = sweep.length()
                 )
             }
-            .filter(VehicleWheelContact::grounded)
-            .minByOrNull(VehicleWheelContact::hitDistance)
+        }
+        return samples
+            .map { sample ->
+                WheelSampleHit(
+                    contact = VehicleWheelPhysics.sampleRaycastWheel(
+                        body = body,
+                        physLevel = physLevel,
+                        mountWorld = sample.position,
+                        suspensionDirWorld = castDir,
+                        maxLength = maxLength,
+                        wheelForwardWorld = wheelForward,
+                        wheelRightWorld = wheelRight,
+                        groundedMaxDistance = groundedMaxDistance
+                    ),
+                    lateralOffset = sample.lateralOffset,
+                    sweepOffset = sample.sweepOffset
+                )
+            }
+            .filter { it.contact.grounded }
+            .minByOrNull { sample ->
+                sample.contact.hitDistance +
+                    sample.lateralOffset * LATERAL_SAMPLE_TIE_BREAK_BIAS +
+                    sample.sweepOffset * SWEEP_SAMPLE_TIE_BREAK_BIAS
+            }
+            ?.contact
             ?: VehicleWheelPhysics.sampleRaycastWheel(
                 body = body,
                 physLevel = physLevel,
@@ -985,5 +1002,17 @@ object KartPhysicsSolver {
     private data class StepOpportunity(
         val rise: Double,
         val approachDistance: Double
+    )
+
+    private data class WheelSample(
+        val position: Vector3d,
+        val lateralOffset: Double,
+        val sweepOffset: Double
+    )
+
+    private data class WheelSampleHit(
+        val contact: VehicleWheelContact,
+        val lateralOffset: Double,
+        val sweepOffset: Double
     )
 }
