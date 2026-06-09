@@ -61,10 +61,13 @@ class WheeledVehicle(
             putBoolean("engine_stalled", wheeledState.engineStalled)
             val wheelSpin = CompoundTag()
             val wheelAngularVelocity = CompoundTag()
+            val visualWheelAngularVelocity = CompoundTag()
             wheeledState.wheelSpinById.forEach { (id, value) -> wheelSpin.putDouble(id, value) }
             wheeledState.wheelAngularVelocityById.forEach { (id, value) -> wheelAngularVelocity.putDouble(id, value) }
+            wheeledState.visualWheelAngularVelocityById.forEach { (id, value) -> visualWheelAngularVelocity.putDouble(id, value) }
             put("wheel_spin_by_id", wheelSpin)
             put("wheel_angular_velocity_by_id", wheelAngularVelocity)
+            put("visual_wheel_angular_velocity_by_id", visualWheelAngularVelocity)
         },
         partStates = wheeledState.partStates
     )
@@ -97,5 +100,11 @@ fun wheeledRuntimeStateFromTag(
     wheelSpin.allKeys.forEach { key -> state.wheelSpinById[key] = wheelSpin.getDouble(key) }
     val wheelAngularVelocity = tag.getCompound("wheel_angular_velocity_by_id")
     wheelAngularVelocity.allKeys.forEach { key -> state.wheelAngularVelocityById[key] = wheelAngularVelocity.getDouble(key) }
+    val visualWheelAngularVelocity = tag.getCompound("visual_wheel_angular_velocity_by_id")
+    if (visualWheelAngularVelocity.isEmpty) {
+        wheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = wheelAngularVelocity.getDouble(key) }
+    } else {
+        visualWheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = visualWheelAngularVelocity.getDouble(key) }
+    }
     return state
 }

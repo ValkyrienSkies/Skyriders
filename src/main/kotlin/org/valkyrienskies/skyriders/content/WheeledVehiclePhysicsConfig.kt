@@ -302,6 +302,7 @@ data class WheeledVehicleRuntimeState(
     val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0),
     val wheelSpinById: MutableMap<String, Double> = HashMap(),
     val wheelAngularVelocityById: MutableMap<String, Double> = HashMap(),
+    val visualWheelAngularVelocityById: MutableMap<String, Double> = HashMap(),
     val wheelSuspensionOffsetById: MutableMap<String, Double> = HashMap(),
     val partStates: MutableMap<String, VehiclePartState> = HashMap(),
     var frontWheelSpin: Double = 0.0,

@@ -598,7 +598,13 @@ object WheeledVehiclePhysicsSolver {
 
             omega = omega.coerceIn(-maxOmega, maxOmega)
             state.wheelAngularVelocityById[loaded.wheel.id] = omega
-            state.wheelSpinById[loaded.wheel.id] = (state.wheelSpinById[loaded.wheel.id] ?: 0.0) + omega * stepDt
+            val visualOmega = if (loaded.contact.grounded) {
+                (groundSpeed / radius).coerceIn(-maxOmega, maxOmega)
+            } else {
+                omega
+            }
+            state.visualWheelAngularVelocityById[loaded.wheel.id] = visualOmega
+            state.wheelSpinById[loaded.wheel.id] = (state.wheelSpinById[loaded.wheel.id] ?: 0.0) + visualOmega * stepDt
             state.wheelSuspensionOffsetById[loaded.wheel.id] = visualSuspensionOffset(loaded)
         }
     }
@@ -871,8 +877,8 @@ object WheeledVehiclePhysicsSolver {
         val rearWheels = wheels.filter { it.axle.localZ == rearZ }
         state.frontWheelSpin = averageByWheel(frontWheels, state.wheelSpinById)
         state.rearWheelSpin = averageByWheel(rearWheels, state.wheelSpinById)
-        state.frontWheelAngularVelocity = averageByWheel(frontWheels, state.wheelAngularVelocityById)
-        state.rearWheelAngularVelocity = averageByWheel(rearWheels, state.wheelAngularVelocityById)
+        state.frontWheelAngularVelocity = averageByWheel(frontWheels, state.visualWheelAngularVelocityById)
+        state.rearWheelAngularVelocity = averageByWheel(rearWheels, state.visualWheelAngularVelocityById)
         state.frontWheelSuspensionOffset = averageByWheel(frontWheels, state.wheelSuspensionOffsetById)
         state.rearWheelSuspensionOffset = averageByWheel(rearWheels, state.wheelSuspensionOffsetById)
     }
