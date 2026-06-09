@@ -32,7 +32,8 @@ object VehicleHudOverlay {
 
     private val METER_BASE = HudTextureRegion(0, 0, 96, 96)
     private val METER_COUNTER_BACKGROUND = HudTextureRegion(96, 0, 23, 15)
-    private val METER_DIAL = HudTextureRegion(96, 96, 16, 32)
+    private val METER_DIAL = HudTextureRegion(108, 21, 4, 35)
+    private val METER_DIAL_PIVOT = HudTextureRegion(107, 16, 8, 4)
 
     /*
      * These atlas constants are intentionally easy to retarget after the actual
@@ -87,8 +88,8 @@ object VehicleHudOverlay {
         BooleanTextureWidget(12, 50, null, DASHBOARD_WARN_LIGHT) { it.parkingBrakeEngaged },
     )
     private val dashboardKeyWidget = ThreeStateTextureWidget(
-        x = 15,
-        y = 26,
+        x = 11,
+        y = 21,
         offRegion = DASHBOARD_KEY_OFF,
         onRegion = DASHBOARD_KEY_ON
     ) { VehicleHudKeyState.HIDDEN }
@@ -98,6 +99,7 @@ object VehicleHudOverlay {
 
     private val meters = listOf(
         RoundMeterWidget(
+            title = "spd",
             anchorOffsetX = -100,
             value = { snapshot -> snapshot.speed.coerceIn(0.0, 60.0) / 60.0 },
             counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
@@ -105,6 +107,7 @@ object VehicleHudOverlay {
             maxDegrees = 128.0f
         ),
         RoundMeterWidget(
+            title = "rev",
             anchorOffsetX = 4,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
             counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
@@ -185,7 +188,7 @@ object VehicleHudOverlay {
         val filledHeight = (height * fuel.coerceIn(0.0, 1.0)).roundToInt().coerceIn(0, height)
         if (filledHeight <= 0) return
         val filledY = y + height - filledHeight
-        guiGraphics.fill(x, filledY, x + width, y + height, 0xB0D13426.toInt())
+        guiGraphics.fill(x, filledY, x + width, y + height, 0xF7F4B626.toInt())
     }
 
     private fun drawRotatedRegion(
@@ -286,6 +289,7 @@ object VehicleHudOverlay {
     }
 
     private data class RoundMeterWidget(
+        val title: String = "",
         val anchorOffsetX: Int,
         val value: (VehicleHudSnapshot) -> Double,
         val counter: (VehicleHudSnapshot) -> String,
@@ -308,7 +312,16 @@ object VehicleHudOverlay {
                 pivotY = y + 48.0,
                 degrees = degrees
             )
-            guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x + 36, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
+            guiGraphics.blitRegion(METER_TEXTURE, METER_DIAL_PIVOT, x + 40, y + 16, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
+
+            //tag
+            if (title.isNotBlank()) {
+                guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x - 6, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
+                METER_ATLAS.renderText(guiGraphics, x - 4, y + 72, title, maxLength = 3, characterSpacing = 1)
+            }
+
+            //counter
+            guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x + 90, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
             METER_ATLAS.renderText(guiGraphics, x + 39, y + 72, counter(snapshot), maxLength = 3, characterSpacing = 1)
         }
     }
