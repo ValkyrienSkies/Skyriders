@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Quaterniond
 import org.joml.Vector3d
 import kotlin.math.max
 
@@ -11,7 +12,14 @@ object VehicleInteractionPicker {
         return VehicleManager.getVehicles(level)
             .asSequence()
             .flatMap { vehicle -> hitVehicleInteractionZones(vehicle, start, end).asSequence() }
-            .minByOrNull(VehicleRayHit::distanceSqr)
+            .groupBy { it.vehicle.bodyId }
+            .values
+            .asSequence()
+            .mapNotNull(::selectBestZoneHit)
+            .minWithOrNull(
+                compareBy<VehicleRayHit> { it.vehicleDistanceSqr }
+                    .thenBy { it.distanceSqr }
+            )
     }
 
     fun hitVehicleInteractionZones(vehicle: IVehicle, start: Vec3, end: Vec3): List<VehicleRayHit> {
@@ -37,8 +45,10 @@ object VehicleInteractionPicker {
         start: Vec3,
         end: Vec3
     ): VehicleRayHit? {
+        val startLocal = worldToLocal(transform, start)
+        val endLocal = worldToLocal(transform, end)
+        val center = zone.center
         val body = vehicle.vehicleDefinition.body
-        val center = transform.toWorld.transformPosition(Vector3d(zone.center))
         val halfX = max(zone.size.x * 0.5, body.collisionBoxSize.x * 0.25)
         val halfY = zone.size.y * 0.5
         val halfZ = zone.size.z * 0.5
@@ -50,8 +60,41 @@ object VehicleInteractionPicker {
             center.y + halfY,
             center.z + halfZ
         )
-        val hit = aabb.clip(start, end).orElse(null) ?: return null
-        return VehicleRayHit(vehicle, zone, hit.distanceToSqr(start))
+        val hitLocal = aabb.clip(startLocal, endLocal).orElse(null) ?: return null
+        val distanceSqr = hitLocal.distanceToSqr(startLocal)
+        return VehicleRayHit(vehicle, zone, distanceSqr, distanceSqr)
+    }
+
+    private fun worldToLocal(
+        transform: org.valkyrienskies.core.api.bodies.properties.BodyTransform,
+        world: Vec3
+    ): Vec3 {
+        val local = Vector3d(
+            world.x - transform.position.x(),
+            world.y - transform.position.y(),
+            world.z - transform.position.z()
+        )
+        Quaterniond(transform.rotation).invert().transform(local)
+        return Vec3(local.x, local.y, local.z)
+    }
+
+    private fun selectBestZoneHit(hits: List<VehicleRayHit>): VehicleRayHit? {
+        if (hits.isEmpty()) return null
+        val vehicleDistanceSqr = hits.minOf(VehicleRayHit::distanceSqr)
+        val best = hits.minWithOrNull(
+            compareByDescending<VehicleRayHit> { interactionPriority(it.zone) }
+                .thenBy { it.distanceSqr }
+        ) ?: return null
+        return best.copy(vehicleDistanceSqr = vehicleDistanceSqr)
+    }
+
+    private fun interactionPriority(zone: VehicleInteractionZone): Int {
+        return when {
+            VehicleInteractionAction.MOUNT in zone.actions -> 30
+            VehicleInteractionAction.ENGINE_TOGGLE in zone.actions -> 20
+            VehicleInteractionAction.PICK_UP in zone.actions -> 10
+            else -> 0
+        }
     }
 
     private fun fallbackBodyZone(definition: VehicleDefinition): VehicleInteractionZone {
@@ -72,5 +115,6 @@ object VehicleInteractionPicker {
 data class VehicleRayHit(
     val vehicle: IVehicle,
     val zone: VehicleInteractionZone,
-    val distanceSqr: Double
+    val distanceSqr: Double,
+    val vehicleDistanceSqr: Double = distanceSqr
 )
