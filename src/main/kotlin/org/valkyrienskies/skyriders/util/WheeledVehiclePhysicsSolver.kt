@@ -48,12 +48,10 @@ object WheeledVehiclePhysicsSolver {
         val grounded = contacts.filter { it.contact.grounded }
         if (grounded.isNotEmpty()) {
             state.groundedGraceTimeRemaining = config.groundedGraceTime
-            smoothGroundNormal(state, contacts, forward, right, dt, config)
         } else {
             state.groundedGraceTimeRemaining = max(0.0, state.groundedGraceTimeRemaining - dt)
         }
         val stabilizedGrounded = grounded.isNotEmpty() || state.groundedGraceTimeRemaining > 0.0
-        val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
 
         val loaded = contacts.map { contactState ->
             LoadedWheelContact(
@@ -62,6 +60,10 @@ object WheeledVehiclePhysicsSolver {
                 normalForce = applySuspension(body, contactState, config)
             )
         }
+        if (grounded.isNotEmpty()) {
+            smoothGroundNormal(state, loaded, forward, right, dt, config)
+        }
+        val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
 
         loaded.forEach { applyLateralGrip(body, it, config) }
         if (activeInput.riderPresent) {
@@ -408,7 +410,7 @@ object WheeledVehiclePhysicsSolver {
 
     private fun smoothGroundNormal(
         state: WheeledVehicleRuntimeState,
-        contacts: List<WheelContactState>,
+        contacts: List<LoadedWheelContact>,
         bodyForward: Vector3d,
         bodyRight: Vector3d,
         dt: Double,
@@ -417,7 +419,11 @@ object WheeledVehiclePhysicsSolver {
         val grounded = contacts.filter { it.contact.grounded }
         if (grounded.isEmpty()) return
         val normalAverage = Vector3d()
-        grounded.forEach { normalAverage.add(it.contact.contactNormalWorld) }
+        val loadBearing = grounded.filter { it.normalForce > 1.0e-4 }
+        val normalContacts = loadBearing.ifEmpty { grounded }
+        normalContacts.forEach { contact ->
+            normalAverage.fma(contact.supportWeight(), contact.contact.contactNormalWorld)
+        }
         var rawNormal = VehiclePhysicsMath.safeNormalize(normalAverage, state.smoothedGroundNormal)
         computeSupportGroundNormal(contacts, bodyForward, bodyRight, rawNormal)?.let { supportNormal ->
             rawNormal = VehiclePhysicsMath.safeNormalize(Vector3d(rawNormal).mul(0.7).fma(0.3, supportNormal), rawNormal)
@@ -428,21 +434,29 @@ object WheeledVehiclePhysicsSolver {
     }
 
     private fun computeSupportGroundNormal(
-        contacts: List<WheelContactState>,
+        contacts: List<LoadedWheelContact>,
         bodyForward: Vector3d,
         bodyRight: Vector3d,
         fallbackNormal: Vector3d
     ): Vector3d? {
-        val hitContacts = contacts.filter { it.contact.hitBody != null && VehiclePhysicsMath.isFinite(it.contact.contactPointWorld) }
+        val hitContacts = contacts
+            .filter { it.normalForce > 1.0e-4 }
+            .filter { it.contact.hitBody != null && VehiclePhysicsMath.isFinite(it.contact.contactPointWorld) }
         if (hitContacts.size < 3) return null
         val terrainForward = VehiclePhysicsMath.projectOntoPlane(bodyForward, fallbackNormal, bodyForward)
         val stableRight = VehiclePhysicsMath.safeNormalize(Vector3d(fallbackNormal).cross(terrainForward), bodyRight)
-        val front = hitContacts.maxByOrNull { it.wheel.axle.localZ } ?: return null
-        val rear = hitContacts.minByOrNull { it.wheel.axle.localZ } ?: return null
-        val left = hitContacts.minByOrNull { it.wheel.side } ?: return null
-        val right = hitContacts.maxByOrNull { it.wheel.side } ?: return null
-        val forwardSpan = Vector3d(front.contact.contactPointWorld).sub(rear.contact.contactPointWorld)
-        val rightSpan = Vector3d(right.contact.contactPointWorld).sub(left.contact.contactPointWorld)
+        val frontZ = hitContacts.maxOf { it.wheel.axle.localZ }
+        val rearZ = hitContacts.minOf { it.wheel.axle.localZ }
+        val front = weightedAveragePoint(hitContacts.filter { it.wheel.axle.localZ == frontZ }) ?: return null
+        val rear = weightedAveragePoint(hitContacts.filter { it.wheel.axle.localZ == rearZ }) ?: return null
+        val left = weightedAveragePoint(hitContacts.filter { it.wheel.side < 0.0 })
+        val right = weightedAveragePoint(hitContacts.filter { it.wheel.side > 0.0 })
+        val forwardSpan = Vector3d(front).sub(rear)
+        val rightSpan = if (left != null && right != null) {
+            Vector3d(right).sub(left)
+        } else {
+            Vector3d(stableRight)
+        }
         if (forwardSpan.lengthSquared() < 1.0e-6) return null
         if (rightSpan.lengthSquared() < 1.0e-6) rightSpan.set(stableRight)
         val support = Vector3d(forwardSpan).cross(rightSpan)
@@ -450,6 +464,21 @@ object WheeledVehiclePhysicsSolver {
         if (VehiclePhysicsMath.safeDot(support, fallbackNormal) < 0.0) support.negate()
         val normal = VehiclePhysicsMath.safeNormalize(support, fallbackNormal)
         return normal.takeIf { VehiclePhysicsMath.safeDot(it, fallbackNormal) > 0.48 }
+    }
+
+    private fun weightedAveragePoint(contacts: List<LoadedWheelContact>): Vector3d? {
+        if (contacts.isEmpty()) return null
+        val totalWeight = contacts.sumOf { it.supportWeight() }
+        if (!totalWeight.isFinite() || totalWeight <= 1.0e-6) return null
+        val point = Vector3d()
+        contacts.forEach { contact ->
+            point.fma(contact.supportWeight(), contact.contact.contactPointWorld)
+        }
+        return point.div(totalWeight)
+    }
+
+    private fun LoadedWheelContact.supportWeight(): Double {
+        return normalForce.takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
     }
 
     private fun updateSteerAngle(
