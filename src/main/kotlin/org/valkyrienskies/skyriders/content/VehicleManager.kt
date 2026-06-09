@@ -21,6 +21,8 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.mod.common.vsCore
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
+import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
+import org.valkyrienskies.skyriders.content.vehicles.wheeledRuntimeStateFromTag
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -170,6 +172,12 @@ object VehicleManager {
                     rearWheelAngularVelocity = record.behaviorTag.getDouble("rear_wheel_angular_velocity")
                 )
             )
+            is WheeledVehicleBehaviorDefinition -> WheeledVehicle(
+                bodyId = bodyId,
+                level = level,
+                vehicleDefinition = definition,
+                wheeledState = wheeledRuntimeStateFromTag(record.behaviorTag, record.engineOn)
+            )
             is BikeVehicleBehaviorDefinition -> throw IllegalArgumentException("Bike vehicles are created through BikeManager")
         }
     }
@@ -241,6 +249,7 @@ object VehicleManager {
         val enabled = !vehicle.vehicleState.engineOn
         when (vehicle) {
             is KartVehicle -> vehicle.kartState.engineOn = enabled
+            is WheeledVehicle -> vehicle.wheeledState.engineOn = enabled
         }
         if (!enabled) {
             clearInput(level.dimensionId, bodyId)
@@ -326,6 +335,14 @@ object VehicleManager {
                 vehicle.kartState.rearWheelAngularVelocity = rearWheelAngularVelocity
                 vehicle.kartState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
                 vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+            }
+            is WheeledVehicle -> {
+                vehicle.wheeledState.frontWheelSpin = frontWheelSpin
+                vehicle.wheeledState.rearWheelSpin = rearWheelSpin
+                vehicle.wheeledState.frontWheelAngularVelocity = frontWheelAngularVelocity
+                vehicle.wheeledState.rearWheelAngularVelocity = rearWheelAngularVelocity
+                vehicle.wheeledState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+                vehicle.wheeledState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
         }
     }

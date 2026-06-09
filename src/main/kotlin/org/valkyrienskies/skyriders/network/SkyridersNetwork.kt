@@ -29,6 +29,7 @@ import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
 import java.util.function.Supplier
+import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 
 object SkyridersNetwork {
     private const val PROTOCOL_VERSION = "1"
@@ -182,6 +183,7 @@ object SkyridersNetwork {
         }
         val groundedCount = when (vehicle) {
             is KartVehicle -> vehicle.kartState.debugGroundedWheels
+            is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
             is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
             else -> -1
         }
@@ -202,15 +204,18 @@ object SkyridersNetwork {
         }
         val lateralSlip = when (vehicle) {
             is KartVehicle -> vehicle.kartState.debugLateralSlip
+            is WheeledVehicle -> vehicle.wheeledState.debugLateralSlip
             else -> 0.0
         }
         val forwardSpeed = when (vehicle) {
             is KartVehicle -> vehicle.kartState.debugForwardSpeed
+            is WheeledVehicle -> vehicle.wheeledState.debugForwardSpeed
             is IBike -> vehicle.state.debugSpeed
             else -> speed
         }
         val steerAngleRad = when (vehicle) {
             is KartVehicle -> vehicle.kartState.debugSteerRad
+            is WheeledVehicle -> vehicle.wheeledState.debugSteerRad
             is IBike -> vehicle.state.debugSteeringAngleRad
             else -> 0.0
         }
@@ -221,31 +226,37 @@ object SkyridersNetwork {
         }
         val frontWheelSpin = when (vehicle) {
             is KartVehicle -> vehicle.kartState.frontWheelSpin
+            is WheeledVehicle -> vehicle.wheeledState.frontWheelSpin
             is IBike -> vehicle.state.frontWheelSpin
             else -> 0.0
         }
         val rearWheelSpin = when (vehicle) {
             is KartVehicle -> vehicle.kartState.rearWheelSpin
+            is WheeledVehicle -> vehicle.wheeledState.rearWheelSpin
             is IBike -> vehicle.state.rearWheelSpin
             else -> 0.0
         }
         val frontWheelAngularVelocity = when (vehicle) {
             is KartVehicle -> vehicle.kartState.frontWheelAngularVelocity
+            is WheeledVehicle -> vehicle.wheeledState.frontWheelAngularVelocity
             is IBike -> vehicle.state.frontWheelAngularVelocity
             else -> 0.0
         }
         val rearWheelAngularVelocity = when (vehicle) {
             is KartVehicle -> vehicle.kartState.rearWheelAngularVelocity
+            is WheeledVehicle -> vehicle.wheeledState.rearWheelAngularVelocity
             is IBike -> vehicle.state.rearWheelAngularVelocity
             else -> 0.0
         }
         val frontWheelSuspensionOffset = when (vehicle) {
             is KartVehicle -> vehicle.kartState.frontWheelSuspensionOffset
+            is WheeledVehicle -> vehicle.wheeledState.frontWheelSuspensionOffset
             is IBike -> vehicle.state.frontWheelSuspensionOffset
             else -> 0.0
         }
         val rearWheelSuspensionOffset = when (vehicle) {
             is KartVehicle -> vehicle.kartState.rearWheelSuspensionOffset
+            is WheeledVehicle -> vehicle.wheeledState.rearWheelSuspensionOffset
             is IBike -> vehicle.state.rearWheelSuspensionOffset
             else -> 0.0
         }
@@ -305,6 +316,18 @@ object SkyridersNetwork {
             when (vehicle) {
                 is KartVehicle -> {
                     val state = vehicle.kartState
+                    VehicleVisualState(
+                        bodyId = vehicle.bodyId,
+                        frontWheelSpin = state.frontWheelSpin,
+                        rearWheelSpin = state.rearWheelSpin,
+                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                    )
+                }
+                is WheeledVehicle -> {
+                    val state = vehicle.wheeledState
                     VehicleVisualState(
                         bodyId = vehicle.bodyId,
                         frontWheelSpin = state.frontWheelSpin,

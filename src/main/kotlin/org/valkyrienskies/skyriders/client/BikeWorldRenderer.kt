@@ -21,6 +21,7 @@ import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
+import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import kotlin.math.exp
 
 object BikeWorldRenderer {
@@ -104,6 +105,7 @@ object BikeWorldRenderer {
                 .takeUnless { it === missingModel }
             val bike = vehicle as? IBike
             val kart = vehicle as? KartVehicle
+            val wheeled = vehicle as? WheeledVehicle
             renderWheelPart(
                 poseStack = poseStack,
                 bufferSource = bufferSource,
@@ -114,6 +116,7 @@ object BikeWorldRenderer {
                 steerRad = when (wheelPart.steerSource) {
                     VehicleWheelSteerSource.FRONT -> bike?.state?.visualSteerRad
                         ?: kart?.kartState?.debugSteerRad
+                        ?: wheeled?.wheeledState?.debugSteerRad
                         ?: 0.0
                     VehicleWheelSteerSource.NONE -> 0.0
                 },
@@ -190,6 +193,7 @@ object BikeWorldRenderer {
         return when (vehicle) {
             is IBike -> WheelPair(vehicle.state.frontWheelSpin, vehicle.state.rearWheelSpin)
             is KartVehicle -> WheelPair(vehicle.kartState.frontWheelSpin, vehicle.kartState.rearWheelSpin)
+            is WheeledVehicle -> WheelPair(vehicle.wheeledState.frontWheelSpin, vehicle.wheeledState.rearWheelSpin)
             else -> WheelPair(0.0, 0.0)
         }
     }
@@ -198,6 +202,7 @@ object BikeWorldRenderer {
         return when (vehicle) {
             is IBike -> WheelPair(vehicle.state.frontWheelSuspensionOffset, vehicle.state.rearWheelSuspensionOffset)
             is KartVehicle -> WheelPair(vehicle.kartState.frontWheelSuspensionOffset, vehicle.kartState.rearWheelSuspensionOffset)
+            is WheeledVehicle -> WheelPair(vehicle.wheeledState.frontWheelSuspensionOffset, vehicle.wheeledState.rearWheelSuspensionOffset)
             else -> WheelPair(0.0, 0.0)
         }
     }

@@ -122,6 +122,12 @@ object BoostPadHandler {
                 Vector3d(behavior.physics.rearWheelLocalPos)
             )
             is KartVehicleBehaviorDefinition -> behavior.physics.wheelLocalPositions.map(::Vector3d)
+            is WheeledVehicleBehaviorDefinition -> behavior.physics.axles.flatMap { axle ->
+                listOf(
+                    Vector3d(-axle.halfTrackWidth, axle.localY, axle.localZ),
+                    Vector3d(axle.halfTrackWidth, axle.localY, axle.localZ)
+                )
+            }
         }
     }
 
@@ -131,6 +137,12 @@ object BoostPadHandler {
                 behavior.physics.suspensionRestLength + behavior.physics.suspensionTravel + behavior.physics.wheelRadius + 0.3
             is KartVehicleBehaviorDefinition ->
                 behavior.physics.suspensionRestLength + behavior.physics.suspensionTravel + behavior.physics.wheelRadius + 0.3
+            is WheeledVehicleBehaviorDefinition -> {
+                val maxReach = behavior.physics.axles.maxOf { axle ->
+                    axle.suspensionRestLength + axle.suspensionTravel + axle.wheelRadius
+                }
+                maxReach + 0.3
+            }
         }.coerceAtLeast(0.5)
     }
 
