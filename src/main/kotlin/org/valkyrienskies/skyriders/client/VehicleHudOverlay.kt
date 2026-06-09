@@ -9,6 +9,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -40,6 +41,8 @@ object VehicleHudOverlay {
     private const val STEERING_VISUAL_DAMPING = 17.0
     private const val METER_WIDGET_PIVOT_X = 48.0
     private const val METER_WIDGET_PIVOT_Y = 48.0
+    private const val METER_SMOOTH_THRESHOLD = 0.25
+    private const val METER_SMOOTH_RESPONSE = 22.0
 
     /*
      * These atlas constants are intentionally easy to retarget after the actual
@@ -135,6 +138,7 @@ object VehicleHudOverlay {
     private var lastRenderMillis = 0L
     private var visualSteeringDegrees = 0.0
     private var visualSteeringVelocityDegrees = 0.0
+    private val visualMeterValues = HashMap<String, Double>()
 
     fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
         snapshot = VehicleHudSnapshot(
@@ -176,7 +180,7 @@ object VehicleHudOverlay {
         val dt = consumeRenderDt()
 
         renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
-        renderMeters(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current)
+        renderMeters(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
     }
 
     private fun renderDashboard(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
@@ -204,12 +208,12 @@ object VehicleHudOverlay {
         dashboardFuelCounter.render(guiGraphics, x, y, (snapshot.fuel * 100.0).roundToInt().coerceIn(0, 999).toString())
     }
 
-    private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot) {
+    private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
         val y = screenHeight - METER_BASE.height
         var currentIndex = 1
         meters.forEach { meter ->
             if (meter.isVisible(snapshot)) {
-                meter.render(guiGraphics, screenWidth + (meter.anchorOffsetX * currentIndex), y, snapshot)
+                meter.render(guiGraphics, screenWidth + (meter.anchorOffsetX * currentIndex), y, snapshot, dt)
                 currentIndex++
             }
         }
@@ -227,6 +231,7 @@ object VehicleHudOverlay {
         lastRenderMillis = 0L
         visualSteeringDegrees = 0.0
         visualSteeringVelocityDegrees = 0.0
+        visualMeterValues.clear()
     }
 
     private fun updateVisualSteeringDegrees(steer: Double, dt: Double): Double {
@@ -294,6 +299,21 @@ object VehicleHudOverlay {
     private fun positiveModulo(value: Double, modulus: Double): Double {
         val result = value % modulus
         return if (result < 0.0) result + modulus else result
+    }
+
+    private fun updateVisualMeterValue(key: String, target: Double, dt: Double): Double {
+        val clampedTarget = target.coerceIn(0.0, 1.0)
+        val current = visualMeterValues[key] ?: clampedTarget
+        val delta = clampedTarget - current
+        val next = if (kotlin.math.abs(delta) >= METER_SMOOTH_THRESHOLD) {
+            val alpha = 1.0 - exp(-dt.coerceIn(0.0, 0.1) * METER_SMOOTH_RESPONSE)
+            current + delta * alpha
+        } else {
+            clampedTarget
+        }
+        val clampedNext = next.coerceIn(0.0, 1.0)
+        visualMeterValues[key] = clampedNext
+        return clampedNext
     }
 
     private fun drawRotatedRegion(
@@ -419,9 +439,9 @@ object VehicleHudOverlay {
             }
         }
 
-        fun render(guiGraphics: GuiGraphics, x: Int, y: Int, snapshot: VehicleHudSnapshot) {
+        fun render(guiGraphics: GuiGraphics, x: Int, y: Int, snapshot: VehicleHudSnapshot, dt: Double) {
             guiGraphics.blitRegion(METER_TEXTURE, METER_BASE, x, y, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
-            val t = value(snapshot).coerceIn(0.0, 1.0)
+            val t = updateVisualMeterValue(title.ifBlank { anchorOffsetX.toString() }, value(snapshot), dt)
             val degrees = minDegrees + ((maxDegrees - minDegrees) * t).toFloat()
             val pivotScreenX = x + METER_WIDGET_PIVOT_X
             val pivotScreenY = y + METER_WIDGET_PIVOT_Y
