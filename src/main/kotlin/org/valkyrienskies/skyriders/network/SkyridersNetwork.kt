@@ -17,6 +17,7 @@ import org.valkyrienskies.skyriders.client.BikeClientEffects
 import org.valkyrienskies.skyriders.client.BikeClientHoistState
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
+import org.valkyrienskies.skyriders.client.VehicleHudOverlay
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
@@ -803,6 +804,7 @@ object SkyridersNetwork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
                     Runnable {
                         BikeDebugOverlay.updateVehicle(this)
+                        VehicleHudOverlay.updateVehicle(this)
                         BikeClientEffects.updateVehicleTelemetry(this)
                         val level = net.minecraft.client.Minecraft.getInstance().level ?: return@Runnable
                         VehicleManager.applyVisualWheelState(
