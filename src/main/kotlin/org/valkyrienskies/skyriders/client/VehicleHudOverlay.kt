@@ -91,6 +91,7 @@ object VehicleHudOverlay {
         BooleanTextureWidget(12, 36, null, DASHBOARD_LIGHT) { it.engineOn },
         BooleanTextureWidget(18, 37, null, DASHBOARD_SMALL_LIGHT) { it.engineStalled },
         BooleanTextureWidget(12, 50, null, DASHBOARD_WARN_LIGHT) { it.parkingBrakeEngaged },
+        BooleanTextureWidget(154, 51, null, DASHBOARD_WARN_LIGHT) { it.fuel <= 0.25 }
     )
     private val dashboardKeyWidget = ThreeStateTextureWidget(
         x = 11,
