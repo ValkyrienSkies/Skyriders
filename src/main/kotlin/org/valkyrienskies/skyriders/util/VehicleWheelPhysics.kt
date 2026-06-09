@@ -19,6 +19,8 @@ data class VehicleWheelContact(
 )
 
 object VehicleWheelPhysics {
+    private const val MIN_GROUND_NORMAL_ALIGNMENT = 0.28
+
     fun sampleRaycastWheel(
         body: PhysVsBody,
         physLevel: PhysLevel,
@@ -48,12 +50,15 @@ object VehicleWheelPhysics {
         }
 
         val contactPoint = Vector3d(mountWorld).fma(hit.distance, suspensionDir)
-        val loaded = hit.distance <= groundedMaxDistance
+        val contactNormal = VehiclePhysicsMath.safeNormalize(hit.hitNormal, Vector3d(suspensionDir).negate())
+        val suspensionUp = Vector3d(suspensionDir).negate()
+        val loaded = hit.distance <= groundedMaxDistance &&
+            VehiclePhysicsMath.safeDot(contactNormal, suspensionUp) >= MIN_GROUND_NORMAL_ALIGNMENT
         return VehicleWheelContact(
             grounded = loaded,
             hitBody = hit.hitBody,
             contactPointWorld = contactPoint,
-            contactNormalWorld = VehiclePhysicsMath.safeNormalize(hit.hitNormal, Vector3d(suspensionDir).negate()),
+            contactNormalWorld = contactNormal,
             suspensionDirWorld = suspensionDir,
             hitDistance = hit.distance,
             compressionDistance = (maxLength - hit.distance).coerceAtLeast(0.0),

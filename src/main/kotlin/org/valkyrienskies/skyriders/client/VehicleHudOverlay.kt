@@ -174,10 +174,10 @@ object VehicleHudOverlay {
         }
         val current = snapshot ?: return
         if (current.bodyId != seat.bodyId) return
-        if (System.currentTimeMillis() - current.receivedAtMillis > STALE_AFTER_MILLIS) {
-            resetVisualState()
-            return
-        }
+//        if (System.currentTimeMillis() - current.receivedAtMillis > STALE_AFTER_MILLIS) {
+//            resetVisualState()
+//            return
+//        }
         val dt = consumeRenderDt()
 
         renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
@@ -293,8 +293,8 @@ object VehicleHudOverlay {
         }
         val sparkleCycle = positiveModulo(time * 0.9, 1.0)
         if (sparkleCycle < 0.45) {
-            val sparkleX = x + (width * 0.72).roundToInt()
-            val sparkleY = filledY + (filledHeight * 0.42).roundToInt()
+            val sparkleX = x + (width * (0.66 + sin(time * 0.73) * 0.08)).roundToInt()
+            val sparkleY = filledY + (filledHeight * (0.36 + sin(time * 1.11 + 1.7) * 0.12)).roundToInt()
             guiGraphics.fill(sparkleX, sparkleY, sparkleX + 1, sparkleY + 1, 0xFFFFFFFF.toInt())
             guiGraphics.fill(sparkleX - 1, sparkleY + 1, sparkleX + 2, sparkleY + 2, 0x99FFF2A4.toInt())
         }

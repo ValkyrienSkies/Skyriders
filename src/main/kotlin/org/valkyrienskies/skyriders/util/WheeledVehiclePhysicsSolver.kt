@@ -25,6 +25,7 @@ object WheeledVehiclePhysicsSolver {
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
     private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
     private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
+    private const val MIN_STEP_ASSIST_RISE = 0.35
 
     fun updatePhysics(
         body: PhysVsBody,
@@ -714,7 +715,7 @@ object WheeledVehiclePhysicsSolver {
                 if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
                 val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
                 val rise = VehiclePhysicsMath.safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
-                if (rise < 0.05 || rise > config.maxStepHeight + axle.wheelRadius * 0.25) return@mapNotNull null
+                if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + axle.wheelRadius * 0.25) return@mapNotNull null
                 if (VehiclePhysicsMath.safeDot(topHit.hitNormal, terrainUp) < 0.48) return@mapNotNull null
                 StepOpportunity(rise, distance)
             }

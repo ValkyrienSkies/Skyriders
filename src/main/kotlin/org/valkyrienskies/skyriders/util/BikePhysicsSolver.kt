@@ -31,6 +31,7 @@ object BikePhysicsSolver {
     private const val WHEEL_GROUND_DRAG = 0.04
     private const val WHEEL_INERTIA_MASS_SCALE = 0.018
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
+    private const val MIN_STEP_ASSIST_RISE = 0.35
 
     fun updateBikePhysics(
         body: PhysVsBody,
@@ -946,7 +947,7 @@ object BikePhysicsSolver {
                 val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
                 val rise = safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
                 val normalDot = safeDot(topHit.hitNormal, terrainUp)
-                if (rise < 0.05 || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
+                if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
                 if (normalDot < 0.48) return@mapNotNull null
 
                 StepOpportunity(rise = rise, approachDistance = forwardDistance)

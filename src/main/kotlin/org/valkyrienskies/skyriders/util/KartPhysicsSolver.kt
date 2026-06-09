@@ -24,6 +24,7 @@ object KartPhysicsSolver {
     private const val PARKING_BRAKE_DEAD_SPEED = 0.025
     private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
     private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
+    private const val MIN_STEP_ASSIST_RISE = 0.35
 
     fun updateKartPhysics(
         body: PhysVsBody,
@@ -629,7 +630,7 @@ object KartPhysicsSolver {
                 val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
                 val rise = VehiclePhysicsMath.safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
                 val normalDot = VehiclePhysicsMath.safeDot(topHit.hitNormal, terrainUp)
-                if (rise < 0.05 || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
+                if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
                 if (normalDot < 0.48) return@mapNotNull null
 
                 StepOpportunity(rise = rise, approachDistance = forwardDistance)
