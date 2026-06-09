@@ -108,7 +108,7 @@ object VehicleHudOverlay {
         RoundMeterWidget(
             title = "5pd",
             anchorOffsetX = -108,
-            value = { snapshot -> snapshot.speed.coerceIn(0.0, 60.0) / 60.0 },
+            value = { snapshot -> snapshot.speed.coerceIn(0.0, snapshot.maxSpeed) / snapshot.maxSpeed },
             counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -145.0f,
             maxDegrees = 145.0f
@@ -117,7 +117,7 @@ object VehicleHudOverlay {
             title = "rev",
             anchorOffsetX = -108,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
-            counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
+            counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -145.0f,
             maxDegrees = 148.0f
         ),
@@ -125,7 +125,7 @@ object VehicleHudOverlay {
             title = "5u5",
             anchorOffsetX = -108,
             value = { snapshot -> snapshot.jumpCharge.coerceIn(0.0, 1.0) },
-            counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
+            counter = { snapshot -> (snapshot.jumpCharge * 100.0).roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -145.0f,
             maxDegrees = 148.0f
         )
