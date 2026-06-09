@@ -75,7 +75,7 @@ object WheeledVehiclePhysicsSolver {
             }
             if (stabilizedGrounded) {
                 applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
-                loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, activeInput, config) }
+                loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config) }
             }
         } else {
             if (state.parkingBrakeEngaged) {
@@ -428,17 +428,18 @@ object WheeledVehiclePhysicsSolver {
         loaded: LoadedWheelContact,
         forward: Vector3d,
         terrainUp: Vector3d,
-        input: VehicleInput,
+        driveCommand: DriveCommand,
         config: WheeledVehiclePhysicsConfig
     ) {
         val contact = loaded.contact
         val axle = loaded.wheel.axle
         if (!axle.stepAssist || !contact.grounded || config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
-        val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
+        val driveDirection = driveCommand.throttle.coerceIn(-1.0, 1.0)
+        val terrainForward = computeStepApproachDirection(body, forward, terrainUp, driveDirection)
         if (terrainForward.lengthSquared() < 1.0e-6) return
         val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
-        val throttleIntoStep = max(0.0, input.throttle.coerceIn(-1.0, 1.0) * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
+        val throttleIntoStep = max(0.0, driveDirection * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
         val crawlAmount = throttleIntoStep * (1.0 - smoothstep(0.8, 3.5, speedIntoStep))
         val effectiveSpeed = max(speedIntoStep, crawlAmount * 1.8)
         if (effectiveSpeed < 0.35) return
