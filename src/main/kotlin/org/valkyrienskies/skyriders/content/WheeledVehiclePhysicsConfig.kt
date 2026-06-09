@@ -101,7 +101,7 @@ data class WheeledVehiclePhysicsConfig(
             yawAssist = 2100.0,
             yawAssistMinSpeed = 0.7,
             yawAssistMaxSpeed = 15.0,
-            maxStepHeight = 0.9,
+            maxStepHeight = 1.5,
             stepAssistStrength = 6400.0
         )
     }
