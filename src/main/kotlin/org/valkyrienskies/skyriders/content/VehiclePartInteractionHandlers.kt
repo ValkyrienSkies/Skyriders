@@ -15,17 +15,17 @@ object VehiclePartInteractionHandlers {
     private val handlers = ConcurrentHashMap<ResourceLocation, VehiclePartInteractionHandler>()
 
     init {
-        register(VehicleInteractionActions.TOGGLE) { player, vehicle, zone, _ ->
-            setOpenState(player, vehicle, zone, null)
+        register(VehicleInteractionActions.TOGGLE) { player, vehicle, zone, action ->
+            setOpenState(player, vehicle, zone, action, null)
         }
-        register(VehicleInteractionActions.OPEN) { player, vehicle, zone, _ ->
-            setOpenState(player, vehicle, zone, true)
+        register(VehicleInteractionActions.OPEN) { player, vehicle, zone, action ->
+            setOpenState(player, vehicle, zone, action, true)
         }
-        register(VehicleInteractionActions.CLOSE) { player, vehicle, zone, _ ->
-            setOpenState(player, vehicle, zone, false)
+        register(VehicleInteractionActions.CLOSE) { player, vehicle, zone, action ->
+            setOpenState(player, vehicle, zone, action, false)
         }
-        register(VehicleInteractionActions.OPEN_DOOR) { player, vehicle, zone, _ ->
-            setOpenState(player, vehicle, zone, null)
+        register(VehicleInteractionActions.OPEN_DOOR) { player, vehicle, zone, action ->
+            setOpenState(player, vehicle, zone, action, null)
         }
     }
 
@@ -44,6 +44,7 @@ object VehiclePartInteractionHandlers {
         player: ServerPlayer,
         vehicle: IVehicle,
         zone: VehicleInteractionZone,
+        requestedAction: ResourceLocation,
         forcedOpen: Boolean?
     ): Boolean {
         val level = player.level() as? ServerLevel ?: return false
@@ -56,6 +57,13 @@ object VehiclePartInteractionHandlers {
         }
         if (changed) {
             player.sendSystemMessage(Component.literal("${vehicle.vehicleDefinition.displayName} $partId ${if (open) "opened" else "closed"}"))
+            VehicleInteractionSounds.play(
+                player = player,
+                vehicle = vehicle,
+                zone = zone,
+                action = if (open) VehicleInteractionActions.OPEN else VehicleInteractionActions.CLOSE,
+                fallbackAction = requestedAction
+            )
         }
         return changed
     }

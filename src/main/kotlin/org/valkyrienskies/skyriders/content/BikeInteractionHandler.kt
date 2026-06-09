@@ -107,6 +107,9 @@ object BikeInteractionHandler {
         level.addFreshEntity(seat)
         player.startRiding(seat, true)
         alignPlayerToBike(player, yaw)
+        vehicle.vehicleDefinition.interactions.zone(interactionZoneId)?.let { zone ->
+            VehicleInteractionSounds.play(player, vehicle, zone, VehicleInteractionActions.MOUNT)
+        }
 
         if (notifyPlayer) {
             player.sendSystemMessage(Component.literal("Mounted ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body ${vehicle.bodyId}"))
@@ -136,7 +139,7 @@ object BikeInteractionHandler {
         val actions = target.actions
 
         if (player.isShiftKeyDown && VehicleInteractionActions.PICK_UP in actions) {
-            startHoisting(player, target.vehicle)
+            startHoisting(player, target.vehicle, target.zone)
             return true
         }
 
@@ -208,7 +211,7 @@ object BikeInteractionHandler {
         }
     }
 
-    private fun startHoisting(player: ServerPlayer, vehicle: IVehicle) {
+    private fun startHoisting(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone? = null) {
         if (player.vehicle is BikeSeatEntity) return
         if (hoistedPlayersByBody.containsKey(vehicle.bodyId)) return
 
@@ -220,6 +223,7 @@ object BikeInteractionHandler {
         hoistedByPlayer[player.uuid] = HoistedBike(level.dimensionId, vehicle.bodyId)
         hoistedPlayersByBody[vehicle.bodyId] = player.uuid
         SkyridersNetwork.sendBikeHoistState(player, true, vehicle.bodyId)
+        zone?.let { VehicleInteractionSounds.play(player, vehicle, it, VehicleInteractionActions.PICK_UP) }
         updateHoistedBike(player)
     }
 

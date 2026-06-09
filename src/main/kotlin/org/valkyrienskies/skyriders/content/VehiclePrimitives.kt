@@ -210,7 +210,14 @@ data class VehicleInteractionZone(
     val center: Vector3d,
     val size: Vector3d,
     val actions: Set<ResourceLocation> = emptySet(),
-    val partId: String? = null
+    val partId: String? = null,
+    val sounds: Map<ResourceLocation, VehicleInteractionSoundDefinition> = emptyMap()
+)
+
+data class VehicleInteractionSoundDefinition(
+    val sound: ResourceLocation,
+    val volume: Float = 0.6f,
+    val pitch: Float = 1.0f
 )
 
 object VehicleInteractionActions {
