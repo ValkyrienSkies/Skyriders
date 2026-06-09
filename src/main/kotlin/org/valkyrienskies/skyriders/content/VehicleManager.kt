@@ -147,7 +147,12 @@ object VehicleManager {
                 restitutionCoefficient = 0.04
             )
         )
-        val record = VehicleSaveRecord(body.id, definition.id.toString(), engineOn = false)
+        val record = VehicleSaveRecord(
+            bodyId = body.id,
+            vehicleType = definition.id.toString(),
+            engineOn = false,
+            partStates = definition.initialPartStates()
+        )
         val vehicle = createVehicleFromBody(level, definition, body.id, record)
         addVehicle(level.dimensionId, vehicle)
         return vehicle
@@ -169,14 +174,15 @@ object VehicleManager {
                     frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
                     rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
                     frontWheelAngularVelocity = record.behaviorTag.getDouble("front_wheel_angular_velocity"),
-                    rearWheelAngularVelocity = record.behaviorTag.getDouble("rear_wheel_angular_velocity")
+                    rearWheelAngularVelocity = record.behaviorTag.getDouble("rear_wheel_angular_velocity"),
+                    partStates = definition.initialPartStates(record.partStates)
                 )
             )
             is WheeledVehicleBehaviorDefinition -> WheeledVehicle(
                 bodyId = bodyId,
                 level = level,
                 vehicleDefinition = definition,
-                wheeledState = wheeledRuntimeStateFromTag(record.behaviorTag, record.engineOn)
+                wheeledState = wheeledRuntimeStateFromTag(definition, record.behaviorTag, record.engineOn, record.partStates)
             )
             is BikeVehicleBehaviorDefinition -> throw IllegalArgumentException("Bike vehicles are created through BikeManager")
         }
@@ -257,6 +263,62 @@ object VehicleManager {
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
         return enabled
+    }
+
+    fun applyControlAction(level: ServerLevel, bodyId: BodyId, action: ResourceLocation): Boolean {
+        val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return false
+        var changed = false
+        when (vehicle) {
+            is WheeledVehicle -> {
+                val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition ?: return false
+                when (action) {
+                    VehicleControlActions.TOGGLE_PARKING_BRAKE -> {
+                        vehicle.wheeledState.parkingBrakeEngaged = !vehicle.wheeledState.parkingBrakeEngaged
+                        changed = true
+                    }
+                    VehicleControlActions.GEAR_UP -> {
+                        if (!behavior.physics.transmission.automatic) {
+                            val maxGear = behavior.physics.transmission.forwardGears.size
+                            vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear + 1).coerceAtMost(maxGear)
+                            vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
+                            changed = true
+                        }
+                    }
+                    VehicleControlActions.GEAR_DOWN -> {
+                        if (!behavior.physics.transmission.automatic) {
+                            vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear - 1).coerceAtLeast(-1)
+                            vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
+                            changed = true
+                        }
+                    }
+                    else -> return false
+                }
+            }
+            else -> return false
+        }
+        if (changed) {
+            BikeLifecycle.saveLevel(level)
+            BikeLifecycle.syncLevel(level)
+        }
+        return changed
+    }
+
+    fun mutatePartState(
+        level: ServerLevel,
+        bodyId: BodyId,
+        partId: String,
+        mutator: (CompoundTag) -> Unit
+    ): Boolean {
+        val vehicle = getVehicle(level.dimensionId, bodyId) ?: return false
+        val stateMap = vehicle.vehicleState.partStates
+        val current = stateMap[partId]?.data?.copy()
+            ?: vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId }?.defaultState?.copy()
+            ?: CompoundTag()
+        mutator(current)
+        stateMap[partId] = VehiclePartState(partId, current)
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
+        return true
     }
 
     fun getSaveRecords(dimensionId: DimensionId): List<VehicleSaveRecord> {

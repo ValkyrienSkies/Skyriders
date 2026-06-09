@@ -11,10 +11,12 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.VehiclePartState
 import org.valkyrienskies.skyriders.content.VehicleRuntimeState
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
 import org.valkyrienskies.skyriders.content.WheeledVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.WheeledVehicleRuntimeState
+import org.valkyrienskies.skyriders.content.initialPartStates
 import org.valkyrienskies.skyriders.util.WheeledVehiclePhysicsSolver
 
 class WheeledVehicle(
@@ -27,7 +29,7 @@ class WheeledVehicle(
         get() = vehicleDefinition.id.toString()
 
     override val vehicleState: VehicleRuntimeState
-        get() = VehicleRuntimeState(engineOn = wheeledState.engineOn)
+        get() = VehicleRuntimeState(engineOn = wheeledState.engineOn, partStates = wheeledState.partStates)
 
     override fun getRenderTransform(): BodyTransform {
         val body = requireBody()
@@ -53,13 +55,16 @@ class WheeledVehicle(
             putDouble("rear_wheel_spin", wheeledState.rearWheelSpin)
             putDouble("front_wheel_angular_velocity", wheeledState.frontWheelAngularVelocity)
             putDouble("rear_wheel_angular_velocity", wheeledState.rearWheelAngularVelocity)
+            putBoolean("parking_brake_engaged", wheeledState.parkingBrakeEngaged)
+            putInt("transmission_gear", wheeledState.transmissionGear)
             val wheelSpin = CompoundTag()
             val wheelAngularVelocity = CompoundTag()
             wheeledState.wheelSpinById.forEach { (id, value) -> wheelSpin.putDouble(id, value) }
             wheeledState.wheelAngularVelocityById.forEach { (id, value) -> wheelAngularVelocity.putDouble(id, value) }
             put("wheel_spin_by_id", wheelSpin)
             put("wheel_angular_velocity_by_id", wheelAngularVelocity)
-        }
+        },
+        partStates = wheeledState.partStates
     )
 
     private fun requireBody() =
@@ -68,14 +73,22 @@ class WheeledVehicle(
         }
 }
 
-fun wheeledRuntimeStateFromTag(tag: CompoundTag, engineOn: Boolean): WheeledVehicleRuntimeState {
+fun wheeledRuntimeStateFromTag(
+    definition: VehicleDefinition,
+    tag: CompoundTag,
+    engineOn: Boolean,
+    partStates: Map<String, VehiclePartState>
+): WheeledVehicleRuntimeState {
     val state = WheeledVehicleRuntimeState(
         engineOn = engineOn,
+        parkingBrakeEngaged = tag.getBoolean("parking_brake_engaged"),
+        transmissionGear = tag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
         frontWheelSpin = tag.getDouble("front_wheel_spin"),
         rearWheelSpin = tag.getDouble("rear_wheel_spin"),
         frontWheelAngularVelocity = tag.getDouble("front_wheel_angular_velocity"),
         rearWheelAngularVelocity = tag.getDouble("rear_wheel_angular_velocity")
     )
+    state.partStates.putAll(definition.initialPartStates(partStates))
     val wheelSpin = tag.getCompound("wheel_spin_by_id")
     wheelSpin.allKeys.forEach { key -> state.wheelSpinById[key] = wheelSpin.getDouble(key) }
     val wheelAngularVelocity = tag.getCompound("wheel_angular_velocity_by_id")

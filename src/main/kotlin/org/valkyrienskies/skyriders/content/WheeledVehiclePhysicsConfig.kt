@@ -31,10 +31,12 @@ data class WheeledVehiclePhysicsConfig(
     val groundNormalSmoothingTime: Double = 0.12,
     val parkingBrakeStrength: Double = 4.5,
     val maxStepHeight: Double = 0.85,
-    val stepAssistStrength: Double = 6500.0
+    val stepAssistStrength: Double = 6500.0,
+    val transmission: VehicleTransmissionConfig = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
 ) {
     init {
         require(axles.isNotEmpty()) { "Wheeled vehicles require at least one axle." }
+        require(transmission.forwardGears.isNotEmpty()) { "Wheeled vehicle transmissions require at least one forward gear." }
     }
 
     companion object {
@@ -102,10 +104,41 @@ data class WheeledVehiclePhysicsConfig(
             yawAssistMinSpeed = 0.7,
             yawAssistMaxSpeed = 15.0,
             maxStepHeight = 1.5,
-            stepAssistStrength = 6400.0
+            stepAssistStrength = 6400.0,
+            transmission = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
         )
     }
 }
+
+data class VehicleTransmissionConfig(
+    val automatic: Boolean = true,
+    val forwardGears: List<VehicleTransmissionGearConfig>,
+    val reverseTopSpeed: Double = 5.5,
+    val reverseTorqueMultiplier: Double = 0.72,
+    val neutralDrag: Double = 0.18,
+    val shiftCooldownSeconds: Double = 0.28,
+    val automaticReverseSpeedThreshold: Double = 0.8
+) {
+    companion object {
+        val DEFAULT_AUTOMATIC = VehicleTransmissionConfig(
+            automatic = true,
+            forwardGears = listOf(
+                VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.5, upshiftSpeed = 5.4),
+                VehicleTransmissionGearConfig(maxSpeed = 11.5, torqueMultiplier = 1.0, upshiftSpeed = 10.0, downshiftSpeed = 4.7),
+                VehicleTransmissionGearConfig(maxSpeed = 17.0, torqueMultiplier = 0.72, downshiftSpeed = 8.8)
+            ),
+            reverseTopSpeed = 5.5,
+            reverseTorqueMultiplier = 0.72
+        )
+    }
+}
+
+data class VehicleTransmissionGearConfig(
+    val maxSpeed: Double,
+    val torqueMultiplier: Double = 1.0,
+    val upshiftSpeed: Double = maxSpeed * 0.82,
+    val downshiftSpeed: Double = maxSpeed * 0.42
+)
 
 data class WheelAxleConfig(
     val id: String,
@@ -130,11 +163,16 @@ data class WheelAxleConfig(
 
 data class WheeledVehicleRuntimeState(
     var engineOn: Boolean = false,
+    var parkingBrakeEngaged: Boolean = false,
+    var transmissionGear: Int = 1,
+    var transmissionShiftCooldown: Double = 0.0,
     var debugSpeed: Double = 0.0,
     var debugGroundedWheels: Int = 0,
     var debugSteerRad: Double = 0.0,
     var debugThrottle: Double = 0.0,
     var debugForwardSpeed: Double = 0.0,
+    var debugTransmissionGear: Int = 1,
+    var debugParkingBrake: Boolean = false,
     var debugLateralSlip: Double = 0.0,
     var smoothedSteerRad: Double = 0.0,
     var groundedGraceTimeRemaining: Double = 0.0,
@@ -142,6 +180,7 @@ data class WheeledVehicleRuntimeState(
     val wheelSpinById: MutableMap<String, Double> = HashMap(),
     val wheelAngularVelocityById: MutableMap<String, Double> = HashMap(),
     val wheelSuspensionOffsetById: MutableMap<String, Double> = HashMap(),
+    val partStates: MutableMap<String, VehiclePartState> = HashMap(),
     var frontWheelSpin: Double = 0.0,
     var rearWheelSpin: Double = 0.0,
     var frontWheelAngularVelocity: Double = 0.0,

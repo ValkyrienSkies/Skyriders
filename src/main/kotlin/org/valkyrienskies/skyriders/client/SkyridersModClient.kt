@@ -15,6 +15,7 @@ import org.lwjgl.glfw.GLFW
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeInput
+import org.valkyrienskies.skyriders.content.VehicleControlActions
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
@@ -40,6 +41,24 @@ object SkyridersModClient {
         GLFW.GLFW_KEY_R,
         "key.categories.skyriders"
     )
+    private val vehicleParkingBrakeToggleKey = KeyMapping(
+        "key.skyriders.vehicle_parking_brake_toggle",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_P,
+        "key.categories.skyriders"
+    )
+    private val vehicleGearUpKey = KeyMapping(
+        "key.skyriders.vehicle_gear_up",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_PAGE_UP,
+        "key.categories.skyriders"
+    )
+    private val vehicleGearDownKey = KeyMapping(
+        "key.skyriders.vehicle_gear_down",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_PAGE_DOWN,
+        "key.categories.skyriders"
+    )
 
     @JvmStatic
     fun clientInit(event: FMLClientSetupEvent) {
@@ -56,6 +75,9 @@ object SkyridersModClient {
         event.register(bikeDismountKey)
         event.register(bikeBrakeKey)
         event.register(bikeEngineToggleKey)
+        event.register(vehicleParkingBrakeToggleKey)
+        event.register(vehicleGearUpKey)
+        event.register(vehicleGearDownKey)
     }
 
     @JvmStatic
@@ -87,6 +109,15 @@ object SkyridersModClient {
             }
             while (bikeEngineToggleKey.consumeClick()) {
                 SkyridersNetwork.sendBikeEngineToggle()
+            }
+            while (vehicleParkingBrakeToggleKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.TOGGLE_PARKING_BRAKE)
+            }
+            while (vehicleGearUpKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_UP)
+            }
+            while (vehicleGearDownKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_DOWN)
             }
 
             val options = minecraft.options

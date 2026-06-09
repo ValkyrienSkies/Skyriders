@@ -66,6 +66,13 @@ object SkyridersNetwork {
         )
         CHANNEL.registerMessage(
             nextPacketId++,
+            VehicleControlActionPacket::class.java,
+            VehicleControlActionPacket::encode,
+            VehicleControlActionPacket::decode,
+            VehicleControlActionPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
             BikeSyncPacket::class.java,
             BikeSyncPacket::encode,
             BikeSyncPacket::decode,
@@ -136,6 +143,10 @@ object SkyridersNetwork {
 
     fun sendBikeEngineToggle() {
         CHANNEL.sendToServer(BikeEngineTogglePacket())
+    }
+
+    fun sendVehicleControlAction(action: ResourceLocation) {
+        CHANNEL.sendToServer(VehicleControlActionPacket(action))
     }
 
     fun sendBikeUse() {
@@ -446,6 +457,37 @@ object SkyridersNetwork {
         }
     }
 
+    data class VehicleControlActionPacket(val action: ResourceLocation) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeResourceLocation(action)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                val player = context.sender ?: return@enqueueWork
+                val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
+                if (!seat.isDriverSeat()) return@enqueueWork
+                VehicleManager.applyControlAction(player.level() as net.minecraft.server.level.ServerLevel, seat.bodyId, action)
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: VehicleControlActionPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): VehicleControlActionPacket {
+                return VehicleControlActionPacket(buf.readResourceLocation())
+            }
+
+            fun handle(packet: VehicleControlActionPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
     class BikeUsePacket {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
             val context = contextSupplier.get()
@@ -561,10 +603,7 @@ object SkyridersNetwork {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeVarInt(records.size)
             records.forEach { record ->
-                buf.writeLong(record.bodyId)
-                buf.writeUtf(record.vehicleType)
-                buf.writeBoolean(record.engineOn)
-                buf.writeNbt(record.behaviorTag)
+                buf.writeNbt(record.save())
             }
         }
 
@@ -586,12 +625,7 @@ object SkyridersNetwork {
             fun decode(buf: FriendlyByteBuf): VehicleSyncPacket {
                 val count = buf.readVarInt()
                 val records = (0 until count).map {
-                    VehicleSaveRecord(
-                        bodyId = buf.readLong(),
-                        vehicleType = buf.readUtf(),
-                        engineOn = buf.readBoolean(),
-                        behaviorTag = buf.readNbt() ?: CompoundTag()
-                    )
+                    VehicleSaveRecord.load(buf.readNbt() ?: CompoundTag())
                 }
                 return VehicleSyncPacket(records)
             }

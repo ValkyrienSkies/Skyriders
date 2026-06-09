@@ -27,7 +27,7 @@ class KartVehicle(
         get() = vehicleDefinition.id.toString()
 
     override val vehicleState: VehicleRuntimeState
-        get() = VehicleRuntimeState(engineOn = kartState.engineOn)
+        get() = VehicleRuntimeState(engineOn = kartState.engineOn, partStates = kartState.partStates)
 
     override fun getRenderTransform(): BodyTransform {
         val body = requireBody()
@@ -53,7 +53,8 @@ class KartVehicle(
             putDouble("rear_wheel_spin", kartState.rearWheelSpin)
             putDouble("front_wheel_angular_velocity", kartState.frontWheelAngularVelocity)
             putDouble("rear_wheel_angular_velocity", kartState.rearWheelAngularVelocity)
-        }
+        },
+        partStates = kartState.partStates
     )
 
     private fun requireBody() =

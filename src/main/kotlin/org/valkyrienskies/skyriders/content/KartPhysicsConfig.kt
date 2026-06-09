@@ -146,5 +146,6 @@ data class KartRuntimeState(
     var frontWheelSuspensionOffset: Double = 0.0,
     var rearWheelSuspensionOffset: Double = 0.0,
     var groundedGraceTimeRemaining: Double = 0.0,
-    val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0)
+    val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0),
+    val partStates: MutableMap<String, VehiclePartState> = HashMap()
 )

@@ -124,6 +124,7 @@ object BikeInteractionHandler {
         val hit = VehicleInteractionPicker.findVehicleOnRay(level, start, end) ?: return null
         return VehicleInteractionHit(
             vehicle = hit.vehicle,
+            zone = hit.zone,
             zoneId = hit.zone.id,
             actions = hit.zone.actions,
             distanceSqr = hit.distanceSqr
@@ -134,16 +135,20 @@ object BikeInteractionHandler {
         val level = player.level() as? ServerLevel ?: return false
         val actions = target.actions
 
-        if (player.isShiftKeyDown && VehicleInteractionAction.PICK_UP in actions) {
+        if (player.isShiftKeyDown && VehicleInteractionActions.PICK_UP in actions) {
             startHoisting(player, target.vehicle)
             return true
         }
 
-        if (VehicleInteractionAction.MOUNT in actions) {
+        if (VehiclePartInteractionHandlers.handle(player, target.vehicle, target.zone)) {
+            return true
+        }
+
+        if (VehicleInteractionActions.MOUNT in actions) {
             return mountVehicle(player, target.vehicle, notifyPlayer = false, interactionZoneId = target.zoneId)
         }
 
-        if (VehicleInteractionAction.ENGINE_TOGGLE in actions) {
+        if (VehicleInteractionActions.ENGINE_TOGGLE in actions) {
             VehicleManager.toggleEngine(level, target.vehicle.bodyId)
             return true
         }
@@ -298,8 +303,9 @@ object BikeInteractionHandler {
 
     data class VehicleInteractionHit(
         val vehicle: IVehicle,
+        val zone: VehicleInteractionZone,
         val zoneId: String,
-        val actions: Set<VehicleInteractionAction>,
+        val actions: Set<net.minecraft.resources.ResourceLocation>,
         val distanceSqr: Double
     )
 

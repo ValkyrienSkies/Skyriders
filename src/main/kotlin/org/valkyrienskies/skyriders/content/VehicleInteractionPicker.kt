@@ -90,9 +90,10 @@ object VehicleInteractionPicker {
 
     private fun interactionPriority(zone: VehicleInteractionZone): Int {
         return when {
-            VehicleInteractionAction.MOUNT in zone.actions -> 30
-            VehicleInteractionAction.ENGINE_TOGGLE in zone.actions -> 20
-            VehicleInteractionAction.PICK_UP in zone.actions -> 10
+            VehicleInteractionActions.MOUNT in zone.actions -> 30
+            zone.partId != null -> 25
+            VehicleInteractionActions.ENGINE_TOGGLE in zone.actions -> 20
+            VehicleInteractionActions.PICK_UP in zone.actions -> 10
             else -> 0
         }
     }
@@ -107,7 +108,7 @@ object VehicleInteractionPicker {
                 body.collisionBoxSize.y,
                 body.collisionBoxSize.z
             ),
-            actions = setOf(VehicleInteractionAction.PICK_UP)
+            actions = setOf(VehicleInteractionActions.PICK_UP)
         )
     }
 }

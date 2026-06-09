@@ -41,7 +41,8 @@ data class VehicleDefinition(
     val sounds: VehicleSoundDefinition,
     val seats: List<VehicleSeatDefinition>,
     val interactions: VehicleInteractionDefinition,
-    val behavior: VehicleBehaviorDefinition
+    val behavior: VehicleBehaviorDefinition,
+    val parts: List<VehiclePartDefinition> = emptyList()
 )
 
 data class VehicleBodyDefinition(
@@ -188,16 +189,54 @@ data class VehicleInteractionZone(
     val id: String,
     val center: Vector3d,
     val size: Vector3d,
-    val actions: Set<VehicleInteractionAction> = emptySet()
+    val actions: Set<ResourceLocation> = emptySet(),
+    val partId: String? = null
 )
 
-enum class VehicleInteractionAction {
-    MOUNT,
-    PICK_UP,
-    OPEN_DOOR,
-    REFUEL,
-    STORAGE,
-    ENGINE_TOGGLE
+object VehicleInteractionActions {
+    val MOUNT = ResourceLocation(SkyridersMod.MOD_ID, "mount")
+    val PICK_UP = ResourceLocation(SkyridersMod.MOD_ID, "pick_up")
+    val OPEN_DOOR = ResourceLocation(SkyridersMod.MOD_ID, "open_door")
+    val REFUEL = ResourceLocation(SkyridersMod.MOD_ID, "refuel")
+    val STORAGE = ResourceLocation(SkyridersMod.MOD_ID, "storage")
+    val ENGINE_TOGGLE = ResourceLocation(SkyridersMod.MOD_ID, "engine_toggle")
+    val TOGGLE = ResourceLocation(SkyridersMod.MOD_ID, "toggle")
+    val OPEN = ResourceLocation(SkyridersMod.MOD_ID, "open")
+    val CLOSE = ResourceLocation(SkyridersMod.MOD_ID, "close")
+}
+
+object VehicleControlActions {
+    val TOGGLE_PARKING_BRAKE = ResourceLocation(SkyridersMod.MOD_ID, "toggle_parking_brake")
+    val GEAR_UP = ResourceLocation(SkyridersMod.MOD_ID, "gear_up")
+    val GEAR_DOWN = ResourceLocation(SkyridersMod.MOD_ID, "gear_down")
+}
+
+data class VehiclePartDefinition(
+    val id: String,
+    val type: ResourceLocation,
+    val defaultState: CompoundTag = CompoundTag(),
+    val interactionActions: Set<ResourceLocation> = emptySet()
+)
+
+data class VehiclePartState(
+    val partId: String,
+    val data: CompoundTag = CompoundTag()
+)
+
+fun VehicleDefinition.initialPartStates(savedStates: Map<String, VehiclePartState> = emptyMap()): MutableMap<String, VehiclePartState> {
+    val states = parts.associate { part ->
+        part.id to VehiclePartState(part.id, part.defaultState.copy())
+    }.toMutableMap()
+    savedStates.forEach { (id, state) ->
+        states[id] = VehiclePartState(id, state.data.copy())
+    }
+    return states
+}
+
+object VehiclePartTypes {
+    val DOOR = ResourceLocation(SkyridersMod.MOD_ID, "door")
+    val FUEL_CAP = ResourceLocation(SkyridersMod.MOD_ID, "fuel_cap")
+    val STORAGE = ResourceLocation(SkyridersMod.MOD_ID, "storage")
 }
 
 data class VehicleSeatDefinition(
@@ -259,20 +298,23 @@ data class VehicleInput(
 }
 
 data class VehicleRuntimeState(
-    var engineOn: Boolean = false
+    var engineOn: Boolean = false,
+    val partStates: MutableMap<String, VehiclePartState> = HashMap()
 )
 
 data class VehicleSaveRecord(
     val bodyId: BodyId,
     val vehicleType: String,
     val engineOn: Boolean,
-    val behaviorTag: CompoundTag = CompoundTag()
+    val behaviorTag: CompoundTag = CompoundTag(),
+    val partStates: Map<String, VehiclePartState> = emptyMap()
 ) {
     fun save(): CompoundTag = CompoundTag().apply {
         putLong(BODY_ID_KEY, bodyId)
         putString(VEHICLE_TYPE_KEY, vehicleType)
         putBoolean(ENGINE_ON_KEY, engineOn)
         put(BEHAVIOR_KEY, behaviorTag.copy())
+        put(PART_STATES_KEY, savePartStates(partStates))
     }
 
     companion object {
@@ -281,13 +323,29 @@ data class VehicleSaveRecord(
         private const val LEGACY_BIKE_TYPE_KEY = "bike_type"
         private const val ENGINE_ON_KEY = "engine_on"
         private const val BEHAVIOR_KEY = "behavior"
+        private const val PART_STATES_KEY = "part_states"
 
         fun load(tag: CompoundTag): VehicleSaveRecord = VehicleSaveRecord(
             bodyId = tag.getLong(BODY_ID_KEY),
             vehicleType = tag.getString(VEHICLE_TYPE_KEY).ifBlank { tag.getString(LEGACY_BIKE_TYPE_KEY) },
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
-            behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy()
+            behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy(),
+            partStates = loadPartStates(tag.getCompound(PART_STATES_KEY))
         )
+
+        private fun savePartStates(partStates: Map<String, VehiclePartState>): CompoundTag {
+            return CompoundTag().apply {
+                partStates.forEach { (id, state) ->
+                    put(id, state.data.copy())
+                }
+            }
+        }
+
+        private fun loadPartStates(tag: CompoundTag): Map<String, VehiclePartState> {
+            return tag.allKeys.associateWith { id ->
+                VehiclePartState(id, tag.getCompound(id).copy())
+            }
+        }
     }
 }
 
@@ -322,7 +380,8 @@ fun BikeInput.toVehicleInput(): VehicleInput = VehicleInput(
 ).clamped()
 
 fun BikeRuntimeState.toVehicleRuntimeState(): VehicleRuntimeState = VehicleRuntimeState(
-    engineOn = engineOn
+    engineOn = engineOn,
+    partStates = partStates
 )
 
 fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
@@ -425,11 +484,12 @@ fun BikeInteractionDefinition.toVehicleInteractionDefinition(): VehicleInteracti
                 center = Vector3d(zone.center),
                 size = Vector3d(zone.size),
                 actions = when (zone.id) {
-                    BikeInteractionDefinition.SEAT -> setOf(VehicleInteractionAction.MOUNT)
-                    BikeInteractionDefinition.BODY -> setOf(VehicleInteractionAction.PICK_UP)
-                    BikeInteractionDefinition.FUEL_CAP -> setOf(VehicleInteractionAction.REFUEL)
+                    BikeInteractionDefinition.SEAT -> setOf(VehicleInteractionActions.MOUNT)
+                    BikeInteractionDefinition.BODY -> setOf(VehicleInteractionActions.PICK_UP)
+                    BikeInteractionDefinition.FUEL_CAP -> setOf(VehicleInteractionActions.REFUEL)
                     else -> emptySet()
-                }
+                },
+                partId = zone.id.takeIf { it == BikeInteractionDefinition.FUEL_CAP }
             )
         }
     )

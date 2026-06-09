@@ -38,6 +38,7 @@ object WheeledVehiclePhysicsSolver {
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
+        val driveCommand = updateTransmission(activeInput, forwardSpeed, config, state, dt)
         val steerRad = updateSteerAngle(state, activeInput.steer, forwardSpeed, config, dt)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val wheels = expandWheels(config)
@@ -66,15 +67,21 @@ object WheeledVehiclePhysicsSolver {
         val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
 
         loaded.forEach { applyLateralGrip(body, it, config) }
+        val parkingBrakeActive = state.parkingBrakeEngaged || activeInput.handbrake > 0.0
         if (activeInput.riderPresent) {
-            updateWheelLongitudinalPhysics(body, loaded, activeInput, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, config, state, dt)
+            if (parkingBrakeActive) {
+                applyParkingBrake(body, loaded, terrainUp, config)
+            }
             if (stabilizedGrounded) {
                 applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
                 loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, activeInput, config) }
             }
         } else {
-            applyParkingBrake(body, loaded, terrainUp, config)
-            updateWheelLongitudinalPhysics(body, loaded, VehicleInput(handbrake = 1.0), config, state, dt)
+            if (state.parkingBrakeEngaged) {
+                applyParkingBrake(body, loaded, terrainUp, config)
+            }
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, config, state, dt)
         }
 
         if (stabilizedGrounded) {
@@ -91,6 +98,112 @@ object WheeledVehiclePhysicsSolver {
                 WheelInstance("${axle.id}_left", axleIndex, -1.0, Vector3d(-axle.halfTrackWidth, axle.localY, axle.localZ), axle),
                 WheelInstance("${axle.id}_right", axleIndex, 1.0, Vector3d(axle.halfTrackWidth, axle.localY, axle.localZ), axle)
             )
+        }
+    }
+
+    private fun updateTransmission(
+        input: VehicleInput,
+        forwardSpeed: Double,
+        config: WheeledVehiclePhysicsConfig,
+        state: WheeledVehicleRuntimeState,
+        dt: Double
+    ): DriveCommand {
+        val transmission = config.transmission
+        val maxForwardGear = transmission.forwardGears.size
+        state.transmissionShiftCooldown = max(0.0, state.transmissionShiftCooldown - dt.coerceIn(0.0, 0.1))
+        state.transmissionGear = state.transmissionGear.coerceIn(-1, maxForwardGear)
+        if (state.transmissionGear == 0 && transmission.automatic) {
+            state.transmissionGear = 1
+        }
+
+        val rawThrottle = input.throttle.coerceIn(-1.0, 1.0)
+        var brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
+        if (state.parkingBrakeEngaged) {
+            brake = 1.0
+        }
+        if (!input.riderPresent) {
+            state.debugTransmissionGear = state.transmissionGear
+            state.debugParkingBrake = state.parkingBrakeEngaged
+            return DriveCommand(
+                throttle = 0.0,
+                brake = brake,
+                wheelTopSpeed = config.wheelTopSpeed,
+                torqueMultiplier = transmission.neutralDrag
+            )
+        }
+
+        var driveThrottle = 0.0
+        if (transmission.automatic) {
+            if (rawThrottle < -0.05) {
+                if (abs(forwardSpeed) <= transmission.automaticReverseSpeedThreshold || state.transmissionGear == -1) {
+                    state.transmissionGear = -1
+                    driveThrottle = rawThrottle
+                } else {
+                    brake = brake.coerceAtLeast(-rawThrottle)
+                }
+            } else {
+                if (state.transmissionGear < 1) {
+                    state.transmissionGear = 1
+                    state.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                }
+                if (rawThrottle > 0.05) {
+                    updateAutomaticForwardGear(forwardSpeed, transmission.forwardGears, state, transmission.shiftCooldownSeconds)
+                    driveThrottle = rawThrottle
+                }
+            }
+        } else {
+            if (rawThrottle < -0.05) {
+                brake = brake.coerceAtLeast(-rawThrottle)
+            } else if (rawThrottle > 0.05) {
+                driveThrottle = when {
+                    state.transmissionGear > 0 -> rawThrottle
+                    state.transmissionGear < 0 -> -rawThrottle
+                    else -> 0.0
+                }
+            }
+        }
+
+        val gear = state.transmissionGear
+        val gearConfig = transmission.forwardGears.getOrNull(gear - 1)
+        val topSpeed = when {
+            gear > 0 && gearConfig != null -> gearConfig.maxSpeed
+            gear < 0 -> transmission.reverseTopSpeed
+            else -> config.wheelTopSpeed
+        }
+        val torque = when {
+            gear > 0 && gearConfig != null -> gearConfig.torqueMultiplier
+            gear < 0 -> transmission.reverseTorqueMultiplier
+            else -> transmission.neutralDrag
+        }
+        state.debugTransmissionGear = gear
+        state.debugParkingBrake = state.parkingBrakeEngaged
+        return DriveCommand(
+            throttle = driveThrottle,
+            brake = brake,
+            wheelTopSpeed = topSpeed,
+            torqueMultiplier = torque
+        )
+    }
+
+    private fun updateAutomaticForwardGear(
+        forwardSpeed: Double,
+        gears: List<org.valkyrienskies.skyriders.content.VehicleTransmissionGearConfig>,
+        state: WheeledVehicleRuntimeState,
+        shiftCooldownSeconds: Double
+    ) {
+        if (state.transmissionShiftCooldown > 0.0 || state.transmissionGear < 1) return
+        val speed = abs(forwardSpeed)
+        val gearIndex = (state.transmissionGear - 1).coerceIn(0, gears.lastIndex)
+        val gear = gears[gearIndex]
+        when {
+            state.transmissionGear < gears.size && speed >= gear.upshiftSpeed -> {
+                state.transmissionGear += 1
+                state.transmissionShiftCooldown = shiftCooldownSeconds
+            }
+            state.transmissionGear > 1 && speed <= gear.downshiftSpeed -> {
+                state.transmissionGear -= 1
+                state.transmissionShiftCooldown = shiftCooldownSeconds
+            }
         }
     }
 
@@ -204,13 +317,13 @@ object WheeledVehiclePhysicsSolver {
     private fun updateWheelLongitudinalPhysics(
         body: PhysVsBody,
         contacts: List<LoadedWheelContact>,
-        input: VehicleInput,
+        driveCommand: DriveCommand,
         config: WheeledVehiclePhysicsConfig,
         state: WheeledVehicleRuntimeState,
         dt: Double
     ) {
-        val throttle = input.throttle.coerceIn(-1.0, 1.0)
-        val brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
+        val throttle = driveCommand.throttle.coerceIn(-1.0, 1.0)
+        val brake = driveCommand.brake.coerceIn(0.0, 1.0)
         val driveBiasTotal = config.axles.filter(WheelAxleConfig::driven).sumOf { it.driveBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val brakeBiasTotal = config.axles.sumOf { it.brakeBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val stepDt = dt.coerceIn(0.0, 0.1)
@@ -218,7 +331,8 @@ object WheeledVehiclePhysicsSolver {
         contacts.forEach { loaded ->
             val axle = loaded.wheel.axle
             val radius = max(axle.wheelRadius, 0.05)
-            val maxOmega = max(config.wheelTopSpeed, 1.0) * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
+            val topSpeed = max(driveCommand.wheelTopSpeed, 1.0)
+            val maxOmega = topSpeed * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
             val groundSpeed = if (loaded.contact.grounded) {
                 VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
             } else {
@@ -229,8 +343,8 @@ object WheeledVehiclePhysicsSolver {
             val brakeShare = axle.brakeBias.coerceAtLeast(0.0) / brakeBiasTotal / 2.0
 
             if (axle.driven && throttle != 0.0) {
-                val motorTarget = throttle * config.wheelTopSpeed * 1.08 / radius
-                val motorAlpha = 1.0 - exp(-stepDt * config.motorResponse * abs(throttle) * (0.5 + driveShare * 2.0))
+                val motorTarget = throttle * topSpeed * 1.08 / radius
+                val motorAlpha = 1.0 - exp(-stepDt * config.motorResponse * driveCommand.torqueMultiplier * abs(throttle) * (0.5 + driveShare * 2.0))
                 omega = lerp(omega, motorTarget, motorAlpha)
             }
             if (brake > 0.0) {
@@ -588,6 +702,13 @@ object WheeledVehiclePhysicsSolver {
         val wheel: WheelInstance,
         val contact: VehicleWheelContact,
         val normalForce: Double
+    )
+
+    private data class DriveCommand(
+        val throttle: Double,
+        val brake: Double,
+        val wheelTopSpeed: Double,
+        val torqueMultiplier: Double
     )
 
     private data class WheelSample(
