@@ -270,7 +270,7 @@ object WheeledVehiclePhysicsSolver {
         } else {
             engine.idleRpm
         }
-        val coupledRpm = coupledEngineRpm(forwardSpeed, gear, gearConfig, topSpeed, config)
+        val coupledRpm = coupledEngineRpm(forwardSpeed, gear, gearConfig, topSpeed, config, state)
         val launchScale = when {
             gear > 0 && gearConfig != null -> gearLaunchTorqueFactor(gearConfig, forwardSpeed)
             gear < 0 -> 0.85
@@ -342,7 +342,8 @@ object WheeledVehiclePhysicsSolver {
         gear: Int,
         gearConfig: org.valkyrienskies.skyriders.content.VehicleTransmissionGearConfig?,
         topSpeed: Double,
-        config: WheeledVehiclePhysicsConfig
+        config: WheeledVehiclePhysicsConfig,
+        state: WheeledVehicleRuntimeState
     ): Double {
         if (gear == 0) return 0.0
         val transmission = config.transmission
@@ -351,6 +352,7 @@ object WheeledVehiclePhysicsSolver {
             gear < 0 -> transmission.reverseGearRatio
             else -> null
         }
+        drivenWheelCoupledRpm(config, state, gearRatio)?.let { return it }
         if (gearRatio != null && gearRatio > 0.0 && transmission.finalDriveRatio > 0.0) {
             val radius = averageDrivenWheelRadius(config).coerceAtLeast(0.05)
             val wheelRpm = abs(forwardSpeed) / radius * 60.0 / (2.0 * PI)
@@ -361,6 +363,27 @@ object WheeledVehiclePhysicsSolver {
         } else {
             0.0
         }
+    }
+
+    private fun drivenWheelCoupledRpm(
+        config: WheeledVehiclePhysicsConfig,
+        state: WheeledVehicleRuntimeState,
+        gearRatio: Double?
+    ): Double? {
+        val transmission = config.transmission
+        if (gearRatio == null || gearRatio <= 0.0 || transmission.finalDriveRatio <= 0.0) return null
+        val drivenAxles = config.axles.filter(WheelAxleConfig::driven)
+        if (drivenAxles.isEmpty()) return null
+
+        val wheelSpeeds = drivenAxles.flatMap { axle ->
+            listOf("${axle.id}_left", "${axle.id}_right").mapNotNull { wheelId ->
+                state.wheelAngularVelocityById[wheelId]?.takeIf(Double::isFinite)?.let(::abs)
+            }
+        }
+        if (wheelSpeeds.isEmpty()) return null
+
+        val averageWheelRpm = wheelSpeeds.average() * 60.0 / (2.0 * PI)
+        return (averageWheelRpm * gearRatio * transmission.finalDriveRatio).coerceIn(0.0, config.engine.revLimiterRpm * 1.1)
     }
 
     private fun averageDrivenWheelRadius(config: WheeledVehiclePhysicsConfig): Double {
