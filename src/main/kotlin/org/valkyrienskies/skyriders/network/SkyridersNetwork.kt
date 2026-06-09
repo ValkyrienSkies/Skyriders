@@ -22,10 +22,13 @@ import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.BikeSaveRecord
+import org.valkyrienskies.skyriders.content.BikeVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.IBike
+import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
+import org.valkyrienskies.skyriders.content.WheeledVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
@@ -193,6 +196,12 @@ object SkyridersNetwork {
         } catch (_: IllegalStateException) {
             0.0
         }
+        val maxSpeed = when (vehicle) {
+            is KartVehicle -> (vehicle.vehicleDefinition.behavior as KartVehicleBehaviorDefinition).physics.wheelTopSpeed
+            is WheeledVehicle -> (vehicle.vehicleDefinition.behavior as WheeledVehicleBehaviorDefinition).physics.wheelTopSpeed
+            is IBike -> (vehicle.vehicleDefinition.behavior as BikeVehicleBehaviorDefinition).physics.wheelTopSpeed
+            else -> 0.0
+        }
         val groundedCount = when (vehicle) {
             is KartVehicle -> vehicle.kartState.debugGroundedWheels
             is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
@@ -292,18 +301,27 @@ object SkyridersNetwork {
             is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
             else -> false
         }
+        val jumpCharge = when (vehicle) {
+            is IBike -> vehicle.state.jumpCharge
+            else -> 0.0
+        }
         val hasTransmission = vehicle is WheeledVehicle
+        val hasJump = vehicle.vehicleDefinition.behavior is BikeVehicleBehaviorDefinition
+
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             VehicleDebugPacket(
                 bodyId = vehicle.bodyId,
                 vehicleId = vehicle.id,
                 vehicleName = vehicle.vehicleDefinition.displayName,
+                maxSpeed = maxSpeed,
                 speed = speed,
                 engineOn = vehicle.vehicleState.engineOn,
                 throttle = input.throttle,
                 steer = input.steer,
                 groundedCount = groundedCount,
+                hasJump = hasJump,
+                jumpCharge = jumpCharge,
                 drifting = drifting,
                 driftBoostCharge = driftBoostCharge,
                 driftBoostLevel = driftBoostLevel,
@@ -743,11 +761,14 @@ object SkyridersNetwork {
         val bodyId: Long,
         val vehicleId: String,
         val vehicleName: String,
+        val maxSpeed: Double,
         val speed: Double,
         val engineOn: Boolean,
         val throttle: Double,
         val steer: Double,
         val groundedCount: Int,
+        val hasJump: Boolean,
+        val jumpCharge: Double,
         val drifting: Boolean,
         val driftBoostCharge: Double,
         val driftBoostLevel: Int,
@@ -772,11 +793,14 @@ object SkyridersNetwork {
             buf.writeLong(bodyId)
             buf.writeUtf(vehicleId)
             buf.writeUtf(vehicleName)
+            buf.writeDouble(maxSpeed)
             buf.writeDouble(speed)
             buf.writeBoolean(engineOn)
             buf.writeDouble(throttle)
             buf.writeDouble(steer)
             buf.writeInt(groundedCount)
+            buf.writeBoolean(hasJump)
+            buf.writeDouble(jumpCharge)
             buf.writeBoolean(drifting)
             buf.writeDouble(driftBoostCharge)
             buf.writeInt(driftBoostLevel)
@@ -833,11 +857,14 @@ object SkyridersNetwork {
                     bodyId = buf.readLong(),
                     vehicleId = buf.readUtf(),
                     vehicleName = buf.readUtf(),
+                    maxSpeed = buf.readDouble(),
                     speed = buf.readDouble(),
                     engineOn = buf.readBoolean(),
                     throttle = buf.readDouble(),
                     steer = buf.readDouble(),
                     groundedCount = buf.readInt(),
+                    hasJump = buf.readBoolean(),
+                    jumpCharge = buf.readDouble(),
                     drifting = buf.readBoolean(),
                     driftBoostCharge = buf.readDouble(),
                     driftBoostLevel = buf.readInt(),

@@ -106,20 +106,28 @@ object VehicleHudOverlay {
 
     private val meters = listOf(
         RoundMeterWidget(
-            title = "spd",
-            anchorOffsetX = -216,
+            title = "5pd",
+            anchorOffsetX = -108,
             value = { snapshot -> snapshot.speed.coerceIn(0.0, 60.0) / 60.0 },
             counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
-            minDegrees = -128.0f,
-            maxDegrees = 128.0f
+            minDegrees = -145.0f,
+            maxDegrees = 145.0f
         ),
         RoundMeterWidget(
             title = "rev",
             anchorOffsetX = -108,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
             counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
-            minDegrees = -128.0f,
-            maxDegrees = 128.0f
+            minDegrees = -145.0f,
+            maxDegrees = 148.0f
+        ),
+        RoundMeterWidget(
+            title = "5u5",
+            anchorOffsetX = -108,
+            value = { snapshot -> snapshot.jumpCharge.coerceIn(0.0, 1.0) },
+            counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
+            minDegrees = -145.0f,
+            maxDegrees = 148.0f
         )
     )
 
@@ -131,17 +139,21 @@ object VehicleHudOverlay {
     fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
         snapshot = VehicleHudSnapshot(
             bodyId = packet.bodyId,
+            maxSpeed = packet.maxSpeed,
             speed = packet.speed,
             forwardSpeed = packet.forwardSpeed,
             steer = packet.steer,
             steerAngleRad = packet.steerAngleRad,
             engineOn = packet.engineOn,
             transmissionGear = packet.transmissionGear,
-            parkingBrakeEngaged = packet.parkingBrakeEngaged,
+            parkingBrakeEngaged = packet.parkingBrakeEngaged || packet.drifting,
             engineRpm = packet.engineRpm,
             clutchEngagement = packet.clutchEngagement,
             engineStalled = packet.engineStalled,
             fuel = 1.0,
+            hasRevs = packet.hasTransmission,
+            hasJump = packet.hasJump,
+            jumpCharge = packet.jumpCharge,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -193,10 +205,13 @@ object VehicleHudOverlay {
     }
 
     private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot) {
-        val anchorX = screenWidth
         val y = screenHeight - METER_BASE.height
+        var currentIndex = 1
         meters.forEach { meter ->
-            meter.render(guiGraphics, anchorX + meter.anchorOffsetX, y, snapshot)
+            if (meter.isVisible(snapshot)) {
+                meter.render(guiGraphics, screenWidth + (meter.anchorOffsetX * currentIndex), y, snapshot)
+                currentIndex++
+            }
         }
     }
 
@@ -312,6 +327,7 @@ object VehicleHudOverlay {
 
     private data class VehicleHudSnapshot(
         val bodyId: Long,
+        val maxSpeed: Double,
         val speed: Double,
         val forwardSpeed: Double,
         val steer: Double,
@@ -320,9 +336,12 @@ object VehicleHudOverlay {
         val transmissionGear: Int,
         val parkingBrakeEngaged: Boolean,
         val engineRpm: Double,
+        val jumpCharge: Double = 0.0,
         val clutchEngagement: Double,
         val engineStalled: Boolean,
         val fuel: Double,
+        val hasRevs: Boolean = true,
+        val hasJump: Boolean = false,
         val receivedAtMillis: Long
     )
 
@@ -392,16 +411,22 @@ object VehicleHudOverlay {
         val minDegrees: Float,
         val maxDegrees: Float
     ) {
+        fun isVisible(snapshot: VehicleHudSnapshot): Boolean {
+            return when (title) {
+                "5u5" -> snapshot.hasJump
+                "rev" -> snapshot.hasRevs
+                else -> true
+            }
+        }
+
         fun render(guiGraphics: GuiGraphics, x: Int, y: Int, snapshot: VehicleHudSnapshot) {
             guiGraphics.blitRegion(METER_TEXTURE, METER_BASE, x, y, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
             val t = value(snapshot).coerceIn(0.0, 1.0)
-            val degrees = maxDegrees + ((minDegrees - maxDegrees) * t).toFloat()
-            val pivotSourceX = METER_DIAL_PIVOT.u + METER_DIAL_PIVOT.width / 2.0
-            val pivotSourceY = METER_DIAL_PIVOT.v + METER_DIAL_PIVOT.height / 2.0
+            val degrees = minDegrees + ((maxDegrees - minDegrees) * t).toFloat()
             val pivotScreenX = x + METER_WIDGET_PIVOT_X
             val pivotScreenY = y + METER_WIDGET_PIVOT_Y
             val dialX = (pivotScreenX - METER_DIAL.width / 2.0).roundToInt()
-            val dialY = pivotScreenY.roundToInt()
+            val dialY = (pivotScreenY - METER_DIAL.height).roundToInt()
             val pivotCapX = (pivotScreenX - METER_DIAL_PIVOT.width / 2.0).roundToInt()
             val pivotCapY = (pivotScreenY - METER_DIAL_PIVOT.height / 2.0).roundToInt()
             drawRotatedRegion(
