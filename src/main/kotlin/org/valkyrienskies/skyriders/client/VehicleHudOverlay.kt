@@ -11,6 +11,7 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 object VehicleHudOverlay {
     private const val STALE_AFTER_MILLIS = 750L
@@ -231,7 +232,53 @@ object VehicleHudOverlay {
         val filledHeight = (height * fuel.coerceIn(0.0, 1.0)).roundToInt().coerceIn(0, height)
         if (filledHeight <= 0) return
         val filledY = y + height - filledHeight
-        guiGraphics.fill(x, filledY, x + width, y + height, 0xF7F4B626.toInt())
+        val bottom = y + height
+        val time = System.currentTimeMillis() / 1000.0
+        for (column in 0 until width) {
+            val wave = sin(column * 0.42 + time * 2.8) * 1.4 + sin(column * 0.83 - time * 1.7) * 0.55
+            val surfaceY = (filledY + wave.roundToInt()).coerceIn(y, bottom)
+            guiGraphics.fill(x + column, surfaceY, x + column + 1, bottom, 0xF7F4B626.toInt())
+            if (surfaceY < bottom) {
+                guiGraphics.fill(x + column, surfaceY, x + column + 1, (surfaceY + 1).coerceAtMost(bottom), 0xFFFFE46A.toInt())
+            }
+        }
+        val glowTop = (filledY + 5).coerceAtMost(bottom)
+        if (glowTop < bottom) {
+            guiGraphics.fill(x + 2, glowTop, x + width - 2, bottom, 0x22FF7A1A)
+        }
+        drawFuelBubbles(guiGraphics, x, filledY, width, filledHeight, time)
+    }
+
+    private fun drawFuelBubbles(guiGraphics: GuiGraphics, x: Int, filledY: Int, width: Int, filledHeight: Int, time: Double) {
+        if (filledHeight < 5) return
+        val bubbleSeeds = listOf(
+            FuelBubble(7, 0.0, 1),
+            FuelBubble(16, 0.33, 2),
+            FuelBubble(27, 0.62, 1),
+            FuelBubble(38, 0.18, 1)
+        )
+        bubbleSeeds.forEachIndexed { index, bubble ->
+            val cycle = positiveModulo(time * (0.24 + index * 0.035) + bubble.phase, 1.0)
+            val bubbleX = x + bubble.x.coerceIn(1, width - 3) + (sin(time * 2.1 + index) * 1.6).roundToInt()
+            val bubbleY = filledY + ((1.0 - cycle) * filledHeight).roundToInt()
+            if (bubbleY < filledY + 1 || bubbleY > filledY + filledHeight - 2) return@forEachIndexed
+            guiGraphics.fill(bubbleX, bubbleY, bubbleX + bubble.size, bubbleY + bubble.size, 0xCFFFF2A4.toInt())
+            if (bubble.size > 1) {
+                guiGraphics.fill(bubbleX + bubble.size, bubbleY + 1, bubbleX + bubble.size + 1, bubbleY + 2, 0x80FFFBE0.toInt())
+            }
+        }
+        val sparkleCycle = positiveModulo(time * 0.9, 1.0)
+        if (sparkleCycle < 0.45) {
+            val sparkleX = x + (width * 0.72).roundToInt()
+            val sparkleY = filledY + (filledHeight * 0.42).roundToInt()
+            guiGraphics.fill(sparkleX, sparkleY, sparkleX + 1, sparkleY + 1, 0xFFFFFFFF.toInt())
+            guiGraphics.fill(sparkleX - 1, sparkleY + 1, sparkleX + 2, sparkleY + 2, 0x99FFF2A4.toInt())
+        }
+    }
+
+    private fun positiveModulo(value: Double, modulus: Double): Double {
+        val result = value % modulus
+        return if (result < 0.0) result + modulus else result
     }
 
     private fun drawRotatedRegion(
@@ -330,6 +377,12 @@ object VehicleHudOverlay {
         PRESENT_ENGINE_OFF,
         PRESENT_ENGINE_ON
     }
+
+    private data class FuelBubble(
+        val x: Int,
+        val phase: Double,
+        val size: Int
+    )
 
     private data class RoundMeterWidget(
         val title: String = "",
