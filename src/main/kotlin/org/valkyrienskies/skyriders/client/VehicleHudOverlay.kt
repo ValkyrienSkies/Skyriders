@@ -9,7 +9,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
-import kotlin.math.PI
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 object VehicleHudOverlay {
@@ -34,6 +34,11 @@ object VehicleHudOverlay {
     private val METER_COUNTER_BACKGROUND = HudTextureRegion(96, 0, 23, 15)
     private val METER_DIAL = HudTextureRegion(108, 21, 4, 35)
     private val METER_DIAL_PIVOT = HudTextureRegion(107, 16, 8, 4)
+    private const val STEERING_VISUAL_MAX_DEGREES = 85.0
+    private const val STEERING_VISUAL_STIFFNESS = 95.0
+    private const val STEERING_VISUAL_DAMPING = 17.0
+    private const val METER_WIDGET_PIVOT_X = 48.0
+    private const val METER_WIDGET_PIVOT_Y = 48.0
 
     /*
      * These atlas constants are intentionally easy to retarget after the actual
@@ -117,6 +122,9 @@ object VehicleHudOverlay {
     )
 
     private var snapshot: VehicleHudSnapshot? = null
+    private var lastRenderMillis = 0L
+    private var visualSteeringDegrees = 0.0
+    private var visualSteeringVelocityDegrees = 0.0
 
     fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
         snapshot = VehicleHudSnapshot(
@@ -142,19 +150,25 @@ object VehicleHudOverlay {
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
             snapshot = null
+            resetVisualState()
             return
         }
         val current = snapshot ?: return
         if (current.bodyId != seat.bodyId) return
-        if (System.currentTimeMillis() - current.receivedAtMillis > STALE_AFTER_MILLIS) return
+        if (System.currentTimeMillis() - current.receivedAtMillis > STALE_AFTER_MILLIS) {
+            resetVisualState()
+            return
+        }
+        val dt = consumeRenderDt()
 
-        renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current)
+        renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
         renderMeters(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current)
     }
 
-    private fun renderDashboard(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot) {
+    private fun renderDashboard(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
         val x = 0
         val y = screenHeight - DASHBOARD_BASE.height
+        val steeringDegrees = updateVisualSteeringDegrees(snapshot.steer, dt)
         drawFuelTank(guiGraphics, x + 117, y + 8, 44, 22, snapshot.fuel)
         guiGraphics.blitRegion(DASHBOARD_TEXTURE, DASHBOARD_BASE, x, y, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT)
         drawRotatedRegion(
@@ -167,7 +181,7 @@ object VehicleHudOverlay {
             y = y,
             pivotX = x + 80.0,
             pivotY = y + 40.0,
-            degrees = (snapshot.steer.coerceIn(-1.0, 1.0) * 85.0).toFloat()
+            degrees = steeringDegrees.toFloat()
         )
         dashboardLights.forEach { it.render(guiGraphics, DASHBOARD_TEXTURE, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT, x, y, snapshot) }
         dashboardKeyWidget.render(guiGraphics, DASHBOARD_TEXTURE, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT, x, y, snapshot)
@@ -182,6 +196,34 @@ object VehicleHudOverlay {
         meters.forEach { meter ->
             meter.render(guiGraphics, anchorX + meter.anchorOffsetX, y, snapshot)
         }
+    }
+
+    private fun consumeRenderDt(): Double {
+        val now = System.currentTimeMillis()
+        val previous = lastRenderMillis
+        lastRenderMillis = now
+        if (previous <= 0L) return 1.0 / 60.0
+        return ((now - previous) / 1000.0).coerceIn(0.0, 0.1)
+    }
+
+    private fun resetVisualState() {
+        lastRenderMillis = 0L
+        visualSteeringDegrees = 0.0
+        visualSteeringVelocityDegrees = 0.0
+    }
+
+    private fun updateVisualSteeringDegrees(steer: Double, dt: Double): Double {
+        val target = -steer.coerceIn(-1.0, 1.0) * STEERING_VISUAL_MAX_DEGREES
+        val safeDt = max(dt, 0.0)
+        val acceleration = (target - visualSteeringDegrees) * STEERING_VISUAL_STIFFNESS -
+            visualSteeringVelocityDegrees * STEERING_VISUAL_DAMPING
+        visualSteeringVelocityDegrees += acceleration * safeDt
+        visualSteeringDegrees += visualSteeringVelocityDegrees * safeDt
+        if (kotlin.math.abs(target - visualSteeringDegrees) < 0.01 && kotlin.math.abs(visualSteeringVelocityDegrees) < 0.01) {
+            visualSteeringDegrees = target
+            visualSteeringVelocityDegrees = 0.0
+        }
+        return visualSteeringDegrees
     }
 
     private fun drawFuelTank(guiGraphics: GuiGraphics, x: Int, y: Int, width: Int, height: Int, fuel: Double) {
@@ -300,19 +342,27 @@ object VehicleHudOverlay {
             guiGraphics.blitRegion(METER_TEXTURE, METER_BASE, x, y, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
             val t = value(snapshot).coerceIn(0.0, 1.0)
             val degrees = minDegrees + ((maxDegrees - minDegrees) * t).toFloat()
+            val pivotSourceX = METER_DIAL_PIVOT.u + METER_DIAL_PIVOT.width / 2.0
+            val pivotSourceY = METER_DIAL_PIVOT.v + METER_DIAL_PIVOT.height / 2.0
+            val pivotScreenX = x + METER_WIDGET_PIVOT_X
+            val pivotScreenY = y + METER_WIDGET_PIVOT_Y
+            val dialX = (pivotScreenX + METER_DIAL.u - pivotSourceX).roundToInt()
+            val dialY = (pivotScreenY + METER_DIAL.v - pivotSourceY).roundToInt()
+            val pivotCapX = (pivotScreenX + METER_DIAL_PIVOT.u - pivotSourceX).roundToInt()
+            val pivotCapY = (pivotScreenY + METER_DIAL_PIVOT.v - pivotSourceY).roundToInt()
             drawRotatedRegion(
                 guiGraphics = guiGraphics,
                 texture = METER_TEXTURE,
                 textureWidth = METER_TEXTURE_WIDTH,
                 textureHeight = METER_TEXTURE_HEIGHT,
                 region = METER_DIAL,
-                x = x + 40,
-                y = y + 16,
-                pivotX = x + 48.0,
-                pivotY = y + 48.0,
+                x = dialX,
+                y = dialY,
+                pivotX = pivotScreenX,
+                pivotY = pivotScreenY,
                 degrees = degrees
             )
-            guiGraphics.blitRegion(METER_TEXTURE, METER_DIAL_PIVOT, x + 40, y + 16, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
+            guiGraphics.blitRegion(METER_TEXTURE, METER_DIAL_PIVOT, pivotCapX, pivotCapY, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
 
             //tag
             if (title.isNotBlank()) {
