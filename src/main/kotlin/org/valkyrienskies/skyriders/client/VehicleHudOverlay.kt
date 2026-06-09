@@ -109,14 +109,6 @@ object VehicleHudOverlay {
 
     private val meters = listOf(
         RoundMeterWidget(
-            title = "5pd",
-            anchorOffsetX = -108,
-            value = { snapshot -> snapshot.speed.coerceIn(0.0, snapshot.maxSpeed) / snapshot.maxSpeed },
-            counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
-            minDegrees = -145.0f,
-            maxDegrees = 145.0f
-        ),
-        RoundMeterWidget(
             title = "rev",
             anchorOffsetX = -108,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
@@ -131,7 +123,15 @@ object VehicleHudOverlay {
             counter = { snapshot -> (snapshot.jumpCharge * 100.0).roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -145.0f,
             maxDegrees = 148.0f
-        )
+        ),
+        RoundMeterWidget(
+            title = "5pd",
+            anchorOffsetX = -108,
+            value = { snapshot -> snapshot.speed.coerceIn(0.0, snapshot.maxSpeed) / snapshot.maxSpeed },
+            counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
+            minDegrees = -145.0f,
+            maxDegrees = 145.0f
+        ),
     )
 
     private var snapshot: VehicleHudSnapshot? = null
@@ -164,6 +164,7 @@ object VehicleHudOverlay {
 
     @SubscribeEvent
     fun onRenderOverlay(event: RenderGuiOverlayEvent.Post) {
+        if (event.overlay.id.path != "hotbar") return
         val minecraft = Minecraft.getInstance()
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
@@ -255,7 +256,10 @@ object VehicleHudOverlay {
         val bottom = y + height
         val time = System.currentTimeMillis() / 1000.0
         for (column in 0 until width) {
-            val wave = sin(column * 0.42 + time * 2.8) * 1.4 + sin(column * 0.83 - time * 1.7) * 0.55
+            val lazySlosh = sin(column * 0.16 + time * 1.05) * 1.15
+            val roundSwell = sin(column * 0.31 - time * 1.85 + 1.4) * 0.75
+            val smallRipple = sin(column * 0.67 + time * 2.65 + 0.8) * 0.32
+            val wave = lazySlosh + roundSwell + smallRipple
             val surfaceY = (filledY + wave.roundToInt()).coerceIn(y, bottom)
             guiGraphics.fill(x + column, surfaceY, x + column + 1, bottom, 0xF7F4B626.toInt())
             if (surfaceY < bottom) {

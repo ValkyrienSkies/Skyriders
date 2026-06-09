@@ -55,6 +55,8 @@ object BikeDebugOverlay {
 
     @SubscribeEvent
     fun onRenderOverlay(event: RenderGuiOverlayEvent.Post) {
+        if (true) return //temporarily disabled
+        if (event.overlay.id.path != "hotbar") return
         val minecraft = Minecraft.getInstance()
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
