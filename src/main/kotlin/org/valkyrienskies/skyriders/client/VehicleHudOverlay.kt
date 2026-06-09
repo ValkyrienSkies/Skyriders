@@ -106,7 +106,7 @@ object VehicleHudOverlay {
     private val meters = listOf(
         RoundMeterWidget(
             title = "spd",
-            anchorOffsetX = 4,
+            anchorOffsetX = -216,
             value = { snapshot -> snapshot.speed.coerceIn(0.0, 60.0) / 60.0 },
             counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -128.0f,
@@ -114,7 +114,7 @@ object VehicleHudOverlay {
         ),
         RoundMeterWidget(
             title = "rev",
-            anchorOffsetX = 104,
+            anchorOffsetX = -108,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
             counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
             minDegrees = -128.0f,
@@ -192,7 +192,7 @@ object VehicleHudOverlay {
     }
 
     private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot) {
-        val anchorX = screenWidth / 2
+        val anchorX = screenWidth
         val y = screenHeight - METER_BASE.height
         meters.forEach { meter ->
             meter.render(guiGraphics, anchorX + meter.anchorOffsetX, y, snapshot)
@@ -342,15 +342,15 @@ object VehicleHudOverlay {
         fun render(guiGraphics: GuiGraphics, x: Int, y: Int, snapshot: VehicleHudSnapshot) {
             guiGraphics.blitRegion(METER_TEXTURE, METER_BASE, x, y, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
             val t = value(snapshot).coerceIn(0.0, 1.0)
-            val degrees = minDegrees + ((maxDegrees - minDegrees) * t).toFloat()
+            val degrees = maxDegrees + ((minDegrees - maxDegrees) * t).toFloat()
             val pivotSourceX = METER_DIAL_PIVOT.u + METER_DIAL_PIVOT.width / 2.0
             val pivotSourceY = METER_DIAL_PIVOT.v + METER_DIAL_PIVOT.height / 2.0
             val pivotScreenX = x + METER_WIDGET_PIVOT_X
             val pivotScreenY = y + METER_WIDGET_PIVOT_Y
-            val dialX = (pivotScreenX + METER_DIAL.u - pivotSourceX).roundToInt()
-            val dialY = (pivotScreenY + METER_DIAL.v - pivotSourceY).roundToInt()
-            val pivotCapX = (pivotScreenX + METER_DIAL_PIVOT.u - pivotSourceX).roundToInt()
-            val pivotCapY = (pivotScreenY + METER_DIAL_PIVOT.v - pivotSourceY).roundToInt()
+            val dialX = (pivotScreenX - METER_DIAL.width / 2.0).roundToInt()
+            val dialY = pivotScreenY.roundToInt()
+            val pivotCapX = (pivotScreenX - METER_DIAL_PIVOT.width / 2.0).roundToInt()
+            val pivotCapY = (pivotScreenY - METER_DIAL_PIVOT.height / 2.0).roundToInt()
             drawRotatedRegion(
                 guiGraphics = guiGraphics,
                 texture = METER_TEXTURE,
