@@ -287,6 +287,10 @@ object SkyridersNetwork {
             is WheeledVehicle -> vehicle.wheeledState.debugClutchEngagement
             else -> 0.0
         }
+        val engineStalled = when (vehicle) {
+            is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
+            else -> false
+        }
         val hasTransmission = vehicle is WheeledVehicle
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
@@ -316,7 +320,8 @@ object SkyridersNetwork {
                 transmissionGear = transmissionGear,
                 parkingBrakeEngaged = parkingBrakeEngaged,
                 engineRpm = engineRpm,
-                clutchEngagement = clutchEngagement
+                clutchEngagement = clutchEngagement,
+                engineStalled = engineStalled
             )
         )
     }
@@ -390,6 +395,7 @@ object SkyridersNetwork {
             buf.writeDouble(input.jump)
             buf.writeDouble(input.pitch)
             buf.writeDouble(input.handbrake)
+            buf.writeDouble(input.clutch)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -416,7 +422,8 @@ object SkyridersNetwork {
                         brake = buf.readDouble(),
                         jump = buf.readDouble(),
                         pitch = buf.readDouble(),
-                        handbrake = buf.readDouble()
+                        handbrake = buf.readDouble(),
+                        clutch = buf.readDouble()
                     ).clamped()
                 )
             }
@@ -757,7 +764,8 @@ object SkyridersNetwork {
         val transmissionGear: Int,
         val parkingBrakeEngaged: Boolean,
         val engineRpm: Double,
-        val clutchEngagement: Double
+        val clutchEngagement: Double,
+        val engineStalled: Boolean
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -786,6 +794,7 @@ object SkyridersNetwork {
             buf.writeBoolean(parkingBrakeEngaged)
             buf.writeDouble(engineRpm)
             buf.writeDouble(clutchEngagement)
+            buf.writeBoolean(engineStalled)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -844,7 +853,8 @@ object SkyridersNetwork {
                     transmissionGear = buf.readInt(),
                     parkingBrakeEngaged = buf.readBoolean(),
                     engineRpm = buf.readDouble(),
-                    clutchEngagement = buf.readDouble()
+                    clutchEngagement = buf.readDouble(),
+                    engineStalled = buf.readBoolean()
                 )
             }
 

@@ -14,15 +14,15 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
 import org.lwjgl.glfw.GLFW
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
-import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.VehicleControlActions
+import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
 import org.valkyrienskies.skyriders.content.VehicleDefinitions
 
 object SkyridersModClient {
-    private var lastSentInput = BikeInput.EMPTY
+    private var lastSentInput = VehicleInput.EMPTY
     private val bikeDismountKey = KeyMapping(
         "key.skyriders.bike_dismount",
         InputConstants.Type.KEYSYM,
@@ -59,6 +59,12 @@ object SkyridersModClient {
         GLFW.GLFW_KEY_PAGE_DOWN,
         "key.categories.skyriders"
     )
+    private val vehicleClutchKey = KeyMapping(
+        "key.skyriders.vehicle_clutch",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_C,
+        "key.categories.skyriders"
+    )
 
     @JvmStatic
     fun clientInit(event: FMLClientSetupEvent) {
@@ -78,6 +84,7 @@ object SkyridersModClient {
         event.register(vehicleParkingBrakeToggleKey)
         event.register(vehicleGearUpKey)
         event.register(vehicleGearDownKey)
+        event.register(vehicleClutchKey)
     }
 
     @JvmStatic
@@ -127,17 +134,18 @@ object SkyridersModClient {
             val right = options.keyRight.isDown
             val leanForward = options.keyShift.isDown
             val leanBack = options.keySprint.isDown
-            val input = BikeInput(
+            val input = VehicleInput(
                 steer = if (left == right) 0.0 else if (left) 1.0 else -1.0,
                 throttle = if (forward == backward) 0.0 else if (forward) 1.0 else -1.0,
                 brake = if (bikeBrakeKey.isDown) 1.0 else 0.0,
                 jump = if (options.keyJump.isDown) 1.0 else 0.0,
-                pitch = if (leanForward == leanBack) 0.0 else if (leanForward) -1.0 else 1.0
+                pitch = if (leanForward == leanBack) 0.0 else if (leanForward) -1.0 else 1.0,
+                clutch = if (vehicleClutchKey.isDown) 1.0 else 0.0
             )
             player.isShiftKeyDown = false
 
             if (input != lastSentInput) {
-                SkyridersNetwork.sendBikeInput(input)
+                SkyridersNetwork.sendVehicleInput(input)
                 lastSentInput = input
             }
         }
@@ -163,7 +171,7 @@ object SkyridersModClient {
 
         @SubscribeEvent
         fun onLoggedOut(event: ClientPlayerNetworkEvent.LoggingOut) {
-            lastSentInput = BikeInput.EMPTY
+            lastSentInput = VehicleInput.EMPTY
             BikeClientHoistState.hoisting = false
         }
     }

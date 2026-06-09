@@ -299,6 +299,7 @@ data class VehicleInput(
     val jump: Double = 0.0,
     val pitch: Double = 0.0,
     val handbrake: Double = 0.0,
+    val clutch: Double = 0.0,
     val riderPresent: Boolean = false
 ) {
     fun clamped(): VehicleInput = copy(
@@ -307,7 +308,8 @@ data class VehicleInput(
         brake = brake.coerceIn(0.0, 1.0),
         jump = jump.coerceIn(0.0, 1.0),
         pitch = pitch.coerceIn(-1.0, 1.0),
-        handbrake = handbrake.coerceIn(0.0, 1.0)
+        handbrake = handbrake.coerceIn(0.0, 1.0),
+        clutch = clutch.coerceIn(0.0, 1.0)
     )
 
     fun toBikeInput(): BikeInput = BikeInput(

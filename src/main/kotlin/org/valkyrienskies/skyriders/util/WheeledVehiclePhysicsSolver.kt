@@ -12,6 +12,7 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.PI
 
 object WheeledVehiclePhysicsSolver {
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
@@ -139,7 +140,8 @@ object WheeledVehiclePhysicsSolver {
                 throttle = 0.0,
                 brake = brake,
                 wheelTopSpeed = config.wheelTopSpeed,
-                torqueMultiplier = transmission.neutralDrag
+                torqueMultiplier = transmission.neutralDrag,
+                engineBrakeScale = 0.0
             )
         }
 
@@ -203,7 +205,8 @@ object WheeledVehiclePhysicsSolver {
             throttle = driveThrottle,
             brake = brake,
             wheelTopSpeed = topSpeed,
-            torqueMultiplier = baseTorque * engineDrive.torqueScale
+            torqueMultiplier = baseTorque * engineDrive.torqueScale,
+            engineBrakeScale = engineDrive.engineBrakeScale
         )
     }
 
@@ -256,8 +259,10 @@ object WheeledVehiclePhysicsSolver {
             state.clutchEngagement = 0.0
             state.debugEngineRpm = state.engineRpm
             state.debugClutchEngagement = 0.0
-            return EngineDriveState(torqueScale = 0.0)
+            state.debugEngineStalled = state.engineStalled
+            return EngineDriveState(torqueScale = 0.0, engineBrakeScale = 0.0)
         }
+        state.engineStalled = false
 
         val throttle = abs(driveThrottle).coerceIn(0.0, 1.0)
         val freeTargetRpm = if (throttle > 0.0) {
@@ -265,18 +270,14 @@ object WheeledVehiclePhysicsSolver {
         } else {
             engine.idleRpm
         }
-        val coupledRpm = if (gear != 0 && topSpeed > 1.0) {
-            (abs(forwardSpeed) / topSpeed * engine.redlineRpm).coerceIn(0.0, engine.revLimiterRpm)
-        } else {
-            0.0
-        }
+        val coupledRpm = coupledEngineRpm(forwardSpeed, gear, gearConfig, topSpeed, config)
         val launchScale = when {
             gear > 0 && gearConfig != null -> gearLaunchTorqueFactor(gearConfig, forwardSpeed)
             gear < 0 -> 0.85
             else -> 0.0
         }
         val clutchAssistRpm = throttle * engine.idleRpm * (0.45 + launchScale * 0.9)
-        val clutchTarget = when {
+        val automaticClutchTarget = when {
             gear == 0 -> 0.0
             throttle > 0.0 -> max(
                 launchScale * 0.18,
@@ -285,8 +286,15 @@ object WheeledVehiclePhysicsSolver {
             abs(forwardSpeed) > 0.5 -> smoothstep(engine.idleRpm, engine.redlineRpm * 0.25, coupledRpm) * 0.45
             else -> 0.0
         }.coerceIn(0.0, 1.0)
+        val rawClutchTarget = if (config.transmission.manualClutch) {
+            if (gear == 0) 0.0 else 1.0 - input.clutch.coerceIn(0.0, 1.0)
+        } else {
+            automaticClutchTarget
+        }
+        val clutchResponse = if (config.transmission.manualClutch) 4.6 else engine.coupledRevResponse
+        val clutchTarget = lerpByResponse(state.clutchEngagement, rawClutchTarget, clutchResponse, stepDt).coerceIn(0.0, 1.0)
 
-        val loadedTargetRpm = max(coupledRpm, engine.stallRpm)
+        val loadedTargetRpm = if (config.transmission.manualClutch) coupledRpm else max(coupledRpm, engine.stallRpm)
         val targetRpm = if (clutchTarget > 0.0) {
             lerp(freeTargetRpm, loadedTargetRpm, clutchTarget * 0.85)
         } else {
@@ -302,11 +310,73 @@ object WheeledVehiclePhysicsSolver {
         state.clutchEngagement = clutchTarget
         state.debugEngineRpm = state.engineRpm
         state.debugClutchEngagement = clutchTarget
+        state.debugEngineStalled = false
+
+        if (shouldStallEngine(config, state.engineRpm, gear, clutchTarget)) {
+            state.engineOn = false
+            state.engineStalled = true
+            state.engineRpm = 0.0
+            state.clutchEngagement = 0.0
+            state.debugEngineRpm = 0.0
+            state.debugClutchEngagement = 0.0
+            state.debugEngineStalled = true
+            return EngineDriveState(torqueScale = 0.0, engineBrakeScale = 0.0)
+        }
 
         val limiterScale = 1.0 - smoothstep(engine.redlineRpm, engine.revLimiterRpm, state.engineRpm)
         val stallScale = smoothstep(engine.stallRpm * 0.75, engine.idleRpm, state.engineRpm)
         val torqueScale = sampleEngineTorque(engine, state.engineRpm) * clutchTarget * limiterScale * stallScale
-        return EngineDriveState(torqueScale = torqueScale.coerceIn(0.0, 1.5))
+        val engineBrakeScale = if (gear != 0 && throttle < 0.05 && abs(forwardSpeed) > 0.35) {
+            engine.engineBrakeTorqueScale * clutchTarget * smoothstep(0.35, 4.0, abs(forwardSpeed))
+        } else {
+            0.0
+        }
+        return EngineDriveState(
+            torqueScale = torqueScale.coerceIn(0.0, 1.5),
+            engineBrakeScale = engineBrakeScale.coerceIn(0.0, 1.0)
+        )
+    }
+
+    private fun coupledEngineRpm(
+        forwardSpeed: Double,
+        gear: Int,
+        gearConfig: org.valkyrienskies.skyriders.content.VehicleTransmissionGearConfig?,
+        topSpeed: Double,
+        config: WheeledVehiclePhysicsConfig
+    ): Double {
+        if (gear == 0) return 0.0
+        val transmission = config.transmission
+        val gearRatio = when {
+            gear > 0 -> gearConfig?.gearRatio
+            gear < 0 -> transmission.reverseGearRatio
+            else -> null
+        }
+        if (gearRatio != null && gearRatio > 0.0 && transmission.finalDriveRatio > 0.0) {
+            val radius = averageDrivenWheelRadius(config).coerceAtLeast(0.05)
+            val wheelRpm = abs(forwardSpeed) / radius * 60.0 / (2.0 * PI)
+            return (wheelRpm * gearRatio * transmission.finalDriveRatio).coerceIn(0.0, config.engine.revLimiterRpm * 1.1)
+        }
+        return if (topSpeed > 1.0) {
+            (abs(forwardSpeed) / topSpeed * config.engine.redlineRpm).coerceIn(0.0, config.engine.revLimiterRpm)
+        } else {
+            0.0
+        }
+    }
+
+    private fun averageDrivenWheelRadius(config: WheeledVehiclePhysicsConfig): Double {
+        val driven = config.axles.filter(WheelAxleConfig::driven)
+        val axles = driven.ifEmpty { config.axles }
+        return axles.sumOf(WheelAxleConfig::wheelRadius) / axles.size
+    }
+
+    private fun shouldStallEngine(
+        config: WheeledVehiclePhysicsConfig,
+        engineRpm: Double,
+        gear: Int,
+        clutchEngagement: Double
+    ): Boolean {
+        if (!config.transmission.manualClutch || gear == 0 || clutchEngagement < 0.68) return false
+        return engineRpm < config.engine.stallRpm
     }
 
     private fun sampleEngineTorque(
@@ -484,8 +554,13 @@ object WheeledVehiclePhysicsSolver {
                 }
                 val forceScale = if (brake > 0.0) 1.0 else driveForceScale
                 val maxForce = loaded.normalForce * config.tireFrictionCoefficient * axle.longitudinalGrip * forceScale
+                val engineBrakeForce = if (axle.driven && brake <= 0.0 && abs(throttle) < 0.05 && driveCommand.engineBrakeScale > 0.0 && abs(groundSpeed) > 0.1) {
+                    -groundSpeed.signOrZero() * loaded.normalForce * config.tireFrictionCoefficient * axle.longitudinalGrip * driveCommand.engineBrakeScale
+                } else {
+                    0.0
+                }
                 val rollingForce = (-groundSpeed * config.rollingResistance / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
-                val forceMag = (shapedSlip * maxForce + rollingForce).coerceIn(-MAX_FORCE, MAX_FORCE)
+                val forceMag = (shapedSlip * maxForce + engineBrakeForce + rollingForce).coerceIn(-MAX_FORCE, MAX_FORCE)
                 VehicleWheelPhysics.applyContactForce(body, loaded.contact, Vector3d(loaded.contact.wheelForwardWorld).mul(forceMag))
 
                 val wheelInertia = max(0.08, config.mass * radius * radius * config.wheelInertiaMassScale)
@@ -836,11 +911,13 @@ object WheeledVehiclePhysicsSolver {
         val throttle: Double,
         val brake: Double,
         val wheelTopSpeed: Double,
-        val torqueMultiplier: Double
+        val torqueMultiplier: Double,
+        val engineBrakeScale: Double
     )
 
     private data class EngineDriveState(
-        val torqueScale: Double
+        val torqueScale: Double,
+        val engineBrakeScale: Double
     )
 
     private data class WheelSample(

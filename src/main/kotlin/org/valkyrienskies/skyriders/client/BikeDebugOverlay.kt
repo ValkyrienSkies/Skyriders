@@ -48,6 +48,7 @@ object BikeDebugOverlay {
             parkingBrakeEngaged = packet.parkingBrakeEngaged,
             engineRpm = packet.engineRpm,
             clutchEngagement = packet.clutchEngagement,
+            engineStalled = packet.engineStalled,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -81,6 +82,7 @@ object BikeDebugOverlay {
             lines.add("Gear: ${formatGear(currentSnapshot.transmissionGear)}")
             lines.add("RPM: ${formatWhole(currentSnapshot.engineRpm)}")
             lines.add("Clutch: ${formatPercent(currentSnapshot.clutchEngagement)}")
+            lines.add("Engine Stalled: ${currentSnapshot.engineStalled}")
             lines.add("Parking Brake: ${currentSnapshot.parkingBrakeEngaged}")
         }
         if (currentSnapshot.groundedCount >= 0) {
@@ -162,6 +164,7 @@ object BikeDebugOverlay {
         val parkingBrakeEngaged: Boolean,
         val engineRpm: Double,
         val clutchEngagement: Double,
+        val engineStalled: Boolean,
         val receivedAtMillis: Long
     )
 

@@ -255,7 +255,19 @@ object VehicleManager {
         val enabled = !vehicle.vehicleState.engineOn
         when (vehicle) {
             is KartVehicle -> vehicle.kartState.engineOn = enabled
-            is WheeledVehicle -> vehicle.wheeledState.engineOn = enabled
+            is WheeledVehicle -> {
+                vehicle.wheeledState.engineOn = enabled
+                vehicle.wheeledState.engineStalled = false
+                vehicle.wheeledState.debugEngineStalled = false
+                if (enabled) {
+                    val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition
+                    val idleRpm = behavior?.physics?.engine?.idleRpm ?: 850.0
+                    vehicle.wheeledState.engineRpm = idleRpm
+                    vehicle.wheeledState.debugEngineRpm = idleRpm
+                    vehicle.wheeledState.clutchEngagement = 0.0
+                    vehicle.wheeledState.debugClutchEngagement = 0.0
+                }
+            }
         }
         if (!enabled) {
             clearInput(level.dimensionId, bodyId)

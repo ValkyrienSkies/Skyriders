@@ -178,11 +178,14 @@ data class WheeledVehiclePhysicsConfig(
             stepAssistStrength = 8200.0,
             transmission = VehicleTransmissionConfig(
                 automatic = false,
+                manualClutch = false,
+                finalDriveRatio = 3.42,
+                reverseGearRatio = 3.1,
                 forwardGears = listOf(
-                    VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.75, launchTorqueScale = 1.0),
-                    VehicleTransmissionGearConfig(maxSpeed = 12.0, torqueMultiplier = 1.18, launchTorqueScale = 0.58),
-                    VehicleTransmissionGearConfig(maxSpeed = 18.0, torqueMultiplier = 0.84, launchTorqueScale = 0.24),
-                    VehicleTransmissionGearConfig(maxSpeed = 24.0, torqueMultiplier = 0.62, launchTorqueScale = 0.08)
+                    VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.75, launchTorqueScale = 1.0, gearRatio = 3.25),
+                    VehicleTransmissionGearConfig(maxSpeed = 12.0, torqueMultiplier = 1.18, launchTorqueScale = 0.58, gearRatio = 1.95),
+                    VehicleTransmissionGearConfig(maxSpeed = 18.0, torqueMultiplier = 0.84, launchTorqueScale = 0.24, gearRatio = 1.3),
+                    VehicleTransmissionGearConfig(maxSpeed = 24.0, torqueMultiplier = 0.62, launchTorqueScale = 0.08, gearRatio = 0.95)
                 ),
                 reverseTopSpeed = 6.0,
                 reverseTorqueMultiplier = 0.72,
@@ -194,12 +197,15 @@ data class WheeledVehiclePhysicsConfig(
 
 data class VehicleTransmissionConfig(
     val automatic: Boolean = true,
+    val manualClutch: Boolean = false,
     val forwardGears: List<VehicleTransmissionGearConfig>,
     val reverseTopSpeed: Double = 5.5,
     val reverseTorqueMultiplier: Double = 0.72,
     val neutralDrag: Double = 0.18,
     val shiftCooldownSeconds: Double = 0.28,
-    val automaticReverseSpeedThreshold: Double = 0.8
+    val automaticReverseSpeedThreshold: Double = 0.8,
+    val finalDriveRatio: Double = 1.0,
+    val reverseGearRatio: Double? = null
 ) {
     companion object {
         val DEFAULT_AUTOMATIC = VehicleTransmissionConfig(
@@ -223,6 +229,7 @@ data class VehicleEngineConfig(
     val freeRevResponse: Double = 7.5,
     val coupledRevResponse: Double = 11.0,
     val clutchStallProtection: Double = 0.42,
+    val engineBrakeTorqueScale: Double = 0.26,
     val torqueCurve: List<VehicleEngineTorquePoint> = listOf(
         VehicleEngineTorquePoint(800.0, 0.55),
         VehicleEngineTorquePoint(1800.0, 0.92),
@@ -246,7 +253,8 @@ data class VehicleTransmissionGearConfig(
     val torqueMultiplier: Double = 1.0,
     val launchTorqueScale: Double = 1.0,
     val upshiftSpeed: Double = maxSpeed * 0.82,
-    val downshiftSpeed: Double = maxSpeed * 0.42
+    val downshiftSpeed: Double = maxSpeed * 0.42,
+    val gearRatio: Double? = null
 )
 
 data class WheelAxleConfig(
@@ -284,9 +292,11 @@ data class WheeledVehicleRuntimeState(
     var debugParkingBrake: Boolean = false,
     var debugEngineRpm: Double = 850.0,
     var debugClutchEngagement: Double = 0.0,
+    var debugEngineStalled: Boolean = false,
     var debugLateralSlip: Double = 0.0,
     var engineRpm: Double = 850.0,
     var clutchEngagement: Double = 0.0,
+    var engineStalled: Boolean = false,
     var smoothedSteerRad: Double = 0.0,
     var groundedGraceTimeRemaining: Double = 0.0,
     val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0),
