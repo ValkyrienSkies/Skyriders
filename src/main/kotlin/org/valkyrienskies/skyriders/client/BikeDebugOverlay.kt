@@ -46,6 +46,8 @@ object BikeDebugOverlay {
             hasTransmission = packet.hasTransmission,
             transmissionGear = packet.transmissionGear,
             parkingBrakeEngaged = packet.parkingBrakeEngaged,
+            engineRpm = packet.engineRpm,
+            clutchEngagement = packet.clutchEngagement,
             receivedAtMillis = System.currentTimeMillis()
         )
     }
@@ -77,6 +79,8 @@ object BikeDebugOverlay {
         )
         if (currentSnapshot.hasTransmission) {
             lines.add("Gear: ${formatGear(currentSnapshot.transmissionGear)}")
+            lines.add("RPM: ${formatWhole(currentSnapshot.engineRpm)}")
+            lines.add("Clutch: ${formatPercent(currentSnapshot.clutchEngagement)}")
             lines.add("Parking Brake: ${currentSnapshot.parkingBrakeEngaged}")
         }
         if (currentSnapshot.groundedCount >= 0) {
@@ -125,6 +129,10 @@ object BikeDebugOverlay {
         return String.format(Locale.ROOT, "%.0f%%", percent)
     }
 
+    private fun formatWhole(value: Double): String {
+        return String.format(Locale.ROOT, "%.0f", if (value.isFinite()) value else 0.0)
+    }
+
     private fun formatGear(gear: Int): String {
         return when {
             gear < 0 -> "R"
@@ -152,6 +160,8 @@ object BikeDebugOverlay {
         val hasTransmission: Boolean,
         val transmissionGear: Int,
         val parkingBrakeEngaged: Boolean,
+        val engineRpm: Double,
+        val clutchEngagement: Double,
         val receivedAtMillis: Long
     )
 

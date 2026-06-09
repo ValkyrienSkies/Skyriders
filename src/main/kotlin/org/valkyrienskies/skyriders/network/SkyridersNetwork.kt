@@ -279,6 +279,14 @@ object SkyridersNetwork {
             is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
             else -> false
         }
+        val engineRpm = when (vehicle) {
+            is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
+            else -> 0.0
+        }
+        val clutchEngagement = when (vehicle) {
+            is WheeledVehicle -> vehicle.wheeledState.debugClutchEngagement
+            else -> 0.0
+        }
         val hasTransmission = vehicle is WheeledVehicle
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
@@ -306,7 +314,9 @@ object SkyridersNetwork {
                 rearWheelSuspensionOffset = rearWheelSuspensionOffset,
                 hasTransmission = hasTransmission,
                 transmissionGear = transmissionGear,
-                parkingBrakeEngaged = parkingBrakeEngaged
+                parkingBrakeEngaged = parkingBrakeEngaged,
+                engineRpm = engineRpm,
+                clutchEngagement = clutchEngagement
             )
         )
     }
@@ -745,7 +755,9 @@ object SkyridersNetwork {
         val rearWheelSuspensionOffset: Double,
         val hasTransmission: Boolean,
         val transmissionGear: Int,
-        val parkingBrakeEngaged: Boolean
+        val parkingBrakeEngaged: Boolean,
+        val engineRpm: Double,
+        val clutchEngagement: Double
     ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeLong(bodyId)
@@ -772,6 +784,8 @@ object SkyridersNetwork {
             buf.writeBoolean(hasTransmission)
             buf.writeInt(transmissionGear)
             buf.writeBoolean(parkingBrakeEngaged)
+            buf.writeDouble(engineRpm)
+            buf.writeDouble(clutchEngagement)
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -828,7 +842,9 @@ object SkyridersNetwork {
                     rearWheelSuspensionOffset = buf.readDouble(),
                     hasTransmission = buf.readBoolean(),
                     transmissionGear = buf.readInt(),
-                    parkingBrakeEngaged = buf.readBoolean()
+                    parkingBrakeEngaged = buf.readBoolean(),
+                    engineRpm = buf.readDouble(),
+                    clutchEngagement = buf.readDouble()
                 )
             }
 

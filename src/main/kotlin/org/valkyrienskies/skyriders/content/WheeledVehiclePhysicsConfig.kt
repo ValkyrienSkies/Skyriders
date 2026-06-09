@@ -32,7 +32,8 @@ data class WheeledVehiclePhysicsConfig(
     val parkingBrakeStrength: Double = 4.5,
     val maxStepHeight: Double = 0.85,
     val stepAssistStrength: Double = 6500.0,
-    val transmission: VehicleTransmissionConfig = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
+    val transmission: VehicleTransmissionConfig = VehicleTransmissionConfig.DEFAULT_AUTOMATIC,
+    val engine: VehicleEngineConfig = VehicleEngineConfig.DEFAULT
 ) {
     init {
         require(axles.isNotEmpty()) { "Wheeled vehicles require at least one axle." }
@@ -178,10 +179,10 @@ data class WheeledVehiclePhysicsConfig(
             transmission = VehicleTransmissionConfig(
                 automatic = false,
                 forwardGears = listOf(
-                    VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.75),
-                    VehicleTransmissionGearConfig(maxSpeed = 12.0, torqueMultiplier = 1.18),
-                    VehicleTransmissionGearConfig(maxSpeed = 18.0, torqueMultiplier = 0.84),
-                    VehicleTransmissionGearConfig(maxSpeed = 24.0, torqueMultiplier = 0.62)
+                    VehicleTransmissionGearConfig(maxSpeed = 6.5, torqueMultiplier = 1.75, launchTorqueScale = 1.0),
+                    VehicleTransmissionGearConfig(maxSpeed = 12.0, torqueMultiplier = 1.18, launchTorqueScale = 0.58),
+                    VehicleTransmissionGearConfig(maxSpeed = 18.0, torqueMultiplier = 0.84, launchTorqueScale = 0.24),
+                    VehicleTransmissionGearConfig(maxSpeed = 24.0, torqueMultiplier = 0.62, launchTorqueScale = 0.08)
                 ),
                 reverseTopSpeed = 6.0,
                 reverseTorqueMultiplier = 0.72,
@@ -214,9 +215,36 @@ data class VehicleTransmissionConfig(
     }
 }
 
+data class VehicleEngineConfig(
+    val idleRpm: Double = 850.0,
+    val stallRpm: Double = 450.0,
+    val redlineRpm: Double = 6200.0,
+    val revLimiterRpm: Double = 6500.0,
+    val freeRevResponse: Double = 7.5,
+    val coupledRevResponse: Double = 11.0,
+    val clutchStallProtection: Double = 0.42,
+    val torqueCurve: List<VehicleEngineTorquePoint> = listOf(
+        VehicleEngineTorquePoint(800.0, 0.55),
+        VehicleEngineTorquePoint(1800.0, 0.92),
+        VehicleEngineTorquePoint(3600.0, 1.0),
+        VehicleEngineTorquePoint(5200.0, 0.84),
+        VehicleEngineTorquePoint(6500.0, 0.35)
+    )
+) {
+    companion object {
+        val DEFAULT = VehicleEngineConfig()
+    }
+}
+
+data class VehicleEngineTorquePoint(
+    val rpm: Double,
+    val torqueScale: Double
+)
+
 data class VehicleTransmissionGearConfig(
     val maxSpeed: Double,
     val torqueMultiplier: Double = 1.0,
+    val launchTorqueScale: Double = 1.0,
     val upshiftSpeed: Double = maxSpeed * 0.82,
     val downshiftSpeed: Double = maxSpeed * 0.42
 )
@@ -254,7 +282,11 @@ data class WheeledVehicleRuntimeState(
     var debugForwardSpeed: Double = 0.0,
     var debugTransmissionGear: Int = 1,
     var debugParkingBrake: Boolean = false,
+    var debugEngineRpm: Double = 850.0,
+    var debugClutchEngagement: Double = 0.0,
     var debugLateralSlip: Double = 0.0,
+    var engineRpm: Double = 850.0,
+    var clutchEngagement: Double = 0.0,
     var smoothedSteerRad: Double = 0.0,
     var groundedGraceTimeRemaining: Double = 0.0,
     val smoothedGroundNormal: Vector3d = Vector3d(0.0, 1.0, 0.0),

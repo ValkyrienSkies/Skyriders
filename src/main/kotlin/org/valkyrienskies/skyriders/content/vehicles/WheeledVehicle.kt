@@ -57,6 +57,7 @@ class WheeledVehicle(
             putDouble("rear_wheel_angular_velocity", wheeledState.rearWheelAngularVelocity)
             putBoolean("parking_brake_engaged", wheeledState.parkingBrakeEngaged)
             putInt("transmission_gear", wheeledState.transmissionGear)
+            putDouble("engine_rpm", wheeledState.engineRpm)
             val wheelSpin = CompoundTag()
             val wheelAngularVelocity = CompoundTag()
             wheeledState.wheelSpinById.forEach { (id, value) -> wheelSpin.putDouble(id, value) }
@@ -83,6 +84,7 @@ fun wheeledRuntimeStateFromTag(
         engineOn = engineOn,
         parkingBrakeEngaged = tag.getBoolean("parking_brake_engaged"),
         transmissionGear = tag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
+        engineRpm = tag.getDouble("engine_rpm").takeIf { it > 0.0 } ?: 850.0,
         frontWheelSpin = tag.getDouble("front_wheel_spin"),
         rearWheelSpin = tag.getDouble("rear_wheel_spin"),
         frontWheelAngularVelocity = tag.getDouble("front_wheel_angular_velocity"),

@@ -282,6 +282,7 @@ object BikeClientEffects {
             0.0
         }
         val throttle = abs(bikeTelemetry?.throttle ?: vehicleTelemetry?.throttle ?: 0.0)
+        val engineRpm = vehicleTelemetry?.engineRpm?.takeIf { vehicleTelemetry.hasTransmission && it > 0.0 }
         val existingSound = engineSoundsByBodyId[vehicle.bodyId]
         val sound = if (existingSound?.soundId == soundId) {
             existingSound
@@ -291,7 +292,7 @@ object BikeClientEffects {
                 engineSoundsByBodyId[vehicle.bodyId] = it
             }
         }
-        sound.update(speed, throttle)
+        sound.update(speed, throttle, engineRpm)
         if (!minecraft.soundManager.isActive(sound)) {
             minecraft.soundManager.play(sound)
         }
@@ -451,7 +452,7 @@ object BikeClientEffects {
             pitch = 0.75f
         }
 
-        fun update(speed: Double, throttle: Double) {
+        fun update(speed: Double, throttle: Double, engineRpm: Double?) {
             val transform = try {
                 vehicle.getRenderTransform()
             } catch (_: IllegalStateException) {
@@ -463,8 +464,9 @@ object BikeClientEffects {
             y = position.y
             z = position.z
 
-            val speedT = (speed / 18.0).coerceIn(0.0, 1.0)
-            val soundSpeedT = (speed / soundDefinition.referenceSpeed).coerceIn(0.0, 1.0)
+            val soundSpeedT = engineRpm
+                ?.let { ((it - 750.0) / 5450.0).coerceIn(0.0, 1.0) }
+                ?: (speed / soundDefinition.referenceSpeed).coerceIn(0.0, 1.0)
             val accelT = throttle.coerceIn(0.0, 1.0)
             volume = (
                 soundDefinition.idleVolume +
