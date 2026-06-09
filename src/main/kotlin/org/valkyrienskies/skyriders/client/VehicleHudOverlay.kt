@@ -98,14 +98,14 @@ object VehicleHudOverlay {
         offRegion = DASHBOARD_KEY_OFF,
         onRegion = DASHBOARD_KEY_ON
     ) { VehicleHudKeyState.HIDDEN }
-    private val dashboardSpeedCounter = HudAtlasCounterWidget(92, 45, maxLength = 3, atlas = DASHBOARD_ATLAS)
-    private val dashboardGearCounter = HudAtlasCounterWidget(145, 45, maxLength = 1, atlas = DASHBOARD_ATLAS)
-    private val dashboardFuelCounter = HudAtlasCounterWidget(128, 30, maxLength = 3, atlas = DASHBOARD_ATLAS)
+    //private val dashboardSpeedCounter = HudAtlasCounterWidget(92, 45, maxLength = 3, atlas = DASHBOARD_ATLAS)
+    private val dashboardGearCounter = HudAtlasCounterWidget(29, 38, maxLength = 1, atlas = DASHBOARD_ATLAS)
+    private val dashboardFuelCounter = HudAtlasCounterWidget(141, 38, maxLength = 3, atlas = DASHBOARD_ATLAS)
 
     private val meters = listOf(
         RoundMeterWidget(
             title = "spd",
-            anchorOffsetX = -100,
+            anchorOffsetX = 4,
             value = { snapshot -> snapshot.speed.coerceIn(0.0, 60.0) / 60.0 },
             counter = { snapshot -> snapshot.speed.roundToInt().coerceIn(0, 999).toString() },
             minDegrees = -128.0f,
@@ -113,7 +113,7 @@ object VehicleHudOverlay {
         ),
         RoundMeterWidget(
             title = "rev",
-            anchorOffsetX = 4,
+            anchorOffsetX = 104,
             value = { snapshot -> snapshot.engineRpm.coerceIn(0.0, 7000.0) / 7000.0 },
             counter = { snapshot -> (snapshot.engineRpm / 1000.0).roundToInt().coerceIn(0, 99).toString() },
             minDegrees = -128.0f,
@@ -185,7 +185,7 @@ object VehicleHudOverlay {
         )
         dashboardLights.forEach { it.render(guiGraphics, DASHBOARD_TEXTURE, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT, x, y, snapshot) }
         dashboardKeyWidget.render(guiGraphics, DASHBOARD_TEXTURE, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT, x, y, snapshot)
-        dashboardSpeedCounter.render(guiGraphics, x, y, snapshot.speed.roundToInt().coerceIn(0, 999).toString())
+        //dashboardSpeedCounter.render(guiGraphics, x, y, snapshot.speed.roundToInt().coerceIn(0, 999).toString())
         dashboardGearCounter.render(guiGraphics, x, y, formatGear(snapshot.transmissionGear))
         dashboardFuelCounter.render(guiGraphics, x, y, (snapshot.fuel * 100.0).roundToInt().coerceIn(0, 999).toString())
     }
@@ -367,12 +367,12 @@ object VehicleHudOverlay {
             //tag
             if (title.isNotBlank()) {
                 guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x - 6, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
-                METER_ATLAS.renderText(guiGraphics, x - 4, y + 72, title, maxLength = 3, characterSpacing = 1)
+                METER_ATLAS.renderText(guiGraphics, x - 3, y + 71, title, maxLength = 3, characterSpacing = 1)
             }
 
             //counter
-            guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x + 90, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
-            METER_ATLAS.renderText(guiGraphics, x + 39, y + 72, counter(snapshot), maxLength = 3, characterSpacing = 1)
+            guiGraphics.blitRegion(METER_TEXTURE, METER_COUNTER_BACKGROUND, x + 82, y + 68, METER_TEXTURE_WIDTH, METER_TEXTURE_HEIGHT)
+            METER_ATLAS.renderText(guiGraphics, x + 85, y + 71, counter(snapshot), maxLength = 3, characterSpacing = 1)
         }
     }
 }
