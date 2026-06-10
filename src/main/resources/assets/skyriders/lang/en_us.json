@@ -25,6 +25,12 @@
   "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",
   "death.attack.skyriders.vehicle_impact.item": "%1$s was run over by %2$s using %3$s",
   "death.attack.skyriders.vehicle_impact.variant_1": "%1$s politely greeted the front bumper",
+  "death.attack.skyriders.vehicle_impact.variant_1.player": "%1$s politely greeted %2$s's front bumper",
+  "death.attack.skyriders.vehicle_impact.variant_1.item": "%1$s politely greeted %2$s's front bumper while %2$s held %3$s",
   "death.attack.skyriders.vehicle_impact.variant_2": "%1$s failed to yield",
-  "death.attack.skyriders.vehicle_impact.variant_3": "%1$s forgot to look both ways"
+  "death.attack.skyriders.vehicle_impact.variant_2.player": "%1$s failed to yield to %2$s",
+  "death.attack.skyriders.vehicle_impact.variant_2.item": "%1$s failed to yield to %2$s and %3$s",
+  "death.attack.skyriders.vehicle_impact.variant_3": "%1$s forgot to look both ways",
+  "death.attack.skyriders.vehicle_impact.variant_3.player": "%1$s forgot to look both ways before %2$s arrived",
+  "death.attack.skyriders.vehicle_impact.variant_3.item": "%1$s forgot to look both ways before %2$s arrived with %3$s"
 }
