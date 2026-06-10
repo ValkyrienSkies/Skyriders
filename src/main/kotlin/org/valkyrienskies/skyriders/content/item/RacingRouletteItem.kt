@@ -115,6 +115,9 @@ private class RacingRouletteItemRenderer(
     ) {
         val minecraft = Minecraft.getInstance()
         poseStack.pushPose()
+        // BEWLR is invoked after ItemRenderer already centers the custom item model at -0.5.
+        // Undo that before delegating to the borrowed reward item's normal renderer.
+        poseStack.translate(0.5, 0.5, 0.5)
         minecraft.itemRenderer.renderStatic(
             RacingRouletteItem.displayStack(stack),
             displayContext,
