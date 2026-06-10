@@ -33,6 +33,8 @@ class WheeledVehicle(
         get() = VehicleRuntimeState(
             engineOn = wheeledState.engineOn,
             fuelAmount = wheeledState.fuelAmount,
+            raceParticipant = wheeledState.raceParticipant,
+            raceColorId = wheeledState.raceColorId,
             partStates = wheeledState.partStates
         )
 
@@ -55,6 +57,8 @@ class WheeledVehicle(
         vehicleType = id,
         engineOn = wheeledState.engineOn,
         fuelAmount = wheeledState.fuelAmount,
+        raceParticipant = wheeledState.raceParticipant,
+        raceColorId = wheeledState.raceColorId,
         behaviorTag = CompoundTag().apply {
             putString("behavior_type", "wheeled")
             putDouble("front_wheel_spin", wheeledState.frontWheelSpin)
@@ -89,11 +93,15 @@ fun wheeledRuntimeStateFromTag(
     tag: CompoundTag,
     engineOn: Boolean,
     fuelAmount: Double,
+    raceParticipant: Boolean = false,
+    raceColorId: Int = -1,
     partStates: Map<String, VehiclePartState>
 ): WheeledVehicleRuntimeState {
     val state = WheeledVehicleRuntimeState(
         engineOn = engineOn,
         fuelAmount = VehicleFuel.initialAmount(definition, fuelAmount),
+        raceParticipant = raceParticipant,
+        raceColorId = raceColorId,
         parkingBrakeEngaged = tag.getBoolean("parking_brake_engaged"),
         transmissionGear = tag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
         engineRpm = tag.getDouble("engine_rpm").takeIf { it > 0.0 } ?: 850.0,

@@ -8,6 +8,8 @@ data class BikeSaveRecord(
     val bikeType: String,
     val engineOn: Boolean = false,
     val fuelAmount: Double = Double.NaN,
+    val raceParticipant: Boolean = false,
+    val raceColorId: Int = -1,
     val visualLeanRad: Double = 0.0,
     val frontWheelSpin: Double = 0.0,
     val rearWheelSpin: Double = 0.0,
@@ -22,6 +24,10 @@ data class BikeSaveRecord(
         if (fuelAmount.isFinite()) {
             putDouble(FUEL_AMOUNT_KEY, fuelAmount)
         }
+        putBoolean(RACE_PARTICIPANT_KEY, raceParticipant)
+        if (raceColorId >= 0) {
+            putInt(RACE_COLOR_ID_KEY, raceColorId)
+        }
         putDouble(VISUAL_LEAN_KEY, visualLeanRad)
         putDouble(FRONT_WHEEL_SPIN_KEY, frontWheelSpin)
         putDouble(REAR_WHEEL_SPIN_KEY, rearWheelSpin)
@@ -35,6 +41,8 @@ data class BikeSaveRecord(
         private const val BIKE_TYPE_KEY = "bike_type"
         private const val ENGINE_ON_KEY = "engine_on"
         private const val FUEL_AMOUNT_KEY = "fuel_amount"
+        private const val RACE_PARTICIPANT_KEY = "race_participant"
+        private const val RACE_COLOR_ID_KEY = "race_color_id"
         private const val VISUAL_LEAN_KEY = "visual_lean"
         private const val FRONT_WHEEL_SPIN_KEY = "front_wheel_spin"
         private const val REAR_WHEEL_SPIN_KEY = "rear_wheel_spin"
@@ -47,6 +55,8 @@ data class BikeSaveRecord(
             bikeType = tag.getString(BIKE_TYPE_KEY),
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
             fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
+            raceParticipant = tag.getBoolean(RACE_PARTICIPANT_KEY),
+            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) tag.getInt(RACE_COLOR_ID_KEY) else -1,
             visualLeanRad = tag.getDouble(VISUAL_LEAN_KEY),
             frontWheelSpin = tag.getDouble(FRONT_WHEEL_SPIN_KEY),
             rearWheelSpin = tag.getDouble(REAR_WHEEL_SPIN_KEY),

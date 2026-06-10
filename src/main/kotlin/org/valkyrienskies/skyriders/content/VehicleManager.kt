@@ -173,6 +173,8 @@ object VehicleManager {
                 kartState = KartRuntimeState(
                     engineOn = record.engineOn,
                     fuelAmount = VehicleFuel.initialAmount(definition, record.fuelAmount),
+                    raceParticipant = record.raceParticipant,
+                    raceColorId = record.raceColorId,
                     transmissionGear = record.behaviorTag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
                     frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
                     rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
@@ -185,7 +187,15 @@ object VehicleManager {
                 bodyId = bodyId,
                 level = level,
                 vehicleDefinition = definition,
-                wheeledState = wheeledRuntimeStateFromTag(definition, record.behaviorTag, record.engineOn, record.fuelAmount, record.partStates)
+                wheeledState = wheeledRuntimeStateFromTag(
+                    definition,
+                    record.behaviorTag,
+                    record.engineOn,
+                    record.fuelAmount,
+                    record.raceParticipant,
+                    record.raceColorId,
+                    record.partStates
+                )
             )
             is BikeVehicleBehaviorDefinition -> throw IllegalArgumentException("Bike vehicles are created through BikeManager")
         }

@@ -42,6 +42,7 @@ import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -79,6 +80,9 @@ object SkyridersMod {
     }
     val CREATIVE_JERRY_CAN: RegistryObject<Item> = ITEMS.register("creative_jerry_can") {
         CreativeJerryCanItem(Item.Properties().stacksTo(1))
+    }
+    val RACE_FLAG: RegistryObject<Item> = ITEMS.register("flag") {
+        RaceFlagItem(Item.Properties().stacksTo(1))
     }
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))
@@ -148,6 +152,7 @@ object SkyridersMod {
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
             modEventBus.addListener(SkyridersModClient::registerKeyMappings)
+            modEventBus.addListener(SkyridersModClient::registerItemColors)
             modEventBus.addListener(SkyridersModClient::registerAdditionalModels)
             modEventBus.addListener(SkyridersModClient::registerGuiOverlays)
         }

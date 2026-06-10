@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
@@ -20,6 +21,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -138,6 +140,10 @@ object BikeInteractionHandler {
         val level = player.level() as? ServerLevel ?: return false
         val actions = target.actions
 
+        if (applyHeldRaceFlag(player, level, target.vehicle)) {
+            return true
+        }
+
         if (player.isShiftKeyDown && VehicleInteractionActions.PICK_UP in actions) {
             startHoisting(player, target.vehicle, target.zone)
             return true
@@ -157,6 +163,19 @@ object BikeInteractionHandler {
         }
 
         return false
+    }
+
+    private fun applyHeldRaceFlag(player: ServerPlayer, level: ServerLevel, vehicle: IVehicle): Boolean {
+        val hand = InteractionHand.entries.firstOrNull { hand ->
+            player.getItemInHand(hand).item is RaceFlagItem
+        } ?: return false
+        val stack = player.getItemInHand(hand)
+        val flag = stack.item as? RaceFlagItem ?: return false
+        flag.applyToVehicle(level, player, vehicle, stack)
+        if (!player.abilities.instabuild) {
+            stack.shrink(1)
+        }
+        return true
     }
 
     @SubscribeEvent

@@ -343,6 +343,8 @@ data class VehicleInput(
 data class VehicleRuntimeState(
     var engineOn: Boolean = false,
     var fuelAmount: Double = Double.NaN,
+    var raceParticipant: Boolean = false,
+    var raceColorId: Int = -1,
     val partStates: MutableMap<String, VehiclePartState> = HashMap()
 )
 
@@ -351,6 +353,8 @@ data class VehicleSaveRecord(
     val vehicleType: String,
     val engineOn: Boolean,
     val fuelAmount: Double = Double.NaN,
+    val raceParticipant: Boolean = false,
+    val raceColorId: Int = -1,
     val behaviorTag: CompoundTag = CompoundTag(),
     val partStates: Map<String, VehiclePartState> = emptyMap()
 ) {
@@ -360,6 +364,10 @@ data class VehicleSaveRecord(
         putBoolean(ENGINE_ON_KEY, engineOn)
         if (fuelAmount.isFinite()) {
             putDouble(FUEL_AMOUNT_KEY, fuelAmount)
+        }
+        putBoolean(RACE_PARTICIPANT_KEY, raceParticipant)
+        if (raceColorId >= 0) {
+            putInt(RACE_COLOR_ID_KEY, raceColorId)
         }
         put(BEHAVIOR_KEY, behaviorTag.copy())
         put(PART_STATES_KEY, savePartStates(partStates))
@@ -371,6 +379,8 @@ data class VehicleSaveRecord(
         private const val LEGACY_BIKE_TYPE_KEY = "bike_type"
         private const val ENGINE_ON_KEY = "engine_on"
         private const val FUEL_AMOUNT_KEY = "fuel_amount"
+        private const val RACE_PARTICIPANT_KEY = "race_participant"
+        private const val RACE_COLOR_ID_KEY = "race_color_id"
         private const val BEHAVIOR_KEY = "behavior"
         private const val PART_STATES_KEY = "part_states"
 
@@ -379,6 +389,8 @@ data class VehicleSaveRecord(
             vehicleType = tag.getString(VEHICLE_TYPE_KEY).ifBlank { tag.getString(LEGACY_BIKE_TYPE_KEY) },
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
             fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
+            raceParticipant = tag.getBoolean(RACE_PARTICIPANT_KEY),
+            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) tag.getInt(RACE_COLOR_ID_KEY) else -1,
             behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy(),
             partStates = loadPartStates(tag.getCompound(PART_STATES_KEY))
         )
@@ -432,6 +444,8 @@ fun BikeInput.toVehicleInput(): VehicleInput = VehicleInput(
 fun BikeRuntimeState.toVehicleRuntimeState(): VehicleRuntimeState = VehicleRuntimeState(
     engineOn = engineOn,
     fuelAmount = fuelAmount,
+    raceParticipant = raceParticipant,
+    raceColorId = raceColorId,
     partStates = partStates
 )
 
@@ -440,6 +454,8 @@ fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
     vehicleType = bikeType,
     engineOn = engineOn,
     fuelAmount = fuelAmount,
+    raceParticipant = raceParticipant,
+    raceColorId = raceColorId,
     behaviorTag = CompoundTag().apply {
         putString("behavior_type", "bike")
         putDouble("visual_lean", visualLeanRad)
@@ -456,6 +472,8 @@ fun VehicleSaveRecord.toBikeSaveRecord(): BikeSaveRecord = BikeSaveRecord(
     bikeType = vehicleType,
     engineOn = engineOn,
     fuelAmount = fuelAmount,
+    raceParticipant = raceParticipant,
+    raceColorId = raceColorId,
     visualLeanRad = behaviorTag.getDouble("visual_lean"),
     frontWheelSpin = behaviorTag.getDouble("front_wheel_spin"),
     rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin"),

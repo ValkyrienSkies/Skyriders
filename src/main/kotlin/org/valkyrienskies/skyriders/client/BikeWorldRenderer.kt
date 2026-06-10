@@ -10,19 +10,25 @@ import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.resources.model.BakedModel
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.item.DyeColor
+import net.minecraft.world.item.ItemDisplayContext
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.AABB
 import net.minecraftforge.client.event.RenderLevelStageEvent
 import net.minecraftforge.client.model.data.ModelData
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.joml.Quaternionf
 import org.joml.Vector3d
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleRefuelSources
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import kotlin.math.exp
@@ -34,6 +40,24 @@ object BikeWorldRenderer {
         "skyriders:atv"
     )
     private val visualStatesByBodyId = HashMap<Long, RenderVisualState>()
+    private val flagStacksByColorId = HashMap<Int, ItemStack>()
+    private val flagAttachments = mapOf(
+        "skyriders:dirt_bike" to FlagAttachment(
+            localPos = Vector3d(0.18, 0.72, -0.62),
+            yawDegrees = 205.0f,
+            scale = 0.56f
+        ),
+        "skyriders:speedster" to FlagAttachment(
+            localPos = Vector3d(0.34, 0.78, -0.86),
+            yawDegrees = 195.0f,
+            scale = 0.68f
+        ),
+        "skyriders:atv" to FlagAttachment(
+            localPos = Vector3d(0.28, 0.72, -0.82),
+            yawDegrees = 195.0f,
+            scale = 0.62f
+        )
+    )
 
     @SubscribeEvent
     fun onRenderLevelStage(event: RenderLevelStageEvent) {
@@ -97,6 +121,7 @@ object BikeWorldRenderer {
         poseStack.translate(bodyPosition.x - cameraX, bodyPosition.y - cameraY, bodyPosition.z - cameraZ)
         poseStack.mulPose(Quaternionf(carriedPlayer?.let(BikeClientHoistState::carriedRotation) ?: transform.rotation))
         renderTemporaryFuelCapMarker(vehicle, poseStack, bufferSource)
+        renderRaceFlagMarker(vehicle, poseStack, bufferSource, packedLight)
         if (render.modelYawRad.isFinite() && render.modelYawRad != 0.0) {
             poseStack.mulPose(Axis.YP.rotation(render.modelYawRad.toFloat()))
         }
@@ -145,6 +170,49 @@ object BikeWorldRenderer {
         }
 
         poseStack.popPose()
+    }
+
+    private fun renderRaceFlagMarker(
+        vehicle: IVehicle,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        packedLight: Int
+    ) {
+        val color = VehicleRaceParticipants.color(vehicle) ?: return
+        val attachment = flagAttachments[vehicle.vehicleDefinition.id.toString()]
+            ?: fallbackFlagAttachment(vehicle)
+        poseStack.pushPose()
+        poseStack.translate(attachment.localPos.x, attachment.localPos.y, attachment.localPos.z)
+        poseStack.mulPose(Axis.YP.rotationDegrees(attachment.yawDegrees))
+        poseStack.scale(attachment.scale, attachment.scale, attachment.scale)
+        Minecraft.getInstance().itemRenderer.renderStatic(
+            flagStack(color),
+            ItemDisplayContext.FIXED,
+            packedLight,
+            OverlayTexture.NO_OVERLAY,
+            poseStack,
+            bufferSource,
+            vehicle.level,
+            0
+        )
+        poseStack.popPose()
+    }
+
+    private fun fallbackFlagAttachment(vehicle: IVehicle): FlagAttachment {
+        val body = vehicle.vehicleDefinition.body
+        return FlagAttachment(
+            localPos = Vector3d(
+                body.collisionBoxOffset.x,
+                body.collisionBoxOffset.y + body.collisionBoxSize.y * 0.5 + 0.05,
+                body.collisionBoxOffset.z - body.collisionBoxSize.z * 0.35
+            )
+        )
+    }
+
+    private fun flagStack(color: DyeColor): ItemStack {
+        return flagStacksByColorId.getOrPut(color.id) {
+            ItemStack(SkyridersMod.RACE_FLAG.get()).also { RaceFlagItem.setColor(it, color) }
+        }
     }
 
     private fun renderTemporaryFuelCapMarker(
@@ -314,6 +382,12 @@ object BikeWorldRenderer {
     private data class WheelPair(
         val front: Double,
         val rear: Double
+    )
+
+    private data class FlagAttachment(
+        val localPos: Vector3d,
+        val yawDegrees: Float = 180.0f,
+        val scale: Float = 0.9f
     )
 
     private data class RenderVisualState(

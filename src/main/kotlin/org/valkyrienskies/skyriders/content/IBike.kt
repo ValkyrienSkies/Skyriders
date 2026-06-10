@@ -50,6 +50,8 @@ interface IBike : IVehicle {
         bikeType = id,
         engineOn = state.engineOn,
         fuelAmount = state.fuelAmount,
+        raceParticipant = state.raceParticipant,
+        raceColorId = state.raceColorId,
         visualLeanRad = state.visualLeanRad,
         frontWheelSpin = state.frontWheelSpin,
         rearWheelSpin = state.rearWheelSpin,

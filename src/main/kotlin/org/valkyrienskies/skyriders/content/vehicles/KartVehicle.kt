@@ -30,6 +30,8 @@ class KartVehicle(
         get() = VehicleRuntimeState(
             engineOn = kartState.engineOn,
             fuelAmount = kartState.fuelAmount,
+            raceParticipant = kartState.raceParticipant,
+            raceColorId = kartState.raceColorId,
             partStates = kartState.partStates
         )
 
@@ -52,6 +54,8 @@ class KartVehicle(
         vehicleType = id,
         engineOn = kartState.engineOn,
         fuelAmount = kartState.fuelAmount,
+        raceParticipant = kartState.raceParticipant,
+        raceColorId = kartState.raceColorId,
         behaviorTag = CompoundTag().apply {
             putString("behavior_type", "kart")
             putInt("transmission_gear", kartState.transmissionGear)

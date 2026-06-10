@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.entity.EntityRenderers
 import net.minecraftforge.client.event.InputEvent
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent
 import net.minecraftforge.client.event.ModelEvent
+import net.minecraftforge.client.event.RegisterColorHandlersEvent
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent
 import net.minecraftforge.event.TickEvent
@@ -18,6 +19,7 @@ import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleControlActions
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
 import org.valkyrienskies.skyriders.content.VehicleDefinitions
@@ -93,6 +95,16 @@ object SkyridersModClient {
         event.register(vehicleGearUpKey)
         event.register(vehicleGearDownKey)
         event.register(vehicleClutchKey)
+    }
+
+    @JvmStatic
+    fun registerItemColors(event: RegisterColorHandlersEvent.Item) {
+        event.register(
+            { stack, tintIndex ->
+                if (tintIndex == RaceFlagItem.FLAG_CLOTH_TINT_INDEX) RaceFlagItem.getColorRgb(stack) else -1
+            },
+            SkyridersMod.RACE_FLAG.get()
+        )
     }
 
     @JvmStatic

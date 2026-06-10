@@ -293,6 +293,8 @@ object BikeManager {
             state = BikeRuntimeState(
                 engineOn = record.engineOn,
                 fuelAmount = VehicleFuel.initialAmount(definition.toVehicleDefinition(), record.fuelAmount),
+                raceParticipant = record.raceParticipant,
+                raceColorId = record.raceColorId,
                 visualLeanRad = record.visualLeanRad,
                 frontWheelSpin = record.frontWheelSpin,
                 rearWheelSpin = record.rearWheelSpin,
