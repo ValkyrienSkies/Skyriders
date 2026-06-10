@@ -47,7 +47,9 @@ object BikeLifecycle {
 
         event.server.allLevels.forEach { level ->
             VehicleManager.tick(level.dimensionId)
-            BoostPadHandler.gameTick(level, VehicleManager.getVehicles(level.dimensionId))
+            val vehicles = VehicleManager.getVehicles(level.dimensionId)
+            BoostPadHandler.gameTick(level, vehicles)
+            VehicleImpactDamageHandler.tick(level, vehicles)
             syncVisualState(level)
         }
     }
