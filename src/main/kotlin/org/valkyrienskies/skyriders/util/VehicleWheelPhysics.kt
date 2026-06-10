@@ -13,6 +13,7 @@ data class VehicleWheelContact(
     val suspensionDirWorld: Vector3d,
     val hitDistance: Double,
     val compressionDistance: Double,
+    val surfaceFriction: Double,
     val wheelForwardWorld: Vector3d,
     val wheelRightWorld: Vector3d,
     val wheelVelocityWorld: Vector3d
@@ -20,6 +21,9 @@ data class VehicleWheelContact(
 
 object VehicleWheelPhysics {
     private const val MIN_GROUND_NORMAL_ALIGNMENT = 0.28
+    private const val DEFAULT_SURFACE_FRICTION_COEFFICIENT = 0.6
+    private const val MIN_SURFACE_FRICTION_SCALE = 0.12
+    private const val MAX_SURFACE_FRICTION_SCALE = 1.65
 
     fun sampleRaycastWheel(
         body: PhysVsBody,
@@ -43,6 +47,7 @@ object VehicleWheelPhysics {
                 suspensionDirWorld = suspensionDir,
                 hitDistance = maxLength,
                 compressionDistance = 0.0,
+                surfaceFriction = 1.0,
                 wheelForwardWorld = Vector3d(wheelForwardWorld),
                 wheelRightWorld = Vector3d(wheelRightWorld),
                 wheelVelocityWorld = velocity
@@ -62,10 +67,20 @@ object VehicleWheelPhysics {
             suspensionDirWorld = suspensionDir,
             hitDistance = hit.distance,
             compressionDistance = (maxLength - hit.distance).coerceAtLeast(0.0),
+            surfaceFriction = surfaceFrictionScale(hit.staticFrictionCoefficient, hit.dynamicFrictionCoefficient),
             wheelForwardWorld = Vector3d(wheelForwardWorld),
             wheelRightWorld = Vector3d(wheelRightWorld),
             wheelVelocityWorld = VehiclePhysicsMath.velocityAtPoint(body, contactPoint)
         )
+    }
+
+    fun surfaceFrictionScale(staticFrictionCoefficient: Double, dynamicFrictionCoefficient: Double): Double {
+        val coefficient = dynamicFrictionCoefficient
+            .takeIf { it.isFinite() && it > 0.0 }
+            ?: staticFrictionCoefficient.takeIf { it.isFinite() && it > 0.0 }
+            ?: DEFAULT_SURFACE_FRICTION_COEFFICIENT
+        return (coefficient / DEFAULT_SURFACE_FRICTION_COEFFICIENT)
+            .coerceIn(MIN_SURFACE_FRICTION_SCALE, MAX_SURFACE_FRICTION_SCALE)
     }
 
     fun applyContactForce(

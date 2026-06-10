@@ -279,7 +279,7 @@ object KartPhysicsSolver {
         } else {
             baseGrip * config.driftRearGripScale
         }
-        val maxLateralForce = (kartContact.normalForce * config.tireFrictionCoefficient * grip)
+        val maxLateralForce = (kartContact.normalForce * config.tireFrictionCoefficient * contact.surfaceFriction * grip)
             .coerceIn(0.0, MAX_FORCE)
         val slip = lateralSpeed / max(abs(forwardSpeed), 1.5)
         val shape = config.lateralSlipShape.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.5
@@ -313,11 +313,13 @@ object KartPhysicsSolver {
         val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, topSpeed, config)
         val driveScale = if (drifting) config.driftDriveScale else 1.0
         val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
-        val driveNormalForce = rearContacts.sumOf(KartContact::normalForce) / rearContacts.size
-        val maxDriveForce = driveNormalForce * config.tireFrictionCoefficient * config.longitudinalGrip
         rearContacts.forEach { kartContact ->
             if (driveForce != 0.0) {
                 val contact = kartContact.contact
+                val maxDriveForce = kartContact.normalForce *
+                    config.tireFrictionCoefficient *
+                    contact.surfaceFriction *
+                    config.longitudinalGrip
                 val limitedDriveForce = driveForce.coerceIn(-maxDriveForce, maxDriveForce)
                 VehicleWheelPhysics.applyContactForce(
                     body,
@@ -339,7 +341,10 @@ object KartPhysicsSolver {
             }
 
             if (brake > 0.0) {
-                val maxBrakeForce = kartContact.normalForce * config.tireFrictionCoefficient * config.longitudinalGrip
+                val maxBrakeForce = kartContact.normalForce *
+                    config.tireFrictionCoefficient *
+                    contact.surfaceFriction *
+                    config.longitudinalGrip
                 val brakeForce = (-wheelForwardSpeed * config.brakeForce * brake).coerceIn(-maxBrakeForce, maxBrakeForce)
                 VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(brakeForce))
             }
@@ -362,7 +367,7 @@ object KartPhysicsSolver {
         val planarSpeed = planarVelocity.length()
         if (!planarSpeed.isFinite() || planarSpeed <= PARKING_BRAKE_DEAD_SPEED) return
 
-        val maxBrakeForce = groundedContacts.sumOf(KartContact::normalForce) *
+        val maxBrakeForce = groundedContacts.sumOf { it.normalForce * it.contact.surfaceFriction } *
             config.tireFrictionCoefficient *
             config.longitudinalGrip *
             config.parkingBrakeStrength

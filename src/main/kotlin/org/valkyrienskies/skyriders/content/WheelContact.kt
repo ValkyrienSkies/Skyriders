@@ -12,6 +12,7 @@ data class WheelContact(
     val hitDistance: Double,
     val compression: Double,
     val normalForceEstimate: Double,
+    val surfaceFriction: Double,
     val wheelForwardWorld: Vector3d,
     val wheelRightWorld: Vector3d,
     val wheelVelocityWorld: Vector3d

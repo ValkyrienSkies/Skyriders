@@ -234,6 +234,7 @@ object BikePhysicsSolver {
                 hitDistance = maxLength,
                 compression = 0.0,
                 normalForceEstimate = 0.0,
+                surfaceFriction = 1.0,
                 wheelForwardWorld = wheelForward,
                 wheelRightWorld = wheelRight,
                 wheelVelocityWorld = velocityAtWorldPoint(body, wheelMountWorld)
@@ -258,6 +259,10 @@ object BikePhysicsSolver {
             hitDistance = hitDistance,
             compression = compression,
             normalForceEstimate = normalForceEstimate,
+            surfaceFriction = VehicleWheelPhysics.surfaceFrictionScale(
+                result.staticFrictionCoefficient,
+                result.dynamicFrictionCoefficient
+            ),
             wheelForwardWorld = wheelForward,
             wheelRightWorld = wheelRight,
             wheelVelocityWorld = velocityAtWorldPoint(body, contactPoint)
@@ -345,6 +350,7 @@ object BikePhysicsSolver {
         }
         val maxLateralForce = contact.normalForceEstimate *
             config.frictionCoefficient *
+            contact.surfaceFriction *
             config.lateralGrip *
             driftGripScale
         val lateralForceMag = -gripFactor * maxLateralForce
@@ -442,6 +448,7 @@ object BikePhysicsSolver {
             }
             val maxLongitudinalForce = contact.normalForceEstimate *
                 config.frictionCoefficient *
+                contact.surfaceFriction *
                 config.longitudinalGrip *
                 forceScale *
                 brakeForceScale
@@ -486,6 +493,7 @@ object BikePhysicsSolver {
         val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val maxBrakeForce = contact.normalForceEstimate *
             config.frictionCoefficient *
+            contact.surfaceFriction *
             config.longitudinalGrip *
             config.parkingBrakeStrength
         val forceMag = (-forwardVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)

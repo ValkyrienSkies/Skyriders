@@ -517,7 +517,7 @@ object WheeledVehiclePhysicsSolver {
         val forwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val slip = lateralSpeed / max(abs(forwardSpeed), 1.5)
         val shapedSlip = slip / (abs(slip) + config.lateralSlipShape.coerceAtLeast(1.0e-4))
-        val maxForce = loaded.normalForce * config.tireFrictionCoefficient * loaded.wheel.axle.lateralGrip
+        val maxForce = loaded.normalForce * config.tireFrictionCoefficient * contact.surfaceFriction * loaded.wheel.axle.lateralGrip
         VehicleWheelPhysics.applyContactForce(
             body,
             contact,
@@ -577,9 +577,10 @@ object WheeledVehiclePhysicsSolver {
                     0.35
                 }
                 val forceScale = if (brake > 0.0) 1.0 else driveForceScale
-                val maxForce = loaded.normalForce * config.tireFrictionCoefficient * axle.longitudinalGrip * forceScale
+                val gripLimit = loaded.normalForce * config.tireFrictionCoefficient * loaded.contact.surfaceFriction * axle.longitudinalGrip
+                val maxForce = gripLimit * forceScale
                 val engineBrakeForce = if (axle.driven && brake <= 0.0 && abs(throttle) < 0.05 && driveCommand.engineBrakeScale > 0.0 && abs(groundSpeed) > 0.1) {
-                    -groundSpeed.signOrZero() * loaded.normalForce * config.tireFrictionCoefficient * axle.longitudinalGrip * driveCommand.engineBrakeScale
+                    -groundSpeed.signOrZero() * gripLimit * driveCommand.engineBrakeScale
                 } else {
                     0.0
                 }
@@ -620,7 +621,9 @@ object WheeledVehiclePhysicsSolver {
         val velocity = body.kinematics.velocity
         val planar = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, terrainUp), terrainUp)
         if (!VehiclePhysicsMath.isFinite(planar) || planar.lengthSquared() < 0.025 * 0.025) return
-        val maxBrakeForce = grounded.sumOf(LoadedWheelContact::normalForce) * config.tireFrictionCoefficient * config.parkingBrakeStrength
+        val maxBrakeForce = grounded.sumOf { it.normalForce * it.contact.surfaceFriction } *
+            config.tireFrictionCoefficient *
+            config.parkingBrakeStrength
         val brakeForce = VehiclePhysicsMath.safeNormalize(planar, Vector3d())
             .mul((-planar.length() * config.mass * config.parkingBrakeStrength).coerceIn(-maxBrakeForce, 0.0))
         VehiclePhysicsMath.safeApplyWorldForce(body, brakeForce, body.kinematics.position)
