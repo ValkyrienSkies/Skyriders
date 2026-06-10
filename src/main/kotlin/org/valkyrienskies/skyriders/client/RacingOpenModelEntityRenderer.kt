@@ -92,8 +92,8 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
                 context = context,
                 modelLocation = CAVENDISH_MODEL,
                 textureLocation = CAVENDISH_TEXTURE,
-                scale = 0.75f,
-                yOffset = -0.02
+                scale = 1.25f,
+                yOffset = 0.0
             )
         }
 

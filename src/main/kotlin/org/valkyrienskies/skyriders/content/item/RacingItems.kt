@@ -75,20 +75,36 @@ class CavendishItem(properties: Properties) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
         val entity = SkyridersMod.CAVENDISH_ENTITY.get().create(level) ?: return false
-        val spawnPosition = dropPosition(body)
+        val forward = body.kinematics.transform.rotation.transform(Vector3d(0.0, 0.0, 1.0)).normalize()
+        val spawnPosition = tossOrigin(body, forward)
+        val tossVelocity = tossVelocity(body, forward)
         entity.ownerBodyId = vehicle.bodyId
-        entity.moveTo(spawnPosition.x, spawnPosition.y, spawnPosition.z, player.yRot, 0.0f)
+        entity.toss(
+            origin = net.minecraft.world.phys.Vec3(spawnPosition.x, spawnPosition.y, spawnPosition.z),
+            velocity = net.minecraft.world.phys.Vec3(tossVelocity.x, tossVelocity.y, tossVelocity.z),
+            yaw = level.random.nextFloat() * 360.0f
+        )
         level.addFreshEntity(entity)
         playItemUseSound(level, player)
         return true
     }
 
-    private fun dropPosition(body: VsBody): Vector3d {
+    private fun tossOrigin(body: VsBody, forward: Vector3d): Vector3d {
         val transform = body.kinematics.transform
-        val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0)).normalize()
         return transform.toWorld.transformPosition(Vector3d())
-            .sub(forward.mul(1.35))
-            .add(0.0, -0.15, 0.0)
+            .sub(Vector3d(forward).mul(0.75))
+            .add(0.0, 0.55, 0.0)
+    }
+
+    private fun tossVelocity(body: VsBody, forward: Vector3d): Vector3d {
+        val inheritedVelocity = body.kinematics.velocity
+        return Vector3d(forward).mul(-0.48)
+            .add(0.0, 0.34, 0.0)
+            .add(inheritedVelocity.x() / TICKS_PER_SECOND, inheritedVelocity.y() / TICKS_PER_SECOND, inheritedVelocity.z() / TICKS_PER_SECOND)
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
     }
 }
 
