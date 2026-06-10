@@ -3,7 +3,9 @@ package org.valkyrienskies.skyriders.client
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.item.ItemProperties
 import net.minecraft.client.renderer.entity.EntityRenderers
+import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.event.InputEvent
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent
 import net.minecraftforge.client.event.ModelEvent
@@ -80,6 +82,9 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.SUGAR_ROCKET_ENTITY.get()) { context ->
                 RacingOpenModelEntityRenderer.sugarRocket(context)
             }
+            ItemProperties.register(SkyridersMod.RACE_COMPASS.get(), ResourceLocation("angle")) { _, _, entity, seed ->
+                RaceCompassClientState.angle(entity, seed)
+            }
             MinecraftForge.EVENT_BUS.register(ClientEvents)
             MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
             MinecraftForge.EVENT_BUS.register(VehicleWorldRenderer)
@@ -138,6 +143,7 @@ object SkyridersModClient {
             val minecraft = Minecraft.getInstance()
             ClientVehicleSyncHandler.tick()
             VehicleClientEffects.tick()
+            RaceCompassClientState.tick()
             val player = minecraft.player ?: return
             if (player.vehicle !is BikeSeatEntity) return
 

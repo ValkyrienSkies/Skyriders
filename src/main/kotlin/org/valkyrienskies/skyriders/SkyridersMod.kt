@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Rarity
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.SoundType
+import net.minecraft.world.level.block.entity.BlockEntityType
 import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.level.material.MapColor
 import net.minecraftforge.common.MinecraftForge
@@ -45,6 +46,12 @@ import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
+import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
+import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlock
+import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockEntity
+import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockItem
+import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlock
+import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlockEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
@@ -78,6 +85,38 @@ object SkyridersMod {
             fullBlock = true
         )
     }
+    val RACE_MARKER_BLOCK: RegistryObject<Block> = BLOCKS.register("race_marker") {
+        RaceMarkerBlock(
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_RED)
+                .strength(1.0f)
+                .sound(SoundType.METAL)
+                .noOcclusion()
+        )
+    }
+    val RACE_MARKER_ITEM: RegistryObject<Item> = ITEMS.register("race_marker") {
+        BlockItem(RACE_MARKER_BLOCK.get(), Item.Properties())
+    }
+    val RACE_ENDPOINT_BLOCK: RegistryObject<Block> = BLOCKS.register("race_endpoint") {
+        RaceEndpointBlock(
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_LIGHT_GRAY)
+                .strength(1.0f)
+                .sound(SoundType.METAL)
+                .noOcclusion()
+        )
+    }
+    val RACE_ENDPOINT_ITEM: RegistryObject<Item> = ITEMS.register("race_endpoint") {
+        RaceEndpointBlockItem(RACE_ENDPOINT_BLOCK.get(), Item.Properties())
+    }
+    val RACE_MARKER_BLOCK_ENTITY: RegistryObject<BlockEntityType<RaceMarkerBlockEntity>> =
+        BLOCK_ENTITIES.register("race_marker") {
+            BlockEntityType.Builder.of(::RaceMarkerBlockEntity, RACE_MARKER_BLOCK.get()).build(null)
+        }
+    val RACE_ENDPOINT_BLOCK_ENTITY: RegistryObject<BlockEntityType<RaceEndpointBlockEntity>> =
+        BLOCK_ENTITIES.register("race_endpoint") {
+            BlockEntityType.Builder.of(::RaceEndpointBlockEntity, RACE_ENDPOINT_BLOCK.get()).build(null)
+        }
     val CREATIVE_JERRY_CAN: RegistryObject<Item> = ITEMS.register("creative_jerry_can") {
         CreativeJerryCanItem(Item.Properties().stacksTo(1))
     }
@@ -98,6 +137,9 @@ object SkyridersMod {
     }
     val HOMING_SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("homing_sugar_rocket") {
         SugarRocketItem(Item.Properties().stacksTo(16), homing = true)
+    }
+    val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
+        RaceCompassItem(Item.Properties().stacksTo(1))
     }
 
     val BERGEN_DISC: RegistryObject<Item> = ITEMS.register(BergenDisc.BURGEN_TRUCK.path) {

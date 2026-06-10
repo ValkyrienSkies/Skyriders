@@ -4,6 +4,7 @@ import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.phys.Vec3
 import net.minecraftforge.api.distmarker.Dist
 import net.minecraftforge.fml.DistExecutor
 import net.minecraftforge.network.NetworkEvent
@@ -17,6 +18,7 @@ import org.valkyrienskies.skyriders.client.BikeClientEffects
 import org.valkyrienskies.skyriders.client.BikeClientHoistState
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
+import org.valkyrienskies.skyriders.client.RaceCompassClientState
 import org.valkyrienskies.skyriders.client.VehicleHudOverlay
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
@@ -132,6 +134,13 @@ object SkyridersNetwork {
             BikeHoistStatePacket::encode,
             BikeHoistStatePacket::decode,
             BikeHoistStatePacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            RaceCompassTargetPacket::class.java,
+            RaceCompassTargetPacket::encode,
+            RaceCompassTargetPacket::decode,
+            RaceCompassTargetPacket::handle
         )
     }
 
@@ -419,6 +428,10 @@ object SkyridersNetwork {
 
     fun sendBikeHoistState(player: ServerPlayer, hoisting: Boolean, bodyId: Long = -1L) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting, bodyId))
+    }
+
+    fun sendRaceCompassTarget(player: ServerPlayer, target: Vec3?) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceCompassTargetPacket(target != null, target ?: Vec3.ZERO))
     }
 
     data class VehicleInputPacket(val input: VehicleInput) {
@@ -1077,4 +1090,39 @@ object SkyridersNetwork {
         val frontWheelSuspensionOffset: Double,
         val rearWheelSuspensionOffset: Double
     )
+
+    data class RaceCompassTargetPacket(val active: Boolean, val target: Vec3) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(active)
+            buf.writeDouble(target.x)
+            buf.writeDouble(target.y)
+            buf.writeDouble(target.z)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { RaceCompassClientState.update(active, if (active) target else null) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: RaceCompassTargetPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): RaceCompassTargetPacket {
+                val active = buf.readBoolean()
+                val target = Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble())
+                return RaceCompassTargetPacket(active, target)
+            }
+
+            fun handle(packet: RaceCompassTargetPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
 }
