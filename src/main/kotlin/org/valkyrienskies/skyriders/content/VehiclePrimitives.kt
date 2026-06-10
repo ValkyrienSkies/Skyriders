@@ -9,6 +9,7 @@ import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.bodies.properties.BodyTransform
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 
 interface IVehicle {
     val id: String
@@ -390,7 +391,11 @@ data class VehicleSaveRecord(
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
             fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
             raceParticipant = tag.getBoolean(RACE_PARTICIPANT_KEY),
-            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) tag.getInt(RACE_COLOR_ID_KEY) else -1,
+            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) {
+                RaceFlagItem.normalizeSavedRaceColor(tag.getInt(RACE_COLOR_ID_KEY))
+            } else {
+                -1
+            },
             behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy(),
             partStates = loadPartStates(tag.getCompound(PART_STATES_KEY))
         )

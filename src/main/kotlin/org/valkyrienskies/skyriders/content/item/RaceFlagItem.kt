@@ -1,9 +1,12 @@
 package org.valkyrienskies.skyriders.content.item
 
+import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.item.TooltipFlag
 import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.Level
 import org.valkyrienskies.skyriders.content.BikeLifecycle
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
@@ -19,6 +22,10 @@ class RaceFlagItem(properties: Properties) : RacingVehicleItem(properties) {
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
         playItemUseSound(level, player)
+    }
+
+    override fun appendHoverText(stack: ItemStack, level: Level?, tooltip: MutableList<Component>, flag: TooltipFlag) {
+        tooltip.add(Component.literal("Race Color: ${describeColor(getColor(stack))}"))
     }
 
     companion object {
@@ -71,6 +78,11 @@ class RaceFlagItem(properties: Properties) : RacingVehicleItem(properties) {
 
         fun getDyeColorRgb(color: DyeColor): Int {
             return DYE_RGB.getOrElse(color.id) { DYE_RGB[DyeColor.RED.id] }
+        }
+
+        fun normalizeSavedRaceColor(savedColor: Int): Int {
+            if (savedColor < 0) return -1
+            return if (savedColor in DYE_RGB.indices) DYE_RGB[savedColor] else savedColor and 0xFFFFFF
         }
 
         fun describeColor(colorRgb: Int): String {

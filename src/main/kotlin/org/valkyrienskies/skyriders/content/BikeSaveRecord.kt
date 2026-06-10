@@ -2,6 +2,7 @@ package org.valkyrienskies.skyriders.content
 
 import net.minecraft.nbt.CompoundTag
 import org.valkyrienskies.core.api.bodies.properties.BodyId
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 
 data class BikeSaveRecord(
     val bodyId: BodyId,
@@ -56,7 +57,11 @@ data class BikeSaveRecord(
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
             fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
             raceParticipant = tag.getBoolean(RACE_PARTICIPANT_KEY),
-            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) tag.getInt(RACE_COLOR_ID_KEY) else -1,
+            raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) {
+                RaceFlagItem.normalizeSavedRaceColor(tag.getInt(RACE_COLOR_ID_KEY))
+            } else {
+                -1
+            },
             visualLeanRad = tag.getDouble(VISUAL_LEAN_KEY),
             frontWheelSpin = tag.getDouble(FRONT_WHEEL_SPIN_KEY),
             rearWheelSpin = tag.getDouble(REAR_WHEEL_SPIN_KEY),

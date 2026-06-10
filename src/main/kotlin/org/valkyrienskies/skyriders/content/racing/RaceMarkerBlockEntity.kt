@@ -68,7 +68,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
     override fun load(tag: CompoundTag) {
         super.load(tag)
         endpointPos = if (tag.contains(ENDPOINT_KEY)) BlockPos.of(tag.getLong(ENDPOINT_KEY)) else null
-        colorId = if (tag.contains(COLOR_KEY)) tag.getInt(COLOR_KEY) else -1
+        colorId = if (tag.contains(COLOR_KEY)) RaceFlagItem.normalizeSavedRaceColor(tag.getInt(COLOR_KEY)) else -1
         markerType = tag.getString(TYPE_KEY).takeIf { it == RaceMarkerTypes.START_FINISH || it == RaceMarkerTypes.CHECKPOINT }
             ?: RaceMarkerTypes.START_FINISH
         checkpointIndex = tag.getInt(CHECKPOINT_KEY).coerceIn(0, 99)
