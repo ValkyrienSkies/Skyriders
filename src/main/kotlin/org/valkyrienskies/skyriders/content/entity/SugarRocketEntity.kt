@@ -25,6 +25,8 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
+import kotlin.math.acos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Entity(type, level) {
@@ -210,8 +212,10 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         val target = findHomingTarget(level) ?: return
         val desired = target.subtract(position()).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
         val current = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: desired
-        val blended = current.scale(1.0 - HOMING_TURN_RATE).add(desired.scale(HOMING_TURN_RATE)).normalize()
-        motorDirection = blended.takeIf { it.lengthSqr() > 1.0e-8 } ?: motorDirection
+        val speed = deltaMovement.length().coerceAtLeast(INITIAL_THRUST_SPEED)
+        val maxTurnRadians = (HOMING_LATERAL_ACCELERATION / speed)
+            .coerceIn(HOMING_MIN_TURN_RADIANS, HOMING_MAX_TURN_RADIANS)
+        motorDirection = rotateTowards(current, desired, maxTurnRadians)
     }
 
     private fun findHomingTarget(level: ServerLevel): Vec3? {
@@ -347,6 +351,24 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         return yaw to pitch
     }
 
+    private fun rotateTowards(current: Vec3, desired: Vec3, maxRadians: Double): Vec3 {
+        val dot = current.dot(desired).coerceIn(-1.0, 1.0)
+        val angle = acos(dot)
+        if (angle <= maxRadians || angle < 1.0e-6) {
+            return desired
+        }
+
+        val sinAngle = sin(angle)
+        if (sinAngle < 1.0e-6) {
+            return current
+        }
+
+        val t = maxRadians / angle
+        return current.scale(sin((1.0 - t) * angle) / sinAngle)
+            .add(desired.scale(sin(t * angle) / sinAngle))
+            .normalize()
+    }
+
     private fun Vec3.limitLength(maxLength: Double): Vec3 {
         val length = length()
         if (length <= maxLength || length < 1.0e-8) return this
@@ -383,7 +405,9 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val BLAST_RADIUS = 3.25
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0
-        private const val HOMING_TURN_RATE = 0.2
+        private const val HOMING_LATERAL_ACCELERATION = 0.18
+        private const val HOMING_MIN_TURN_RADIANS = 0.035
+        private const val HOMING_MAX_TURN_RADIANS = 0.2
         private const val RENDER_DISTANCE = 192.0
         private val HOMING: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
