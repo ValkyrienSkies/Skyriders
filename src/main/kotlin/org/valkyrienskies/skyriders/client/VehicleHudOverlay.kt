@@ -164,7 +164,7 @@ object VehicleHudOverlay {
 
     @SubscribeEvent
     fun onRenderOverlay(event: RenderGuiOverlayEvent.Post) {
-        if (event.overlay.id.path != "hotbar") return
+        if (event.overlay.id.path != "player_list") return
         val minecraft = Minecraft.getInstance()
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
