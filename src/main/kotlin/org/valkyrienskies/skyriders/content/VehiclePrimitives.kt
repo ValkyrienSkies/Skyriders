@@ -42,7 +42,15 @@ data class VehicleDefinition(
     val seats: List<VehicleSeatDefinition>,
     val interactions: VehicleInteractionDefinition,
     val behavior: VehicleBehaviorDefinition,
+    val fuel: VehicleFuelDefinition = VehicleFuelDefinition(),
     val parts: List<VehiclePartDefinition> = emptyList()
+)
+
+data class VehicleFuelDefinition(
+    val capacity: Double = 100.0,
+    val idleUsePerSecond: Double = 0.018,
+    val throttleUsePerSecond: Double = 0.075,
+    val motionWorkUsePerSpeedPerSecond: Double = 0.0025
 )
 
 data class VehicleBodyDefinition(
@@ -143,6 +151,7 @@ data class VehicleSoundDefinition(
     val engineLoop: ResourceLocation? = null,
     val driftLoop: ResourceLocation? = null,
     val engineStart: ResourceLocation? = null,
+    val engineStartFail: ResourceLocation? = null,
     val engineStop: ResourceLocation? = null,
     val gearShift: ResourceLocation? = null,
     val handbrakeEngage: ResourceLocation? = null,
@@ -162,6 +171,7 @@ data class VehicleSoundDefinition(
             engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "kart_engine"),
             driftLoop = ResourceLocation(SkyridersMod.MOD_ID, "kart_drift"),
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
+            engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
             engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop"),
             idleVolume = 0.2,
             speedVolume = 0.2,
@@ -176,6 +186,7 @@ data class VehicleSoundDefinition(
         val GENERIC_ENGINE = VehicleSoundDefinition(
             engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "engine"),
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "engine_start"),
+            engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
             engineStop = ResourceLocation(SkyridersMod.MOD_ID, "engine_stop"),
             gearShift = ResourceLocation(SkyridersMod.MOD_ID, "gearshift"),
             handbrakeEngage = ResourceLocation(SkyridersMod.MOD_ID, "handbrake_engage"),
@@ -328,6 +339,7 @@ data class VehicleInput(
 
 data class VehicleRuntimeState(
     var engineOn: Boolean = false,
+    var fuelAmount: Double = Double.NaN,
     val partStates: MutableMap<String, VehiclePartState> = HashMap()
 )
 
@@ -335,6 +347,7 @@ data class VehicleSaveRecord(
     val bodyId: BodyId,
     val vehicleType: String,
     val engineOn: Boolean,
+    val fuelAmount: Double = Double.NaN,
     val behaviorTag: CompoundTag = CompoundTag(),
     val partStates: Map<String, VehiclePartState> = emptyMap()
 ) {
@@ -342,6 +355,9 @@ data class VehicleSaveRecord(
         putLong(BODY_ID_KEY, bodyId)
         putString(VEHICLE_TYPE_KEY, vehicleType)
         putBoolean(ENGINE_ON_KEY, engineOn)
+        if (fuelAmount.isFinite()) {
+            putDouble(FUEL_AMOUNT_KEY, fuelAmount)
+        }
         put(BEHAVIOR_KEY, behaviorTag.copy())
         put(PART_STATES_KEY, savePartStates(partStates))
     }
@@ -351,6 +367,7 @@ data class VehicleSaveRecord(
         private const val VEHICLE_TYPE_KEY = "vehicle_type"
         private const val LEGACY_BIKE_TYPE_KEY = "bike_type"
         private const val ENGINE_ON_KEY = "engine_on"
+        private const val FUEL_AMOUNT_KEY = "fuel_amount"
         private const val BEHAVIOR_KEY = "behavior"
         private const val PART_STATES_KEY = "part_states"
 
@@ -358,6 +375,7 @@ data class VehicleSaveRecord(
             bodyId = tag.getLong(BODY_ID_KEY),
             vehicleType = tag.getString(VEHICLE_TYPE_KEY).ifBlank { tag.getString(LEGACY_BIKE_TYPE_KEY) },
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
+            fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
             behaviorTag = tag.getCompound(BEHAVIOR_KEY).copy(),
             partStates = loadPartStates(tag.getCompound(PART_STATES_KEY))
         )
@@ -410,6 +428,7 @@ fun BikeInput.toVehicleInput(): VehicleInput = VehicleInput(
 
 fun BikeRuntimeState.toVehicleRuntimeState(): VehicleRuntimeState = VehicleRuntimeState(
     engineOn = engineOn,
+    fuelAmount = fuelAmount,
     partStates = partStates
 )
 
@@ -417,6 +436,7 @@ fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
     bodyId = bodyId,
     vehicleType = bikeType,
     engineOn = engineOn,
+    fuelAmount = fuelAmount,
     behaviorTag = CompoundTag().apply {
         putString("behavior_type", "bike")
         putDouble("visual_lean", visualLeanRad)
@@ -424,18 +444,28 @@ fun BikeSaveRecord.toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
         putDouble("rear_wheel_spin", rearWheelSpin)
         putDouble("front_wheel_angular_velocity", frontWheelAngularVelocity)
         putDouble("rear_wheel_angular_velocity", rearWheelAngularVelocity)
-    }
+    },
+    partStates = partStates
 )
 
 fun VehicleSaveRecord.toBikeSaveRecord(): BikeSaveRecord = BikeSaveRecord(
     bodyId = bodyId,
     bikeType = vehicleType,
     engineOn = engineOn,
+    fuelAmount = fuelAmount,
     visualLeanRad = behaviorTag.getDouble("visual_lean"),
     frontWheelSpin = behaviorTag.getDouble("front_wheel_spin"),
     rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin"),
     frontWheelAngularVelocity = behaviorTag.getDouble("front_wheel_angular_velocity"),
-    rearWheelAngularVelocity = behaviorTag.getDouble("rear_wheel_angular_velocity")
+    rearWheelAngularVelocity = behaviorTag.getDouble("rear_wheel_angular_velocity"),
+    partStates = partStates
+)
+
+fun fuelCapPartDefinition(): VehiclePartDefinition = VehiclePartDefinition(
+    id = VehicleInteractionDefinition.FUEL_CAP,
+    type = VehiclePartTypes.FUEL_CAP,
+    defaultState = CompoundTag().apply { putBoolean("open", false) },
+    interactionActions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE)
 )
 
 fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
@@ -458,7 +488,12 @@ fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
         )
     ),
     interactions = interactions.toVehicleInteractionDefinition(),
-    behavior = BikeVehicleBehaviorDefinition(config)
+    behavior = BikeVehicleBehaviorDefinition(config),
+    parts = if (interactions.zones.any { it.id == BikeInteractionDefinition.FUEL_CAP }) {
+        listOf(fuelCapPartDefinition())
+    } else {
+        emptyList()
+    }
 )
 
 fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = VehicleRenderDefinition(
@@ -493,6 +528,7 @@ fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = Veh
     engineLoop = engineLoop,
     driftLoop = engineLoop,
     engineStart = engineStart,
+    engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
     engineStop = engineStop,
     idleVolume = idleVolume,
     speedVolume = speedVolume,
@@ -515,7 +551,7 @@ fun BikeInteractionDefinition.toVehicleInteractionDefinition(): VehicleInteracti
                 actions = when (zone.id) {
                     BikeInteractionDefinition.SEAT -> setOf(VehicleInteractionActions.MOUNT)
                     BikeInteractionDefinition.BODY -> setOf(VehicleInteractionActions.PICK_UP)
-                    BikeInteractionDefinition.FUEL_CAP -> setOf(VehicleInteractionActions.REFUEL)
+                    BikeInteractionDefinition.FUEL_CAP -> setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE)
                     else -> emptySet()
                 },
                 partId = zone.id.takeIf { it == BikeInteractionDefinition.FUEL_CAP }

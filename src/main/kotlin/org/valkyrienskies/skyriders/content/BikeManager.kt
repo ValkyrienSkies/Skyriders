@@ -100,7 +100,9 @@ object BikeManager {
     fun physTick(physLevel: PhysLevel, dt: Double) {
         serverBikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
             val body = physLevel.getBodyById(bike.bodyId) ?: return@forEach
-            bike.physTick(physLevel, body, getInput(physLevel.dimension, bike.bodyId), dt)
+            val input = getInput(physLevel.dimension, bike.bodyId)
+            VehicleFuel.consume(bike, body, input.toVehicleInput(), dt)
+            bike.physTick(physLevel, body, input, dt)
         }
     }
 
@@ -119,7 +121,12 @@ object BikeManager {
 
     fun toggleEngine(level: ServerLevel, bodyId: BodyId): Boolean? {
         val bike = getBike(level.dimensionId, bodyId) ?: return null
-        bike.state.engineOn = !bike.state.engineOn
+        val enabled = !bike.state.engineOn
+        if (enabled && !VehicleFuel.canStart(bike)) {
+            VehicleEngineSounds.playStartFail(level, bike)
+            return false
+        }
+        bike.state.engineOn = enabled
         if (!bike.state.engineOn) {
             updateInput(level.dimensionId, bodyId) { BikeInput.EMPTY }
         }
@@ -255,7 +262,10 @@ object BikeManager {
             ),
             level = level,
             definition = definition,
-            state = BikeRuntimeState()
+            state = BikeRuntimeState(
+                fuelAmount = VehicleFuel.initialAmount(definition.toVehicleDefinition(), Double.NaN),
+                partStates = definition.toVehicleDefinition().initialPartStates()
+            )
         )
         addBike(level.dimensionId, bike)
         return bike
@@ -281,11 +291,13 @@ object BikeManager {
             definition = definition,
             state = BikeRuntimeState(
                 engineOn = record.engineOn,
+                fuelAmount = VehicleFuel.initialAmount(definition.toVehicleDefinition(), record.fuelAmount),
                 visualLeanRad = record.visualLeanRad,
                 frontWheelSpin = record.frontWheelSpin,
                 rearWheelSpin = record.rearWheelSpin,
                 frontWheelAngularVelocity = record.frontWheelAngularVelocity,
-                rearWheelAngularVelocity = record.rearWheelAngularVelocity
+                rearWheelAngularVelocity = record.rearWheelAngularVelocity,
+                partStates = definition.toVehicleDefinition().initialPartStates()
             )
         )
     }

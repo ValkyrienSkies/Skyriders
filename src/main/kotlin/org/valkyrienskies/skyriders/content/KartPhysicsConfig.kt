@@ -125,6 +125,7 @@ data class KartPhysicsConfig(
 
 data class KartRuntimeState(
     var engineOn: Boolean = false,
+    var fuelAmount: Double = Double.NaN,
     var debugSpeed: Double = 0.0,
     var debugGroundedWheels: Int = 0,
     var debugSteerRad: Double = 0.0,

@@ -10,6 +10,7 @@ import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleDefinition
+import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehiclePartState
 import org.valkyrienskies.skyriders.content.VehicleRuntimeState
@@ -29,7 +30,11 @@ class WheeledVehicle(
         get() = vehicleDefinition.id.toString()
 
     override val vehicleState: VehicleRuntimeState
-        get() = VehicleRuntimeState(engineOn = wheeledState.engineOn, partStates = wheeledState.partStates)
+        get() = VehicleRuntimeState(
+            engineOn = wheeledState.engineOn,
+            fuelAmount = wheeledState.fuelAmount,
+            partStates = wheeledState.partStates
+        )
 
     override fun getRenderTransform(): BodyTransform {
         val body = requireBody()
@@ -49,6 +54,7 @@ class WheeledVehicle(
         bodyId = bodyId,
         vehicleType = id,
         engineOn = wheeledState.engineOn,
+        fuelAmount = wheeledState.fuelAmount,
         behaviorTag = CompoundTag().apply {
             putString("behavior_type", "wheeled")
             putDouble("front_wheel_spin", wheeledState.frontWheelSpin)
@@ -82,10 +88,12 @@ fun wheeledRuntimeStateFromTag(
     definition: VehicleDefinition,
     tag: CompoundTag,
     engineOn: Boolean,
+    fuelAmount: Double,
     partStates: Map<String, VehiclePartState>
 ): WheeledVehicleRuntimeState {
     val state = WheeledVehicleRuntimeState(
         engineOn = engineOn,
+        fuelAmount = VehicleFuel.initialAmount(definition, fuelAmount),
         parkingBrakeEngaged = tag.getBoolean("parking_brake_engaged"),
         transmissionGear = tag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
         engineRpm = tag.getDouble("engine_rpm").takeIf { it > 0.0 } ?: 850.0,

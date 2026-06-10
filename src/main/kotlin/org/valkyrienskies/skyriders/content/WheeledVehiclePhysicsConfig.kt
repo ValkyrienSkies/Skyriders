@@ -282,6 +282,7 @@ data class WheelAxleConfig(
 
 data class WheeledVehicleRuntimeState(
     var engineOn: Boolean = false,
+    var fuelAmount: Double = Double.NaN,
     var parkingBrakeEngaged: Boolean = false,
     var transmissionGear: Int = 1,
     var transmissionShiftCooldown: Double = 0.0,

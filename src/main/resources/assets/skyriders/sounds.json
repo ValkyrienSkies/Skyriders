@@ -128,5 +128,20 @@
       }
     ],
     "subtitle": "skyriders.subtitle.handbrake_disengage"
+  },
+  "engine_start_fail": {
+    "sounds": [
+      {
+        "name": "skyriders:generic/vehicle_engine_start_fail_1",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:generic/vehicle_engine_start_fail_2",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.engine_start_fail"
   }
 }

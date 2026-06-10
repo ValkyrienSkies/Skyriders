@@ -1,6 +1,5 @@
 package org.valkyrienskies.skyriders.content
 
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import org.joml.Vector3d
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -68,7 +67,8 @@ object KartDefinitions {
         id: ResourceLocation,
         displayName: String,
         physics: KartPhysicsConfig,
-        render: VehicleRenderDefinition
+        render: VehicleRenderDefinition,
+        fuelCapCenter: Vector3d = Vector3d(-0.52, 0.48, -0.42)
     ): VehicleDefinition = VehicleDefinition(
         id = id,
         displayName = displayName,
@@ -105,10 +105,18 @@ object KartDefinitions {
                     center = Vector3d(0.0, 0.48, -0.15),
                     size = Vector3d(0.95, 0.55, 0.85),
                     actions = setOf(VehicleInteractionActions.MOUNT)
+                ),
+                VehicleInteractionZone(
+                    id = VehicleInteractionDefinition.FUEL_CAP,
+                    center = Vector3d(fuelCapCenter),
+                    size = Vector3d(0.32, 0.32, 0.32),
+                    actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
+                    partId = VehicleInteractionDefinition.FUEL_CAP
                 )
             )
         ),
-        behavior = KartVehicleBehaviorDefinition(physics)
+        behavior = KartVehicleBehaviorDefinition(physics),
+        parts = listOf(fuelCapPartDefinition())
     )
 
     private fun debugKartRender(): VehicleRenderDefinition {
@@ -332,20 +340,13 @@ object WheeledVehicleDefinitions {
                     id = VehicleInteractionDefinition.FUEL_CAP,
                     center = Vector3d(fuelCapCenter),
                     size = Vector3d(0.32, 0.32, 0.32),
-                    actions = setOf(VehicleInteractionActions.TOGGLE),
+                    actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
                     partId = VehicleInteractionDefinition.FUEL_CAP
                 )
             )
         ),
         behavior = WheeledVehicleBehaviorDefinition(physics),
-        parts = listOf(
-            VehiclePartDefinition(
-                id = VehicleInteractionDefinition.FUEL_CAP,
-                type = VehiclePartTypes.FUEL_CAP,
-                defaultState = CompoundTag().apply { putBoolean("open", false) },
-                interactionActions = setOf(VehicleInteractionActions.TOGGLE)
-            )
-        )
+        parts = listOf(fuelCapPartDefinition())
     )
 
     private fun atvRender(): VehicleRenderDefinition {

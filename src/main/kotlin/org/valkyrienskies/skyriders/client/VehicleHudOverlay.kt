@@ -154,7 +154,7 @@ object VehicleHudOverlay {
             engineRpm = packet.engineRpm,
             clutchEngagement = packet.clutchEngagement,
             engineStalled = packet.engineStalled,
-            fuel = 1.0,
+            fuel = packet.fuel.coerceIn(0.0, 1.0),
             hasRevs = packet.hasTransmission,
             hasJump = packet.hasJump,
             jumpCharge = packet.jumpCharge,

@@ -26,6 +26,7 @@ import org.valkyrienskies.skyriders.content.BikeVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
 import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
@@ -318,6 +319,7 @@ object SkyridersNetwork {
                 maxSpeed = maxSpeed,
                 speed = speed,
                 engineOn = vehicle.vehicleState.engineOn,
+                fuel = VehicleFuel.fraction(vehicle),
                 throttle = input.throttle,
                 steer = input.steer,
                 groundedCount = groundedCount,
@@ -767,6 +769,7 @@ object SkyridersNetwork {
         val maxSpeed: Double,
         val speed: Double,
         val engineOn: Boolean,
+        val fuel: Double,
         val throttle: Double,
         val steer: Double,
         val groundedCount: Int,
@@ -799,6 +802,7 @@ object SkyridersNetwork {
             buf.writeDouble(maxSpeed)
             buf.writeDouble(speed)
             buf.writeBoolean(engineOn)
+            buf.writeDouble(fuel)
             buf.writeDouble(throttle)
             buf.writeDouble(steer)
             buf.writeInt(groundedCount)
@@ -864,6 +868,7 @@ object SkyridersNetwork {
                     maxSpeed = buf.readDouble(),
                     speed = buf.readDouble(),
                     engineOn = buf.readBoolean(),
+                    fuel = buf.readDouble(),
                     throttle = buf.readDouble(),
                     steer = buf.readDouble(),
                     groundedCount = buf.readInt(),

@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.nbt.CompoundTag
+import org.valkyrienskies.skyriders.SkyridersMod
 import java.util.concurrent.ConcurrentHashMap
 
 fun interface VehiclePartInteractionHandler {
@@ -27,6 +28,9 @@ object VehiclePartInteractionHandlers {
         register(VehicleInteractionActions.OPEN_DOOR) { player, vehicle, zone, action ->
             setOpenState(player, vehicle, zone, action, null)
         }
+        register(VehicleInteractionActions.REFUEL) { player, vehicle, zone, _ ->
+            refuelWithJerryCan(player, vehicle, zone)
+        }
     }
 
     fun register(action: ResourceLocation, handler: VehiclePartInteractionHandler) {
@@ -35,7 +39,12 @@ object VehiclePartInteractionHandlers {
 
     fun handle(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone): Boolean {
         if (zone.partId == null) return false
-        return zone.actions.any { action ->
+        if (VehicleInteractionActions.REFUEL in zone.actions &&
+            handlers[VehicleInteractionActions.REFUEL]?.handle(player, vehicle, zone, VehicleInteractionActions.REFUEL) == true
+        ) {
+            return true
+        }
+        return zone.actions.asSequence().filterNot { it == VehicleInteractionActions.REFUEL }.any { action ->
             handlers[action]?.handle(player, vehicle, zone, action) == true
         }
     }
@@ -66,5 +75,22 @@ object VehiclePartInteractionHandlers {
             )
         }
         return changed
+    }
+
+    private fun refuelWithJerryCan(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone): Boolean {
+        if (zone.partId != VehicleInteractionDefinition.FUEL_CAP) return false
+        val level = player.level() as? ServerLevel ?: return false
+        val can = SkyridersMod.CREATIVE_JERRY_CAN.get()
+        if (!player.mainHandItem.`is`(can) && !player.offhandItem.`is`(can)) return false
+
+        val added = VehicleFuel.refill(vehicle)
+        if (added <= 0.0) {
+            player.sendSystemMessage(Component.literal("${vehicle.vehicleDefinition.displayName} tank is already full"))
+            return true
+        }
+        player.sendSystemMessage(Component.literal("Refueled ${vehicle.vehicleDefinition.displayName}"))
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
+        return true
     }
 }

@@ -27,6 +27,7 @@ import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
@@ -61,6 +62,9 @@ object SkyridersMod {
             fullBlock = true
         )
     }
+    val CREATIVE_JERRY_CAN: RegistryObject<Item> = ITEMS.register("creative_jerry_can") {
+        CreativeJerryCanItem(Item.Properties().stacksTo(1))
+    }
 
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
@@ -92,6 +96,9 @@ object SkyridersMod {
     }
     val GENERIC_ENGINE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_start") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_start"))
+    }
+    val GENERIC_ENGINE_START_FAIL_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_start_fail") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_start_fail"))
     }
     val GENERIC_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_stop") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_stop"))

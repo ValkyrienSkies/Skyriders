@@ -151,6 +151,7 @@ object VehicleManager {
             bodyId = body.id,
             vehicleType = definition.id.toString(),
             engineOn = false,
+            fuelAmount = VehicleFuel.initialAmount(definition, Double.NaN),
             partStates = definition.initialPartStates()
         )
         val vehicle = createVehicleFromBody(level, definition, body.id, record)
@@ -171,6 +172,7 @@ object VehicleManager {
                 vehicleDefinition = definition,
                 kartState = KartRuntimeState(
                     engineOn = record.engineOn,
+                    fuelAmount = VehicleFuel.initialAmount(definition, record.fuelAmount),
                     frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
                     rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
                     frontWheelAngularVelocity = record.behaviorTag.getDouble("front_wheel_angular_velocity"),
@@ -182,7 +184,7 @@ object VehicleManager {
                 bodyId = bodyId,
                 level = level,
                 vehicleDefinition = definition,
-                wheeledState = wheeledRuntimeStateFromTag(definition, record.behaviorTag, record.engineOn, record.partStates)
+                wheeledState = wheeledRuntimeStateFromTag(definition, record.behaviorTag, record.engineOn, record.fuelAmount, record.partStates)
             )
             is BikeVehicleBehaviorDefinition -> throw IllegalArgumentException("Bike vehicles are created through BikeManager")
         }
@@ -253,6 +255,10 @@ object VehicleManager {
         }
         val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return null
         val enabled = !vehicle.vehicleState.engineOn
+        if (enabled && !VehicleFuel.canStart(vehicle)) {
+            VehicleEngineSounds.playStartFail(level, vehicle)
+            return false
+        }
         when (vehicle) {
             is KartVehicle -> vehicle.kartState.engineOn = enabled
             is WheeledVehicle -> {
@@ -361,7 +367,9 @@ object VehicleManager {
         BikeManager.physTick(physLevel, dt)
         serverVehiclesByDimension[physLevel.dimension]?.values?.forEach { vehicle ->
             val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
-            vehicle.physTick(physLevel, body, getInput(physLevel.dimension, vehicle.bodyId), dt)
+            val input = getInput(physLevel.dimension, vehicle.bodyId)
+            VehicleFuel.consume(vehicle, body, input, dt)
+            vehicle.physTick(physLevel, body, input, dt)
         }
         BoostPadHandler.physTick(physLevel, getVehicles(physLevel.dimension), dt)
     }

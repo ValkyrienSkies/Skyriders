@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.resources.model.BakedModel
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.phys.AABB
 import net.minecraftforge.client.event.RenderLevelStageEvent
 import net.minecraftforge.client.model.data.ModelData
 import net.minecraftforge.eventbus.api.SubscribeEvent
@@ -17,6 +18,7 @@ import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
@@ -25,6 +27,11 @@ import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import kotlin.math.exp
 
 object BikeWorldRenderer {
+    private val TEMP_FUEL_CAP_MARKER_IDS = setOf(
+        "skyriders:dirt_bike",
+        "skyriders:speedster",
+        "skyriders:atv"
+    )
     private val visualStatesByBodyId = HashMap<Long, RenderVisualState>()
 
     @SubscribeEvent
@@ -50,6 +57,7 @@ object BikeWorldRenderer {
             )
         }
         bufferSource.endBatch(RenderType.cutout())
+        bufferSource.endBatch(RenderType.lines())
     }
 
     private fun renderVehicle(
@@ -87,6 +95,7 @@ object BikeWorldRenderer {
         poseStack.pushPose()
         poseStack.translate(bodyPosition.x - cameraX, bodyPosition.y - cameraY, bodyPosition.z - cameraZ)
         poseStack.mulPose(Quaternionf(carriedPlayer?.let(BikeClientHoistState::carriedRotation) ?: transform.rotation))
+        renderTemporaryFuelCapMarker(vehicle, poseStack, bufferSource)
         if (render.modelYawRad.isFinite() && render.modelYawRad != 0.0) {
             poseStack.mulPose(Axis.YP.rotation(render.modelYawRad.toFloat()))
         }
@@ -135,6 +144,36 @@ object BikeWorldRenderer {
         }
 
         poseStack.popPose()
+    }
+
+    private fun renderTemporaryFuelCapMarker(
+        vehicle: IVehicle,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource
+    ) {
+        if (vehicle.vehicleDefinition.id.toString() !in TEMP_FUEL_CAP_MARKER_IDS) return
+        val zone = vehicle.vehicleDefinition.interactions.zone(VehicleInteractionDefinition.FUEL_CAP) ?: return
+        if (!zone.center.isFinite() || !zone.size.isFinite()) return
+        val halfX = zone.size.x * 0.5
+        val halfY = zone.size.y * 0.5
+        val halfZ = zone.size.z * 0.5
+        val box = AABB(
+            zone.center.x - halfX,
+            zone.center.y - halfY,
+            zone.center.z - halfZ,
+            zone.center.x + halfX,
+            zone.center.y + halfY,
+            zone.center.z + halfZ
+        )
+        LevelRenderer.renderLineBox(
+            poseStack,
+            bufferSource.getBuffer(RenderType.lines()),
+            box,
+            0.02f,
+            0.02f,
+            0.02f,
+            1.0f
+        )
     }
 
     private fun updateRenderVisualState(vehicle: IVehicle): RenderVisualState {
