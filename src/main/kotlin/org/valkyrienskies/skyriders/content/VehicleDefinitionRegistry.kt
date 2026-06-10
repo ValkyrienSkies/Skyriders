@@ -354,7 +354,7 @@ object WheeledVehicleDefinitions {
             texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/atv.png"),
             seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/atv.png"),
             showWheels = true,
-            modelYawRad = 0.0,
+            modelYawRad = Math.PI,
             modelScale = 1.28,
             modelOffset = Vector3d(-0.64, -0.53, -0.64),
             wheelSpinVisualScale = 0.6,
