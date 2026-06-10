@@ -73,6 +73,7 @@ object KartPhysicsSolver {
         state.debugGroundedWheels = groundedContacts.size
         state.debugSteerRad = steerRad
         state.debugThrottle = activeInput.throttle
+        state.debugDriveWork = 0.0
         state.debugStepAssistWork = 0.0
 
         val appliedContacts = contacts.mapIndexed { index, contact ->
@@ -89,7 +90,7 @@ object KartPhysicsSolver {
         }
 
         if (activeInput.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, activeInput, driftGripActive, steerRad, config)
+            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, activeInput, driftGripActive, steerRad, config, state)
             if (stabilizedGrounded) {
                 val activeStepWheels = contacts.count(VehicleWheelContact::grounded).coerceAtLeast(1)
                 contacts.forEach { contact ->
@@ -297,7 +298,8 @@ object KartPhysicsSolver {
         input: VehicleInput,
         drifting: Boolean,
         steerRad: Double,
-        config: KartPhysicsConfig
+        config: KartPhysicsConfig,
+        state: KartRuntimeState
     ) {
         val rearContacts = contacts.filter { !it.front && it.contact.grounded && it.normalForce > 0.0 }
         if (rearContacts.isEmpty()) return
@@ -322,6 +324,10 @@ object KartPhysicsSolver {
                     contact.surfaceFriction *
                     config.longitudinalGrip
                 val limitedDriveForce = driveForce.coerceIn(-maxDriveForce, maxDriveForce)
+                val drivePower = limitedDriveForce * VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+                if (drivePower > 0.0) {
+                    state.debugDriveWork += drivePower / max(config.mass, 1.0)
+                }
                 VehicleWheelPhysics.applyContactForce(
                     body,
                     contact,

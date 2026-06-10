@@ -297,6 +297,7 @@ data class WheeledVehicleRuntimeState(
     var debugClutchEngagement: Double = 0.0,
     var debugEngineStalled: Boolean = false,
     var debugLateralSlip: Double = 0.0,
+    var debugDriveWork: Double = 0.0,
     var debugStepAssistWork: Double = 0.0,
     var engineRpm: Double = 850.0,
     var clutchEngagement: Double = 0.0,

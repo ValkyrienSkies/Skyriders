@@ -67,6 +67,8 @@ object WheeledVehiclePhysicsSolver {
             smoothGroundNormal(state, loaded, forward, right, dt, config)
         }
         val terrainUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        state.debugDriveWork = 0.0
+        state.debugStepAssistWork = 0.0
 
         loaded.forEach { applyLateralGrip(body, it, config) }
         val parkingBrakeActive = state.parkingBrakeEngaged || activeInput.handbrake > 0.0
@@ -598,7 +600,14 @@ object WheeledVehiclePhysicsSolver {
                     0.0
                 }
                 val rollingForce = (-groundSpeed * config.rollingResistance / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
-                val forceMag = (shapedSlip * maxForce + engineBrakeForce + rollingForce).coerceIn(-MAX_FORCE, MAX_FORCE)
+                val driveForceMag = shapedSlip * maxForce
+                if (axle.driven && throttle != 0.0) {
+                    val drivePower = driveForceMag * VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
+                    if (drivePower > 0.0) {
+                        state.debugDriveWork += drivePower / max(config.mass, 1.0)
+                    }
+                }
+                val forceMag = (driveForceMag + engineBrakeForce + rollingForce).coerceIn(-MAX_FORCE, MAX_FORCE)
                 VehicleWheelPhysics.applyContactForce(body, loaded.contact, Vector3d(loaded.contact.wheelForwardWorld).mul(forceMag))
 
                 val wheelInertia = max(0.08, config.mass * radius * radius * config.wheelInertiaMassScale)
@@ -896,7 +905,6 @@ object WheeledVehiclePhysicsSolver {
         state.debugGroundedWheels = contacts.count { it.contact.grounded }
         state.debugSteerRad = steerRad
         state.debugThrottle = input.throttle
-        state.debugStepAssistWork = 0.0
         val grounded = contacts.filter { it.contact.grounded }
         state.debugLateralSlip = if (grounded.isEmpty()) {
             0.0

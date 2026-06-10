@@ -389,6 +389,7 @@ object BikePhysicsSolver {
             driven = !rear.grounded && front.grounded && throttle > 0.0,
             forceScale = frontForceScale,
             config = config,
+            state = state,
             dt = dt
         )
         state.rearWheelAngularVelocity = applyWheelLongitudinalPhysics(
@@ -400,6 +401,7 @@ object BikePhysicsSolver {
             driven = true,
             forceScale = rearForceScale,
             config = config,
+            state = state,
             dt = dt
         )
     }
@@ -413,6 +415,7 @@ object BikePhysicsSolver {
         driven: Boolean,
         forceScale: Double,
         config: BikePhysicsConfig,
+        state: BikeRuntimeState,
         dt: Double
     ): Double {
         val stepDt = dt.coerceIn(0.0, 0.1)
@@ -453,6 +456,12 @@ object BikePhysicsSolver {
                 forceScale *
                 brakeForceScale
             val forceMag = gripFactor * maxLongitudinalForce
+            if (driven && throttle != 0.0) {
+                val drivePower = forceMag * safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+                if (drivePower > 0.0) {
+                    state.debugDriveWork += drivePower / max(config.mass, 1.0)
+                }
+            }
 
             applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
 
@@ -1098,6 +1107,7 @@ object BikePhysicsSolver {
         state.debugThrottle = input.throttle
         state.debugSteeringAngleRad = frontSteerRad
         state.debugDrifting = drifting
+        state.debugDriveWork = 0.0
         state.debugStepAssistWork = 0.0
     }
 

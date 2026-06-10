@@ -51,6 +51,7 @@ data class VehicleFuelDefinition(
     val idleUsePerSecond: Double = 0.018,
     val throttleUsePerSecond: Double = 0.075,
     val motionWorkUsePerSpeedPerSecond: Double = 0.0025,
+    val driveWorkUsePerWorkSecond: Double = 0.001,
     val stepAssistUsePerWorkSecond: Double = 0.012
 )
 

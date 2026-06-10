@@ -133,6 +133,7 @@ data class KartRuntimeState(
     var smoothedSteerRad: Double = 0.0,
     var debugForwardSpeed: Double = 0.0,
     var debugLateralSlip: Double = 0.0,
+    var debugDriveWork: Double = 0.0,
     var debugStepAssistWork: Double = 0.0,
     var drifting: Boolean = false,
     var driftDirection: Double = 0.0,
