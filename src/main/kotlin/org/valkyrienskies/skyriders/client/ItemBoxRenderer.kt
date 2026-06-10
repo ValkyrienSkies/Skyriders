@@ -3,15 +3,11 @@ package org.valkyrienskies.skyriders.client
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.math.Axis
-import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
-import net.minecraft.client.renderer.Sheets
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
-import net.minecraft.client.renderer.texture.TextureAtlasSprite
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.inventory.InventoryMenu
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -29,28 +25,9 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         val recharging = entity.recharging
         val alpha = if (recharging) 0.34f else 0.92f
         val boxBuffer = bufferSource.getBuffer(RenderType.entityTranslucent(BOX_TEXTURE))
-        val baseBuffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet())
-        val baseSprite = Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(BASE_SPRITE)
-
-        poseStack.pushPose()
-        poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw))
-        addBox(
-            poseStack = poseStack,
-            buffer = baseBuffer,
-            minX = -0.55f,
-            minY = 0.0f,
-            minZ = -0.55f,
-            maxX = 0.55f,
-            maxY = 0.14f,
-            maxZ = 0.55f,
-            red = 1.0f,
-            green = 1.0f,
-            blue = 1.0f,
-            alpha = 1.0f,
-            packedLight = packedLight,
-            sprite = baseSprite
-        )
-        poseStack.popPose()
+        // Base rendering is intentionally disabled for now. Entity renderers are
+        // happier with one texture path, and mixing block/atlas textures here
+        // caused atlas and BufferBuilder issues.
 
         poseStack.pushPose()
         poseStack.translate(0.0, 1.08, 0.0)
@@ -98,17 +75,20 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
-        sprite: TextureAtlasSprite? = null
+        uMin: Float = 0.0f,
+        uMax: Float = 1.0f,
+        vMin: Float = 0.0f,
+        vMax: Float = 1.0f
     ) {
         val pose = poseStack.last()
         val matrix = pose.pose()
         val normal = pose.normal()
-        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight, sprite)
-        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight, sprite)
-        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
-        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
-        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
-        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
     }
 
     private fun face(
@@ -135,12 +115,15 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
-        sprite: TextureAtlasSprite? = null
+        uMin: Float = 0.0f,
+        uMax: Float = 1.0f,
+        vMin: Float = 0.0f,
+        vMax: Float = 1.0f
     ) {
-        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
-        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
-        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
-        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
+        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
     }
 
     private fun vertex(
@@ -160,10 +143,13 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
-        sprite: TextureAtlasSprite? = null
+        uMin: Float = 0.0f,
+        uMax: Float = 1.0f,
+        vMin: Float = 0.0f,
+        vMax: Float = 1.0f
     ) {
-        val finalU = sprite?.getU((u * 16.0f).toDouble()) ?: u
-        val finalV = sprite?.getV((v * 16.0f).toDouble()) ?: v
+        val finalU = uMin + (uMax - uMin) * u
+        val finalV = vMin + (vMax - vMin) * v
         buffer.vertex(matrix, x, y, z)
             .color(red, green, blue, alpha)
             .uv(finalU, finalV)
@@ -175,7 +161,6 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
 
     companion object {
         private val BOX_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/item_box.png")
-        private val BASE_SPRITE = ResourceLocation(SkyridersMod.MOD_ID, "block/boostpad")
         private val TEXTURE = BOX_TEXTURE
     }
 }
