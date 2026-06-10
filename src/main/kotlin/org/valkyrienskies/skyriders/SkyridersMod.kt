@@ -23,6 +23,7 @@ import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeLifecycle
+import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
@@ -41,8 +42,6 @@ object SkyridersMod {
     private val ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MOD_ID)
     private val ENTITIES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MOD_ID)
     private val BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID)
-    private val SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID)
-
     // Put RegistryObjects here:
     val BOOST_PAD_BLOCK: RegistryObject<Block> = registerBlockAndItem("boost_pad") {
         BoostPadBlock(
@@ -73,45 +72,6 @@ object SkyridersMod {
             .updateInterval(1)
             .build("$MOD_ID:bike_seat")
     }
-    val BIKE_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine"))
-    }
-    val BIKE_ENGINE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine_start") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine_start"))
-    }
-    val BIKE_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine_stop") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine_stop"))
-    }
-    val BOOST_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boost") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "boost"))
-    }
-    val KART_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_engine"))
-    }
-    val KART_ENGINE_DRIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine_drift") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_drift"))
-    }
-    val GENERIC_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine"))
-    }
-    val GENERIC_ENGINE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_start") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_start"))
-    }
-    val GENERIC_ENGINE_START_FAIL_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_start_fail") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_start_fail"))
-    }
-    val GENERIC_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_stop") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_stop"))
-    }
-    val GEARSHIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("gearshift") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "gearshift"))
-    }
-    val HANDBRAKE_ENGAGE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("handbrake_engage") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "handbrake_engage"))
-    }
-    val HANDBRAKE_DISENGAGE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("handbrake_disengage") {
-        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "handbrake_disengage"))
-    }
 
     // end of RegistryObjects
 
@@ -122,7 +82,7 @@ object SkyridersMod {
         ITEMS.register(modEventBus)
         ENTITIES.register(modEventBus)
         BLOCK_ENTITIES.register(modEventBus)
-        SOUND_EVENTS.register(modEventBus)
+        SkyridersSounds.register(modEventBus)
 
         modEventBus.addListener(::init)
         MinecraftForge.EVENT_BUS.register(BikeLifecycle)

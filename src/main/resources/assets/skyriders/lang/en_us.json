@@ -1,8 +1,8 @@
 {
   "key.categories.skyriders": "Skyriders",
-  "key.skyriders.bike_dismount": "Dismount Bike",
-  "key.skyriders.bike_brake": "Bike Brake / Drift",
-  "key.skyriders.bike_engine_toggle": "Toggle Bike Engine",
+  "key.skyriders.bike_dismount": "Dismount Vehicle",
+  "key.skyriders.bike_brake": "Brake / Drift",
+  "key.skyriders.bike_engine_toggle": "Toggle Engine",
   "key.skyriders.vehicle_parking_brake_toggle": "Toggle Parking Brake",
   "key.skyriders.vehicle_gear_up": "Gear Up",
   "key.skyriders.vehicle_gear_down": "Gear Down",
@@ -23,6 +23,15 @@
   "skyriders.subtitle.gearshift": "Vehicle gear shifts",
   "skyriders.subtitle.handbrake_engage": "Vehicle handbrake engages",
   "skyriders.subtitle.handbrake_disengage": "Vehicle handbrake disengages",
+
+  "skyriders.subtitle.spinout": "Vehicle spins out",
+
+  "skyriders.subtitle.racing_item_get": "Racing item picked up",
+  "skyriders.subtitle.racing_item_use": "Racing item used",
+
+  "skyriders.subtitle.thunderbolt": "Thunderbolt used",
+  "skyriders.subtitle.sugar_rocket_explode": "Sugar rocket explodes",
+
   "death.attack.skyriders.vehicle_impact": "%1$s was run over",
   "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",
   "death.attack.skyriders.vehicle_impact.item": "%1$s was run over by %2$s using %3$s",

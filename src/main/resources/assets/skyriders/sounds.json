@@ -143,5 +143,55 @@
       }
     ],
     "subtitle": "skyriders.subtitle.engine_start_fail"
+  },
+  "sugar_rocket_explode": {
+    "sounds": [
+      {
+        "name": "skyriders:badexplosion",
+        "type": "file",
+        "attenuation_distance": 64
+      }
+    ],
+    "subtitle": "skyriders.subtitle.sugar_rocket_explode"
+  },
+  "racing_item_get": {
+    "sounds": [
+      {
+        "name": "skyriders:item_get",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.racing_item_get"
+  },
+  "racing_item_use": {
+    "sounds": [
+      {
+        "name": "skyriders:item_activate",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.racing_item_use"
+  },
+  "spinout": {
+    "sounds": [
+      {
+        "name": "skyriders:spinout",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.spinout"
+  },
+  "thunderbolt": {
+    "sounds": [
+      {
+        "name": "skyriders:thunderbolt",
+        "type": "file",
+        "attenuation_distance": 64
+      }
+    ],
+    "subtitle": "skyriders.subtitle.thunderbolt"
   }
 }

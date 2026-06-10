@@ -92,7 +92,7 @@ object BoostPadHandler {
             position.x(),
             position.y(),
             position.z(),
-            SkyridersMod.BOOST_SOUND.get(),
+            SkyridersSounds.BOOST_SOUND.get(),
             SoundSource.BLOCKS,
             0.75f,
             1.0f
