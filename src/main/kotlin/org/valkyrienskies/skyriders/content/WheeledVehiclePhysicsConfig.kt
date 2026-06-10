@@ -29,6 +29,8 @@ data class WheeledVehiclePhysicsConfig(
     val yawAssistMaxSpeed: Double,
     val groundedGraceTime: Double = 0.1,
     val groundNormalSmoothingTime: Double = 0.12,
+    val suspensionDroopGroundedFraction: Double = 0.45,
+    val suspensionDroopPreloadFraction: Double = 0.16,
     val parkingBrakeStrength: Double = 4.5,
     val maxStepHeight: Double = 0.85,
     val stepAssistStrength: Double = 6500.0,
@@ -105,7 +107,7 @@ data class WheeledVehiclePhysicsConfig(
             yawAssistMinSpeed = 0.7,
             yawAssistMaxSpeed = 15.0,
             maxStepHeight = 1.5,
-            stepAssistStrength = 6400.0,
+            stepAssistStrength = 8200.0,
             transmission = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
         )
 

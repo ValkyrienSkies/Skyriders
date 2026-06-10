@@ -25,7 +25,7 @@ object WheeledVehiclePhysicsSolver {
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
     private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
     private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
-    private const val MIN_STEP_ASSIST_RISE = 0.35
+    private const val MIN_STEP_ASSIST_RISE = 0.12
 
     fun updatePhysics(
         body: PhysVsBody,
@@ -433,7 +433,8 @@ object WheeledVehiclePhysicsSolver {
         val castDir = Vector3d(suspensionUp).negate()
         val axle = wheel.axle
         val maxLength = axle.suspensionRestLength + axle.suspensionTravel + axle.wheelRadius
-        val groundedMaxDistance = axle.suspensionRestLength + axle.wheelRadius + axle.suspensionTravel * 0.35
+        val droopGroundedRange = axle.suspensionTravel * config.suspensionDroopGroundedFraction.coerceIn(0.0, 1.0)
+        val groundedMaxDistance = axle.suspensionRestLength + axle.wheelRadius + droopGroundedRange
         val bodyForward = VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val baseForward = VehiclePhysicsMath.projectOntoPlane(bodyForward, suspensionUp, bodyForward)
         val wheelForward = if (steerRad != 0.0) {
@@ -501,11 +502,22 @@ object WheeledVehiclePhysicsSolver {
         val axle = contactState.wheel.axle
         if (!contact.grounded) return 0.0
         val springLength = contact.hitDistance - axle.wheelRadius
-        val compression = (axle.suspensionRestLength - springLength).coerceIn(0.0, axle.suspensionTravel)
-        if (compression <= 0.0) return 0.0
+        val compression = axle.suspensionRestLength - springLength
+        val compressed = compression.coerceIn(0.0, axle.suspensionTravel)
+        val droop = (springLength - axle.suspensionRestLength).coerceAtLeast(0.0)
+        val droopRange = axle.suspensionTravel * config.suspensionDroopGroundedFraction.coerceIn(0.0, 1.0)
+        val droopLoad = if (compressed <= 0.0 && droopRange > 1.0e-4) {
+            val droopT = (droop / droopRange).coerceIn(0.0, 1.0)
+            val preload = config.mass * 9.81 * 0.25 * config.suspensionDroopPreloadFraction.coerceIn(0.0, 1.0)
+            preload * (1.0 - droopT)
+        } else {
+            0.0
+        }
+        if (compressed <= 0.0 && droopLoad <= 0.0) return 0.0
         val suspensionUp = VehiclePhysicsMath.safeNormalize(Vector3d(contact.suspensionDirWorld).negate(), WORLD_UP)
         val springVelocity = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.suspensionDirWorld)
-        val forceMag = (compression * axle.suspensionStrength + springVelocity * axle.suspensionDamping).coerceAtLeast(0.0)
+        val dampingScale = if (compressed > 0.0) 1.0 else 0.35
+        val forceMag = (compressed * axle.suspensionStrength + droopLoad + springVelocity * axle.suspensionDamping * dampingScale).coerceAtLeast(0.0)
         val normalForce = forceMag.coerceIn(0.0, MAX_FORCE)
         VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(suspensionUp).mul(normalForce))
         return normalForce

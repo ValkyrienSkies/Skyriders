@@ -364,7 +364,7 @@ object WheeledVehicleDefinitions {
                     id = "front_left_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_flw"),
                     pivot = Vector3d(0.8453125, 0.234375, 0.0625),
-                    visualOffset = Vector3d(-0.7203125, 0.0546875, 0.96875),
+                    visualOffset = Vector3d(-0.0015625, 0.0546875, -0.09375),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
                 ),
@@ -372,7 +372,7 @@ object WheeledVehicleDefinitions {
                     id = "front_right_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_frw"),
                     pivot = Vector3d(0.8453125, 0.234375, 0.0625),
-                    visualOffset = Vector3d(0.0296875, 0.0546875, 0.96875),
+                    visualOffset = Vector3d(-0.6265625, 0.0546875, -0.09375),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
                 ),
@@ -380,7 +380,7 @@ object WheeledVehicleDefinitions {
                     id = "rear_left_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_blw"),
                     pivot = Vector3d(0.8453125, 0.234375, 0.0625),
-                    visualOffset = Vector3d(-0.7203125, 0.0546875, -0.09375),
+                    visualOffset = Vector3d(-0.0015625, 0.0546875, 0.96875),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),
@@ -388,7 +388,7 @@ object WheeledVehicleDefinitions {
                     id = "rear_right_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_brw"),
                     pivot = Vector3d(0.8453125, 0.234375, 0.0625),
-                    visualOffset = Vector3d(0.0296875, 0.0546875, -0.09375),
+                    visualOffset = Vector3d(-0.6265625, 0.0546875, 0.96875),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),
