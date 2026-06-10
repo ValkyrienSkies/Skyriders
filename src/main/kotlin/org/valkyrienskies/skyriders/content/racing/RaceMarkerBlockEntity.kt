@@ -20,6 +20,8 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         private set
     var checkpointIndex: Int = 0
         private set
+    var lapCount: Int = DEFAULT_LAP_COUNT
+        private set
     var powered: Boolean = false
         private set
     var countdownTicks: Int = 0
@@ -44,6 +46,12 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         checkpointIndex = (checkpointIndex + 1).coerceAtMost(99)
         markDirtyAndSync()
         return checkpointIndex
+    }
+
+    fun cycleLapCount(): Int {
+        lapCount = if (lapCount >= MAX_CONFIGURABLE_LAP_COUNT) 1 else lapCount + 1
+        markDirtyAndSync()
+        return lapCount
     }
 
     fun setPoweredState(poweredNow: Boolean, level: ServerLevel) {
@@ -72,6 +80,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         markerType = tag.getString(TYPE_KEY).takeIf { it == RaceMarkerTypes.START_FINISH || it == RaceMarkerTypes.CHECKPOINT }
             ?: RaceMarkerTypes.START_FINISH
         checkpointIndex = tag.getInt(CHECKPOINT_KEY).coerceIn(0, 99)
+        lapCount = if (tag.contains(LAP_COUNT_KEY)) tag.getInt(LAP_COUNT_KEY).coerceIn(1, MAX_LAP_COUNT) else DEFAULT_LAP_COUNT
         powered = tag.getBoolean(POWERED_KEY)
         countdownTicks = tag.getInt(COUNTDOWN_KEY).coerceAtLeast(0)
     }
@@ -82,6 +91,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         tag.putInt(COLOR_KEY, colorId)
         tag.putString(TYPE_KEY, markerType)
         tag.putInt(CHECKPOINT_KEY, checkpointIndex)
+        tag.putInt(LAP_COUNT_KEY, lapCount)
         tag.putBoolean(POWERED_KEY, powered)
         tag.putInt(COUNTDOWN_KEY, countdownTicks)
     }
@@ -93,7 +103,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
     fun describe(): Component {
         val color = if (colorId >= 0) RaceFlagItem.describeColor(colorId) else "none"
         val endpoint = endpointPos?.let { "${it.x}, ${it.y}, ${it.z}" } ?: "unlinked"
-        return Component.literal("Race marker: $markerType checkpoint=$checkpointIndex color=$color endpoint=$endpoint")
+        return Component.literal("Race marker: $markerType checkpoint=$checkpointIndex laps=$lapCount color=$color endpoint=$endpoint")
     }
 
     private fun markDirtyAndSync() {
@@ -107,8 +117,12 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         private const val COLOR_KEY = "ColorId"
         private const val TYPE_KEY = "MarkerType"
         private const val CHECKPOINT_KEY = "CheckpointIndex"
+        private const val LAP_COUNT_KEY = "LapCount"
         private const val POWERED_KEY = "Powered"
         private const val COUNTDOWN_KEY = "CountdownTicks"
+        private const val DEFAULT_LAP_COUNT = 3
+        private const val MAX_CONFIGURABLE_LAP_COUNT = 6
+        private const val MAX_LAP_COUNT = 99
 
         fun serverTick(level: Level, pos: BlockPos, state: BlockState, blockEntity: RaceMarkerBlockEntity) {
             val serverLevel = level as? ServerLevel ?: return

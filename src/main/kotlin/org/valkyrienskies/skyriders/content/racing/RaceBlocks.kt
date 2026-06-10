@@ -75,6 +75,9 @@ class RaceMarkerBlock(properties: Properties) : BaseEntityBlock(properties) {
                 if (player.isShiftKeyDown) {
                     val type = marker.cycleType()
                     player.displayClientMessage(Component.literal("Race marker type: $type"), true)
+                } else if (marker.markerType == RaceMarkerTypes.START_FINISH) {
+                    val lapCount = marker.cycleLapCount()
+                    player.displayClientMessage(Component.literal("Race laps: $lapCount"), true)
                 } else {
                     val index = marker.incrementCheckpointIndex()
                     player.displayClientMessage(Component.literal("Checkpoint index: $index"), true)

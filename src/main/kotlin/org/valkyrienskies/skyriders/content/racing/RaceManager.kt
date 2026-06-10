@@ -128,6 +128,7 @@ object RaceManager {
             racers = participants,
             active = true,
             musicTrack = selectRaceMusicTrack(level),
+            totalLaps = startMarker.lapCount,
             totalParticipants = participants.size
         )
         participants.values.forEach { racer ->
@@ -193,6 +194,16 @@ object RaceManager {
             val maxCheckpoint = race.maxCheckpointIndex()
             if (racer.nextCheckpointIndex <= maxCheckpoint) return
             if (race.finishOrder.contains(racer.bodyId)) return
+            if (racer.currentLap < race.totalLaps) {
+                racer.currentLap++
+                racer.crossedCheckpoints.clear()
+                racer.nextCheckpointIndex = race.firstCheckpointIndex()
+                racer.nextTarget = nextTarget(level, racer, race)
+                successEffect(level, position)
+                pulseEndpoint(level, marker)
+                driverForBody(level, racer.bodyId)?.sendActionBar("Lap ${racer.currentLap}/${race.totalLaps}")
+                return
+            }
             race.finishOrder.add(racer.bodyId)
             successEffect(level, position)
             pulseEndpoint(level, marker)
@@ -250,7 +261,8 @@ object RaceManager {
             refreshRacerPosition(level, racer, race)
         }
         return race.racers.values.sortedWith(
-            compareByDescending<RacerState> { it.crossedCheckpoints.size }
+            compareByDescending<RacerState> { it.currentLap }
+                .thenByDescending { it.crossedCheckpoints.size }
                 .thenBy { distanceToNextTarget(it) }
         )
     }
@@ -452,6 +464,7 @@ object RaceManager {
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
         val musicTrack: ResourceLocation?,
+        val totalLaps: Int,
         val totalParticipants: Int,
         var active: Boolean
     ) {
@@ -467,6 +480,7 @@ object RaceManager {
         val driverId: java.util.UUID?,
         val driverName: String,
         var position: Vector3d,
+        var currentLap: Int = 1,
         var nextCheckpointIndex: Int = 0,
         val crossedCheckpoints: MutableSet<Int> = HashSet(),
         val previousDistances: MutableMap<Long, Double> = HashMap(),
