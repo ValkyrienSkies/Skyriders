@@ -116,14 +116,14 @@ object SkyridersMod {
     }
     val SUGAR_ROCKET_ENTITY: RegistryObject<EntityType<SugarRocketEntity>> = ENTITIES.register("sugar_rocket") {
         EntityType.Builder.of(::SugarRocketEntity, MobCategory.MISC)
-            .sized(0.35f, 0.35f)
+            .sized(1.0f, 1.0f)
             .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:sugar_rocket")
     }
     val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
         EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)
-            .sized(0.1f, 0.1f)
+            .sized(9.0f, 9.0f)
             .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:bad_explosion")

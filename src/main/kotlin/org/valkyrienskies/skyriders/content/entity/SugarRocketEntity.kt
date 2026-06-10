@@ -24,7 +24,6 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
-import org.valkyrienskies.skyriders.util.VehiclePhysicsMath
 import kotlin.math.sqrt
 
 class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Entity(type, level) {
@@ -133,20 +132,21 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         return ClientboundAddEntityPacket(this)
     }
 
+    override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
+        return distance < RENDER_DISTANCE * RENDER_DISTANCE
+    }
+
     private fun updateHoming(level: ServerLevel) {
         val target = findHomingTarget(level) ?: return
-        val current = deltaMovement
-        if (current.lengthSqr() < 1.0e-8) return
-
-        val desired = target.subtract(position()).normalize()
-        val blended = current.normalize().scale(1.0 - HOMING_TURN_RATE).add(desired.scale(HOMING_TURN_RATE)).normalize()
+        val desired = target.subtract(position()).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
+        val current = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: desired
+        val blended = current.scale(1.0 - HOMING_TURN_RATE).add(desired.scale(HOMING_TURN_RATE)).normalize()
         motorDirection = blended.takeIf { it.lengthSqr() > 1.0e-8 } ?: motorDirection
     }
 
     private fun findHomingTarget(level: ServerLevel): Vec3? {
         val shipWorld = level.shipWorld ?: return null
         val pos = position()
-        val forward = deltaMovement.normalize()
         var bestDistanceSq = HOMING_RANGE * HOMING_RANGE
         var bestTarget: Vec3? = null
 
@@ -157,9 +157,6 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             val toTarget = target.subtract(pos)
             val distanceSq = toTarget.lengthSqr()
             if (distanceSq > bestDistanceSq) return@forEach
-            if (VehiclePhysicsMath.safeDot(Vector3d(forward.x, forward.y, forward.z), Vector3d(toTarget.x, toTarget.y, toTarget.z).normalize()) < HOMING_MIN_DOT) {
-                return@forEach
-            }
             bestDistanceSq = distanceSq
             bestTarget = target
         }
@@ -209,7 +206,15 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
 
     private fun updateVelocity(fueled: Boolean) {
         deltaMovement = if (fueled) {
-            deltaMovement.add(motorDirection.scale(ROCKET_ACCELERATION)).limitLength(MAX_ROCKET_SPEED)
+            val currentSpeed = deltaMovement.length().coerceAtLeast(INITIAL_THRUST_SPEED)
+            val targetSpeed = (currentSpeed + ROCKET_ACCELERATION).coerceAtMost(MAX_ROCKET_SPEED)
+            val currentDirection = deltaMovement.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: motorDirection
+            val thrustDirection = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: currentDirection
+            currentDirection
+                .scale(1.0 - VELOCITY_ALIGNMENT_RATE)
+                .add(thrustDirection.scale(VELOCITY_ALIGNMENT_RATE))
+                .normalize()
+                .scale(targetSpeed)
         } else {
             Vec3(
                 deltaMovement.x * OUT_OF_FUEL_DRAG,
@@ -261,14 +266,16 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val FUEL_DISTANCE = 30.0
         private const val ROCKET_ACCELERATION = 0.115
         private const val MAX_ROCKET_SPEED = 2.45
+        private const val INITIAL_THRUST_SPEED = 0.45
+        private const val VELOCITY_ALIGNMENT_RATE = 0.28
         private const val OUT_OF_FUEL_DRAG = 0.975
         private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 3.25
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0
-        private const val HOMING_TURN_RATE = 0.12
-        private const val HOMING_MIN_DOT = -0.15
+        private const val HOMING_TURN_RATE = 0.2
+        private const val RENDER_DISTANCE = 192.0
         private val HOMING: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
         private val HAS_FUEL: EntityDataAccessor<Boolean> =

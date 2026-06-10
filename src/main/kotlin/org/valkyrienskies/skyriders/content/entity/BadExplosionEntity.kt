@@ -21,6 +21,10 @@ class BadExplosionEntity(type: EntityType<BadExplosionEntity>, level: Level) : E
         }
     }
 
+    override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
+        return distance < RENDER_DISTANCE * RENDER_DISTANCE
+    }
+
     override fun defineSynchedData() {
     }
 
@@ -36,5 +40,6 @@ class BadExplosionEntity(type: EntityType<BadExplosionEntity>, level: Level) : E
 
     companion object {
         const val FRAME_COUNT = 17
+        private const val RENDER_DISTANCE = 192.0
     }
 }
