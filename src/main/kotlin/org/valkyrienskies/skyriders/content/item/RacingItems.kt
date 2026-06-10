@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.content.item
 
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResultHolder
@@ -22,6 +23,16 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
         playItemUseSound(level, player)
+        level.playSound(
+            null,
+            player.x,
+            player.y,
+            player.z,
+            SoundEvents.HONEY_DRINK,
+            SoundSource.PLAYERS,
+            0.9f,
+            1.0f
+        )
         VehicleStatusEffects.applyBoost(vehicle, duration = 0.95, acceleration = 36.0, targetSpeed = 34.0, fadeRange = 8.0)
         return true
     }
@@ -91,6 +102,7 @@ class SugarRocketItem(
         val direction = player.lookAngle.normalize()
         val forwardOffset = Vector3d(direction.x, direction.y, direction.z).mul(1.1)
         val bodyPosition = body.kinematics.position
+        val inheritedVelocity = body.kinematics.velocity
         val origin = net.minecraft.world.phys.Vec3(
             bodyPosition.x() + forwardOffset.x,
             bodyPosition.y() + 0.55 + forwardOffset.y,
@@ -99,10 +111,22 @@ class SugarRocketItem(
 
         entity.ownerBodyId = vehicle.bodyId
         entity.homing = homing
-        entity.launch(origin, direction)
+        entity.launch(
+            origin = origin,
+            direction = direction,
+            inheritedVelocity = net.minecraft.world.phys.Vec3(
+                inheritedVelocity.x() / TICKS_PER_SECOND,
+                inheritedVelocity.y() / TICKS_PER_SECOND,
+                inheritedVelocity.z() / TICKS_PER_SECOND
+            )
+        )
         level.addFreshEntity(entity)
         playItemUseSound(level, player)
         return true
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
     }
 }
 

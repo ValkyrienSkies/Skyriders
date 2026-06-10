@@ -34,7 +34,11 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         get() = entityData.get(HOMING)
         set(value) = entityData.set(HOMING, value)
 
+    val hasFuel: Boolean
+        get() = entityData.get(HAS_FUEL)
+
     private var distanceTravelled = 0.0
+    private var motorDirection = Vec3(0.0, 0.0, 1.0)
 
     init {
         blocksBuilding = false
@@ -45,19 +49,23 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         super.tick()
 
         if (level().isClientSide) {
+            spawnTrailParticles()
             setPosition(nextPosition(deltaMovement))
             return
         }
 
         val serverLevel = level() as? ServerLevel ?: return
-        if (tickCount > MAX_LIFETIME_TICKS || distanceTravelled >= MAX_TRAVEL_DISTANCE) {
-            explode(serverLevel, position())
+        if (tickCount > MAX_LIFETIME_TICKS) {
+            discard()
             return
         }
 
-        if (homing) {
+        val fueled = distanceTravelled < FUEL_DISTANCE
+        entityData.set(HAS_FUEL, fueled)
+        if (fueled && homing) {
             updateHoming(serverLevel)
         }
+        updateVelocity(fueled)
 
         val start = position()
         val velocity = deltaMovement
@@ -87,26 +95,38 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         }
     }
 
-    fun launch(origin: Vec3, direction: Vec3, speed: Double = ROCKET_SPEED) {
+    fun launch(origin: Vec3, direction: Vec3, inheritedVelocity: Vec3 = Vec3.ZERO) {
         val safeDirection = direction.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: Vec3(0.0, 0.0, 1.0)
+        motorDirection = safeDirection
         moveTo(origin.x, origin.y, origin.z, yRot, xRot)
-        deltaMovement = safeDirection.scale(speed)
+        deltaMovement = inheritedVelocity.limitLength(MAX_ROCKET_SPEED)
     }
 
     override fun defineSynchedData() {
         entityData.define(HOMING, false)
+        entityData.define(HAS_FUEL, true)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
         ownerBodyId = compound.getLong(OWNER_BODY_ID_KEY)
         homing = compound.getBoolean(HOMING_KEY)
         distanceTravelled = compound.getDouble(DISTANCE_TRAVELLED_KEY)
+        entityData.set(HAS_FUEL, compound.getBoolean(HAS_FUEL_KEY).takeIf { compound.contains(HAS_FUEL_KEY) } ?: true)
+        motorDirection = Vec3(
+            compound.getDouble(MOTOR_DIRECTION_X_KEY),
+            compound.getDouble(MOTOR_DIRECTION_Y_KEY),
+            compound.getDouble(MOTOR_DIRECTION_Z_KEY)
+        ).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: Vec3(0.0, 0.0, 1.0)
     }
 
     override fun addAdditionalSaveData(compound: CompoundTag) {
         compound.putLong(OWNER_BODY_ID_KEY, ownerBodyId)
         compound.putBoolean(HOMING_KEY, homing)
         compound.putDouble(DISTANCE_TRAVELLED_KEY, distanceTravelled)
+        compound.putBoolean(HAS_FUEL_KEY, hasFuel)
+        compound.putDouble(MOTOR_DIRECTION_X_KEY, motorDirection.x)
+        compound.putDouble(MOTOR_DIRECTION_Y_KEY, motorDirection.y)
+        compound.putDouble(MOTOR_DIRECTION_Z_KEY, motorDirection.z)
     }
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> {
@@ -120,7 +140,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
 
         val desired = target.subtract(position()).normalize()
         val blended = current.normalize().scale(1.0 - HOMING_TURN_RATE).add(desired.scale(HOMING_TURN_RATE)).normalize()
-        deltaMovement = blended.scale(ROCKET_SPEED)
+        motorDirection = blended.takeIf { it.lengthSqr() > 1.0e-8 } ?: motorDirection
     }
 
     private fun findHomingTarget(level: ServerLevel): Vec3? {
@@ -187,6 +207,30 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         discard()
     }
 
+    private fun updateVelocity(fueled: Boolean) {
+        deltaMovement = if (fueled) {
+            deltaMovement.add(motorDirection.scale(ROCKET_ACCELERATION)).limitLength(MAX_ROCKET_SPEED)
+        } else {
+            Vec3(
+                deltaMovement.x * OUT_OF_FUEL_DRAG,
+                deltaMovement.y * OUT_OF_FUEL_DRAG - OUT_OF_FUEL_GRAVITY,
+                deltaMovement.z * OUT_OF_FUEL_DRAG
+            )
+        }
+    }
+
+    private fun spawnTrailParticles() {
+        val velocity = deltaMovement
+        val back = if (velocity.lengthSqr() > 1.0e-8) velocity.normalize().scale(-0.42) else Vec3.ZERO
+        val px = x + back.x + (random.nextDouble() - 0.5) * 0.12
+        val py = y + back.y + (random.nextDouble() - 0.5) * 0.12
+        val pz = z + back.z + (random.nextDouble() - 0.5) * 0.12
+        level().addParticle(ParticleTypes.SMOKE, px, py, pz, -velocity.x * 0.03, -velocity.y * 0.03, -velocity.z * 0.03)
+        if (hasFuel) {
+            level().addParticle(ParticleTypes.FLAME, px, py, pz, -velocity.x * 0.015, -velocity.y * 0.015, -velocity.z * 0.015)
+        }
+    }
+
     private fun nextPosition(velocity: Vec3): Vec3 {
         return position().add(velocity)
     }
@@ -199,13 +243,26 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         return sqrt(size.x * size.x + size.z * size.z) * 0.5
     }
 
+    private fun Vec3.limitLength(maxLength: Double): Vec3 {
+        val length = length()
+        if (length <= maxLength || length < 1.0e-8) return this
+        return scale(maxLength / length)
+    }
+
     companion object {
         private const val OWNER_BODY_ID_KEY = "OwnerBodyId"
         private const val HOMING_KEY = "Homing"
+        private const val HAS_FUEL_KEY = "HasFuel"
         private const val DISTANCE_TRAVELLED_KEY = "DistanceTravelled"
-        private const val MAX_LIFETIME_TICKS = 20 * 5
-        private const val MAX_TRAVEL_DISTANCE = 56.0
-        private const val ROCKET_SPEED = 1.65
+        private const val MOTOR_DIRECTION_X_KEY = "MotorDirectionX"
+        private const val MOTOR_DIRECTION_Y_KEY = "MotorDirectionY"
+        private const val MOTOR_DIRECTION_Z_KEY = "MotorDirectionZ"
+        private const val MAX_LIFETIME_TICKS = 20 * 14
+        private const val FUEL_DISTANCE = 30.0
+        private const val ROCKET_ACCELERATION = 0.115
+        private const val MAX_ROCKET_SPEED = 2.45
+        private const val OUT_OF_FUEL_DRAG = 0.975
+        private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 3.25
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
@@ -213,6 +270,8 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val HOMING_TURN_RATE = 0.12
         private const val HOMING_MIN_DOT = -0.15
         private val HOMING: EntityDataAccessor<Boolean> =
+            SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
+        private val HAS_FUEL: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
     }
 }

@@ -52,6 +52,35 @@ object VehicleOpenModelRenderer {
         return true
     }
 
+    fun renderTexturedIfNeeded(
+        modelLocation: ResourceLocation,
+        textureLocation: ResourceLocation,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        packedLight: Int
+    ): Boolean {
+        val model = getModel(modelLocation) ?: return false
+
+        val consumer = bufferSource.getBuffer(RenderType.entityCutout(textureLocation))
+        val pose = poseStack.last()
+        model.faces.forEach { face ->
+            val shade = faceShade(face.normal)
+            val color = (shade * 255.0f).toInt().coerceIn(0, 255)
+            for (i in 0 until 4) {
+                val vertex = face.vertices[i]
+                val uv = face.uvs[i]
+                consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
+                    .color(color, color, color, 255)
+                    .uv((uv.x() / model.textureWidth).toFloat(), (uv.y() / model.textureHeight).toFloat())
+                    .overlayCoords(OverlayTexture.NO_OVERLAY)
+                    .uv2(packedLight)
+                    .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
+                    .endVertex()
+            }
+        }
+        return true
+    }
+
     private fun faceShade(normal: Vector3f): Float {
         val up = normal.y().coerceIn(-1.0f, 1.0f)
         val horizontal = (1.0f - kotlin.math.abs(up)).coerceIn(0.0f, 1.0f)
@@ -98,7 +127,10 @@ object VehicleOpenModelRenderer {
             }
         }
 
+        val textureSize = json.getAsJsonArray("texture_size")
         return OpenModel(
+            textureWidth = textureSize?.get(0)?.asDouble ?: 16.0,
+            textureHeight = textureSize?.get(1)?.asDouble ?: 16.0,
             hasRotatedComponents = hasRotatedComponents,
             faces = faces
         )
@@ -286,6 +318,8 @@ object VehicleOpenModelRenderer {
     }
 
     private data class OpenModel(
+        val textureWidth: Double,
+        val textureHeight: Double,
         val hasRotatedComponents: Boolean,
         val faces: List<OpenFace>
     )

@@ -43,7 +43,7 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         poseStack.translate(-0.5, 0.0, -0.5)
         poseStack.scale(scale, scale, scale)
 
-        if (!VehicleOpenModelRenderer.renderIfNeeded(selectedModel, poseStack, bufferSource, light)) {
+        if (!VehicleOpenModelRenderer.renderTexturedIfNeeded(selectedModel, textureLocation, poseStack, bufferSource, light)) {
             val model = minecraft.modelManager.getModel(selectedModel)
             minecraft.blockRenderer.modelRenderer.renderModel(
                 poseStack.last(),
@@ -72,6 +72,8 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
                 val horizontal = kotlin.math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
                 poseStack.mulPose(Axis.YP.rotationDegrees(Math.toDegrees(atan2(-velocity.x, -velocity.z)).toFloat()))
                 poseStack.mulPose(Axis.XP.rotationDegrees(Math.toDegrees(atan2(velocity.y, horizontal)).toFloat()))
+                val rollSpeed = if (entity.hasFuel) 46.0f else 8.0f
+                poseStack.mulPose(Axis.ZP.rotationDegrees((entity.tickCount * rollSpeed) % 360.0f))
                 return
             }
         }
