@@ -169,7 +169,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             1.0f
         )
         SkyridersMod.BAD_EXPLOSION_ENTITY.get().create(level)?.let { effect ->
-            effect.moveTo(position.x, position.y, position.z, random.nextFloat() * 360.0f, 0.0f)
+            effect.moveTo(position.x, position.y + EXPLOSION_VISUAL_Y_OFFSET, position.z, random.nextFloat() * 360.0f, 0.0f)
             level.addFreshEntity(effect)
         }
         level.sendParticles(ParticleTypes.CLOUD, position.x, position.y, position.z, 18, 0.65, 0.45, 0.65, 0.08)
@@ -208,6 +208,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val ROCKET_SPEED = 1.65
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 3.25
+        private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0
         private const val HOMING_TURN_RATE = 0.12
         private const val HOMING_MIN_DOT = -0.15

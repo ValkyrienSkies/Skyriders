@@ -71,7 +71,7 @@ class BadExplosionRenderer(context: EntityRendererProvider.Context) : EntityRend
     }
 
     companion object {
-        private const val SIZE = 4.5f
+        private const val SIZE = 9f
         private val TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/effects/badexplosion.png")
     }
 }
