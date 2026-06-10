@@ -145,6 +145,7 @@ object SkyridersModClient {
             ClientVehicleSyncHandler.tick()
             VehicleClientEffects.tick()
             RaceCompassClientState.tick()
+            RaceMusicClientState.tick()
             val player = minecraft.player ?: return
             if (player.vehicle !is BikeSeatEntity) return
 
@@ -210,6 +211,7 @@ object SkyridersModClient {
         fun onLoggedOut(event: ClientPlayerNetworkEvent.LoggingOut) {
             lastSentInput = VehicleInput.EMPTY
             BikeClientHoistState.hoisting = false
+            RaceMusicClientState.stop()
         }
     }
 }

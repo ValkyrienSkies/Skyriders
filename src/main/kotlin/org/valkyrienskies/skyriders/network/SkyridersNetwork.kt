@@ -19,6 +19,7 @@ import org.valkyrienskies.skyriders.client.BikeClientHoistState
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.client.RaceCompassClientState
+import org.valkyrienskies.skyriders.client.RaceMusicClientState
 import org.valkyrienskies.skyriders.client.VehicleHudOverlay
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
@@ -141,6 +142,13 @@ object SkyridersNetwork {
             RaceCompassTargetPacket::encode,
             RaceCompassTargetPacket::decode,
             RaceCompassTargetPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            RaceMusicPacket::class.java,
+            RaceMusicPacket::encode,
+            RaceMusicPacket::decode,
+            RaceMusicPacket::handle
         )
     }
 
@@ -432,6 +440,14 @@ object SkyridersNetwork {
 
     fun sendRaceCompassTarget(player: ServerPlayer, target: Vec3?) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceCompassTargetPacket(target != null, target ?: Vec3.ZERO))
+    }
+
+    fun sendRaceMusicStart(player: ServerPlayer, track: ResourceLocation) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(true, track))
+    }
+
+    fun sendRaceMusicStop(player: ServerPlayer) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
     }
 
     data class VehicleInputPacket(val input: VehicleInput) {
@@ -1125,4 +1141,47 @@ object SkyridersNetwork {
             }
         }
     }
+
+    data class RaceMusicPacket(val active: Boolean, val track: ResourceLocation) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(active)
+            if (active) {
+                buf.writeResourceLocation(track)
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable {
+                        if (active) {
+                            RaceMusicClientState.start(track)
+                        } else {
+                            RaceMusicClientState.stop()
+                        }
+                    }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: RaceMusicPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): RaceMusicPacket {
+                val active = buf.readBoolean()
+                val track = if (active) buf.readResourceLocation() else EMPTY_SOUND
+                return RaceMusicPacket(active, track)
+            }
+
+            fun handle(packet: RaceMusicPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    private val EMPTY_SOUND = ResourceLocation(SkyridersMod.MOD_ID, "empty")
 }

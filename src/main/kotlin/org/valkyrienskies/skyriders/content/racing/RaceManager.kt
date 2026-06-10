@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content.racing
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundEvents
@@ -15,6 +16,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.common.toWorldCoordinates
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
@@ -116,6 +118,7 @@ object RaceManager {
             checkpointIndices = checkpoints.mapTo(HashSet()) { it.checkpointIndex },
             racers = participants,
             active = true,
+            musicTrack = selectRaceMusicTrack(level),
             totalParticipants = participants.size
         )
         participants.values.forEach { racer ->
@@ -124,6 +127,9 @@ object RaceManager {
             racer.previousDistances[startMarker.blockPos.asLong()] = line.signedDistance(racer.position)
         }
         racesByKey[RaceKey(race.dimension, race.colorId)] = race
+        race.musicTrack?.let { track ->
+            sendRaceMusicStartToRacers(level, race, track)
+        }
         playGoSound(level, startMarker.blockPos)
         broadcastNear(level, startMarker.blockPos, "GO!")
     }
@@ -185,13 +191,34 @@ object RaceManager {
             driverForBody(level, racer.bodyId)?.let { driver ->
                 driver.sendSystemMessage(Component.literal("Finished $place/$total"))
                 SkyridersNetwork.sendRaceCompassTarget(driver, null)
+                SkyridersNetwork.sendRaceMusicStop(driver)
             }
             race.racers.remove(racer.bodyId)
             if (race.racers.isEmpty()) {
-                race.active = false
-                racesByKey.remove(RaceKey(race.dimension, race.colorId))
+                endRace(level, race)
             }
         }
+    }
+
+    private fun endRace(level: ServerLevel, race: ActiveRace) {
+        race.active = false
+        racesByKey.remove(RaceKey(race.dimension, race.colorId))
+        val dimension = level.dimension().location().toString()
+        if (racesByKey.values.none { it.active && it.dimension == dimension }) {
+            sendRaceMusicStopToRacers(level, race)
+        }
+    }
+
+    private fun sendRaceMusicStartToRacers(level: ServerLevel, race: ActiveRace, track: ResourceLocation) {
+        race.racers.values
+            .mapNotNull { racer -> driverForBody(level, racer.bodyId) }
+            .forEach { driver -> SkyridersNetwork.sendRaceMusicStart(driver, track) }
+    }
+
+    private fun sendRaceMusicStopToRacers(level: ServerLevel, race: ActiveRace) {
+        race.racers.values
+            .mapNotNull { racer -> driverForBody(level, racer.bodyId) }
+            .forEach { driver -> SkyridersNetwork.sendRaceMusicStop(driver) }
     }
 
     private fun nextTarget(level: ServerLevel, racer: RacerState, race: ActiveRace): Vector3d? {
@@ -294,6 +321,12 @@ object RaceManager {
 
     private fun driverForBody(level: ServerLevel, bodyId: Long): ServerPlayer? = driverForVehicle(level, bodyId)
 
+    private fun selectRaceMusicTrack(level: ServerLevel): ResourceLocation? {
+        val tracks = SkyridersSounds.RACE_MUSIC_TRACKS
+        if (tracks.isEmpty()) return null
+        return tracks[level.random.nextInt(tracks.size)].get().location
+    }
+
     private fun crossed(previous: Double, current: Double): Boolean {
         if (!previous.isFinite() || !current.isFinite()) return false
         if (abs(previous) < 1.0E-4 || abs(current) < 1.0E-4) return false
@@ -310,6 +343,7 @@ object RaceManager {
         val checkpointIndices: Set<Int>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
+        val musicTrack: ResourceLocation?,
         val totalParticipants: Int,
         var active: Boolean
     ) {

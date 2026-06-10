@@ -201,5 +201,13 @@
         "stream": true
       }
     ]
+  },
+  "stormchasing": {
+    "sounds": [
+      {
+        "name": "skyriders:race_music/stormchasing",
+        "stream": true
+      }
+    ]
   }
 }
