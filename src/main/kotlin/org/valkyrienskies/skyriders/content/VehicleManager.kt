@@ -386,6 +386,7 @@ object VehicleManager {
     fun applyVisualWheelState(
         level: Level,
         bodyId: BodyId,
+        frontSteerRad: Double,
         frontWheelSpin: Double,
         rearWheelSpin: Double,
         frontWheelAngularVelocity: Double,
@@ -403,6 +404,8 @@ object VehicleManager {
                 vehicle.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
             is KartVehicle -> {
+                vehicle.kartState.debugSteerRad = frontSteerRad
+                vehicle.kartState.smoothedSteerRad = frontSteerRad
                 vehicle.kartState.frontWheelSpin = frontWheelSpin
                 vehicle.kartState.rearWheelSpin = rearWheelSpin
                 vehicle.kartState.frontWheelAngularVelocity = frontWheelAngularVelocity
@@ -411,6 +414,8 @@ object VehicleManager {
                 vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
             is WheeledVehicle -> {
+                vehicle.wheeledState.debugSteerRad = frontSteerRad
+                vehicle.wheeledState.smoothedSteerRad = frontSteerRad
                 vehicle.wheeledState.frontWheelSpin = frontWheelSpin
                 vehicle.wheeledState.rearWheelSpin = rearWheelSpin
                 vehicle.wheeledState.frontWheelAngularVelocity = frontWheelAngularVelocity

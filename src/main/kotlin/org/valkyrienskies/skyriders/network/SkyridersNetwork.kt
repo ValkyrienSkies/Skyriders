@@ -375,6 +375,7 @@ object SkyridersNetwork {
                     val state = vehicle.kartState
                     VehicleVisualState(
                         bodyId = vehicle.bodyId,
+                        frontSteerRad = state.debugSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
                         rearWheelSpin = state.rearWheelSpin,
                         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
@@ -387,6 +388,7 @@ object SkyridersNetwork {
                     val state = vehicle.wheeledState
                     VehicleVisualState(
                         bodyId = vehicle.bodyId,
+                        frontSteerRad = state.debugSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
                         rearWheelSpin = state.rearWheelSpin,
                         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
@@ -834,6 +836,7 @@ object SkyridersNetwork {
                         VehicleManager.applyVisualWheelState(
                             level = level,
                             bodyId = bodyId,
+                            frontSteerRad = steerAngleRad,
                             frontWheelSpin = frontWheelSpin,
                             rearWheelSpin = rearWheelSpin,
                             frontWheelAngularVelocity = frontWheelAngularVelocity,
@@ -985,6 +988,7 @@ object SkyridersNetwork {
             buf.writeVarInt(states.size)
             states.forEach { state ->
                 buf.writeLong(state.bodyId)
+                buf.writeDouble(state.frontSteerRad)
                 buf.writeDouble(state.frontWheelSpin)
                 buf.writeDouble(state.rearWheelSpin)
                 buf.writeDouble(state.frontWheelAngularVelocity)
@@ -1004,6 +1008,7 @@ object SkyridersNetwork {
                             VehicleManager.applyVisualWheelState(
                                 level = level,
                                 bodyId = state.bodyId,
+                                frontSteerRad = state.frontSteerRad,
                                 frontWheelSpin = state.frontWheelSpin,
                                 rearWheelSpin = state.rearWheelSpin,
                                 frontWheelAngularVelocity = state.frontWheelAngularVelocity,
@@ -1028,6 +1033,7 @@ object SkyridersNetwork {
                 val states = (0 until count).map {
                     VehicleVisualState(
                         bodyId = buf.readLong(),
+                        frontSteerRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
                         rearWheelSpin = buf.readDouble(),
                         frontWheelAngularVelocity = buf.readDouble(),
@@ -1047,6 +1053,7 @@ object SkyridersNetwork {
 
     data class VehicleVisualState(
         val bodyId: Long,
+        val frontSteerRad: Double,
         val frontWheelSpin: Double,
         val rearWheelSpin: Double,
         val frontWheelAngularVelocity: Double,
