@@ -77,7 +77,8 @@ object WheeledVehiclePhysicsSolver {
             }
             if (stabilizedGrounded) {
                 applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
-                loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config) }
+                val activeStepWheels = loaded.count { it.contact.grounded && it.wheel.axle.stepAssist }.coerceAtLeast(1)
+                loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config, activeStepWheels) }
             }
         } else {
             if (state.parkingBrakeEngaged) {
@@ -659,7 +660,8 @@ object WheeledVehiclePhysicsSolver {
         forward: Vector3d,
         terrainUp: Vector3d,
         driveCommand: DriveCommand,
-        config: WheeledVehiclePhysicsConfig
+        config: WheeledVehiclePhysicsConfig,
+        activeStepWheels: Int
     ) {
         val contact = loaded.contact
         val axle = loaded.wheel.axle
@@ -675,23 +677,46 @@ object WheeledVehiclePhysicsSolver {
         if (effectiveSpeed < 0.35) return
 
         val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveSpeed)
-        val probeLength = (axle.wheelRadius + 0.42 + effectiveSpeed * 0.08).coerceIn(axle.wheelRadius + 0.3, axle.wheelRadius + 1.45)
+        val probeLength = (axle.wheelRadius + 0.45 + effectiveSpeed * 0.09)
+            .coerceIn(axle.wheelRadius + 0.35, axle.wheelRadius + 1.75)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(axle.wheelRadius * 0.45, terrainUp)
-            .fma(0.05 + speedLookahead * 0.2, terrainForward)
+            .fma(0.06 + speedLookahead * 0.24, terrainForward)
         val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
         if (obstacle.hitBody.id == body.id) return
         val step = findStepLandingSurface(physLevel, body, contact, lowProbeStart, obstacle.distance, terrainForward, terrainUp, axle, config, speedLookahead) ?: return
 
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
-        val targetUpSpeed = (effectiveSpeed * step.rise / max(0.25, step.approachDistance) * (0.5 + speedLookahead * 0.2))
-            .coerceIn(0.0, 2.2 + speedLookahead * 2.4)
-        val missingUpSpeed = max(0.0, targetUpSpeed - VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, terrainUp))
-        val lift = Vector3d(terrainUp).mul(
-            (config.mass * missingUpSpeed * (10.0 + speedLookahead * 10.0) + config.stepAssistStrength * (0.18 + heightAmount * 0.2) * crawlAmount)
-                .coerceIn(0.0, config.stepAssistStrength * (0.75 + heightAmount * 0.45 + speedLookahead * 1.1))
+        val approachDistance = max(0.25, step.approachDistance)
+        val targetUpSpeed = (effectiveSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
+            .coerceIn(0.0, 2.4 + speedLookahead * 2.8)
+        val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, terrainUp)
+        val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
+        val liftDemand = if (targetUpSpeed > 1.0e-4) {
+            (missingUpSpeed / targetUpSpeed).coerceIn(0.0, 1.0)
+        } else {
+            0.0
+        }
+        val wheelShare = (2.0 / activeStepWheels.toDouble()).coerceIn(0.35, 1.0)
+        val velocityLiftForce = config.mass * missingUpSpeed * (12.0 + speedLookahead * 12.0)
+        val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.22 + heightAmount * 0.16)
+        val baseLiftForce = config.stepAssistStrength * (0.22 + heightAmount * 0.2) * liftDemand
+        val maxLiftForce = min(
+            config.mass * (28.0 + speedLookahead * 40.0),
+            config.stepAssistStrength * (0.85 + heightAmount * 0.55 + speedLookahead * 1.65)
         )
-        val carry = Vector3d(terrainForward).mul(config.stepAssistStrength * (0.02 + speedLookahead * 0.12 + heightAmount * 0.04))
+        val lift = Vector3d(terrainUp)
+            .mul((baseLiftForce + velocityLiftForce + crawlLiftForce).coerceIn(0.0, maxLiftForce) * wheelShare)
+
+        val speedLimitScale = 1.0 - smoothstep(config.wheelTopSpeed, config.wheelTopSpeed * 1.18, speedIntoStep)
+        val obstacleProximityScale = 1.0 - smoothstep(probeLength * 0.45, probeLength, obstacle.distance)
+        val crawlCarryForce = config.stepAssistStrength * crawlAmount * (0.18 + heightAmount * 0.08)
+        val rawCarryForce = config.stepAssistStrength *
+            (0.025 + speedLookahead * 0.18 + heightAmount * 0.05) *
+            speedLimitScale.coerceIn(0.0, 1.0) * obstacleProximityScale.coerceIn(0.0, 1.0) + crawlCarryForce
+        val maxCarryForce = config.mass * (1.8 + speedLookahead * 3.8 + heightAmount * 1.2)
+        val carry = Vector3d(terrainForward).mul(rawCarryForce.coerceIn(0.0, maxCarryForce) * wheelShare)
+
         VehicleWheelPhysics.applyContactForce(body, contact, lift.add(carry))
     }
 
@@ -714,7 +739,7 @@ object WheeledVehiclePhysicsSolver {
         val forwardDistances = listOf(
             obstacleDistance + axle.wheelRadius * 0.45,
             obstacleDistance + 0.35 + speedLookahead * 0.15,
-            obstacleDistance + 0.6 + speedLookahead * 0.55
+            obstacleDistance + 0.65 + speedLookahead * 0.65
         )
         return forwardDistances.asSequence()
             .filter { it.isFinite() && it > 0.0 }

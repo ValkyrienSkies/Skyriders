@@ -43,8 +43,8 @@ data class WheeledVehiclePhysicsConfig(
     companion object {
         val ATV = WheeledVehiclePhysicsConfig(
             mass = 285.0,
-            collisionBoxSize = Vector3d(1.15, 0.70, 1.75),
-            collisionBoxOffset = Vector3d(0.0, 0.25, -0.04),
+            collisionBoxSize = Vector3d(1.15, 0.70, 1.65),
+            collisionBoxOffset = Vector3d(0.0, 0.25, -0.08),
             axles = listOf(
                 WheelAxleConfig(
                     id = "front",
