@@ -32,14 +32,10 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
 
         poseStack.pushPose()
         poseStack.translate(0.0, 1.08, 0.0)
-        if (!recharging) {
-            val time = entity.tickCount.toFloat() + partialTick
-            poseStack.mulPose(Axis.YP.rotationDegrees(time * 5.2f))
-            poseStack.mulPose(Axis.XP.rotationDegrees(time * 3.1f))
-            poseStack.mulPose(Axis.ZP.rotationDegrees(time * 2.4f))
-        } else {
-            poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw))
-        }
+        val time = if (recharging) entity.frozenRotationTick.toFloat() else entity.tickCount.toFloat() + partialTick
+        poseStack.mulPose(Axis.YP.rotationDegrees(time * 5.2f))
+        poseStack.mulPose(Axis.XP.rotationDegrees(time * 3.1f))
+        poseStack.mulPose(Axis.ZP.rotationDegrees(time * 2.4f))
         addBox(
             poseStack = poseStack,
             buffer = boxBuffer,
@@ -53,7 +49,8 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
             green = 1.0f,
             blue = 1.0f,
             alpha = alpha,
-            packedLight = packedLight
+            packedLight = packedLight,
+            packedOverlay = if (recharging) OverlayTexture.pack(1.0f, true) else OverlayTexture.NO_OVERLAY
         )
         poseStack.popPose()
 
@@ -76,6 +73,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
+        packedOverlay: Int = OverlayTexture.NO_OVERLAY,
         uMin: Float = 0.0f,
         uMax: Float = 1.0f,
         vMin: Float = 0.0f,
@@ -84,12 +82,12 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         val pose = poseStack.last()
         val matrix = pose.pose()
         val normal = pose.normal()
-        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
     }
 
     private fun face(
@@ -116,15 +114,16 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
+        packedOverlay: Int = OverlayTexture.NO_OVERLAY,
         uMin: Float = 0.0f,
         uMax: Float = 1.0f,
         vMin: Float = 0.0f,
         vMax: Float = 1.0f
     ) {
-        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
-        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
+        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, packedOverlay, uMin, uMax, vMin, vMax)
     }
 
     private fun vertex(
@@ -144,6 +143,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         blue: Float,
         alpha: Float,
         packedLight: Int,
+        packedOverlay: Int = OverlayTexture.NO_OVERLAY,
         uMin: Float = 0.0f,
         uMax: Float = 1.0f,
         vMin: Float = 0.0f,
@@ -154,7 +154,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         buffer.vertex(matrix, x, y, z)
             .color(red, green, blue, alpha)
             .uv(finalU, finalV)
-            .overlayCoords(OverlayTexture.NO_OVERLAY)
+            .overlayCoords(packedOverlay)
             .uv2(packedLight)
             .normal(normal, normalX, normalY, normalZ)
             .endVertex()

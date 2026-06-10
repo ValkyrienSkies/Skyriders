@@ -215,6 +215,16 @@
     ],
     "subtitle": "skyriders.subtitle.thunderbolt"
   },
+  "race_start": {
+    "sounds": [
+      {
+        "name": "skyriders:race_start",
+        "type": "file",
+        "attenuation_distance": 96
+      }
+    ],
+    "subtitle": "skyriders.subtitle.race_start"
+  },
   "bergen_disc": {
     "sounds": [
       {

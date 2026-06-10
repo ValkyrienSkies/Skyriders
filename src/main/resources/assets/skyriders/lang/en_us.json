@@ -47,6 +47,7 @@
 
   "skyriders.subtitle.thunderbolt": "Thunderbolt used",
   "skyriders.subtitle.sugar_rocket_explode": "Sugar rocket explodes",
+  "skyriders.subtitle.race_start": "Race starts",
 
   "death.attack.skyriders.vehicle_impact": "%1$s was run over",
   "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",

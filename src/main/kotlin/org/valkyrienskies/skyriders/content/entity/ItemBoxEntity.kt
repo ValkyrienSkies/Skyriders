@@ -8,9 +8,11 @@ import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
@@ -22,6 +24,7 @@ import net.minecraft.world.level.storage.loot.LootParams
 import net.minecraft.world.level.storage.loot.LootTable
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets
 import org.joml.Vector3d
+import org.joml.Vector3f
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.SkyridersSounds
@@ -38,6 +41,9 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
     val recharging: Boolean
         get() = rechargeTicks > 0
 
+    val frozenRotationTick: Int
+        get() = entityData.get(FROZEN_ROTATION_TICK)
+
     init {
         blocksBuilding = false
         noPhysics = true
@@ -50,6 +56,10 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
         if (rechargeTicks > 0) {
             rechargeTicks = rechargeTicks - 1
+            if (rechargeTicks == 0) {
+                playRechargeSound(serverLevel())
+                spawnRechargeBurst(serverLevel())
+            }
             return
         }
 
@@ -62,6 +72,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             val radius = PICKUP_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(center) > radius * radius) continue
             if (grantPickup(serverLevel, driver)) {
+                freezeRotation()
                 rechargeTicks = RECHARGE_TICKS_DEFAULT
                 playPickupSound(serverLevel)
                 spawnPickupBurst(serverLevel)
@@ -72,6 +83,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
     override fun defineSynchedData() {
         entityData.define(RECHARGE_TICKS, 0)
+        entityData.define(FROZEN_ROTATION_TICK, 0)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -87,6 +99,11 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
     fun placeAt(x: Double, y: Double, z: Double, yaw: Float) {
         moveTo(x, y, z, yaw, 0.0f)
         rechargeTicks = 0
+        entityData.set(FROZEN_ROTATION_TICK, tickCount)
+    }
+
+    private fun freezeRotation() {
+        entityData.set(FROZEN_ROTATION_TICK, tickCount)
     }
 
     private fun grantPickup(level: ServerLevel, driver: ServerPlayer): Boolean {
@@ -156,6 +173,46 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         )
     }
 
+    private fun playRechargeSound(level: ServerLevel) {
+        level.playSound(
+            null,
+            x,
+            y + PICKUP_Y_OFFSET,
+            z,
+            SoundEvents.NOTE_BLOCK_BELL.value(),
+            SoundSource.PLAYERS,
+            0.8f,
+            1.65f
+        )
+    }
+
+    private fun spawnRechargeBurst(level: ServerLevel) {
+        level.sendParticles(
+            DustParticleOptions(Vector3f(0.15f, 1.0f, 0.12f), 1.2f),
+            x,
+            y + PICKUP_Y_OFFSET,
+            z,
+            34,
+            0.45,
+            0.35,
+            0.45,
+            0.08
+        )
+        level.sendParticles(
+            ParticleTypes.HAPPY_VILLAGER,
+            x,
+            y + PICKUP_Y_OFFSET,
+            z,
+            10,
+            0.35,
+            0.28,
+            0.35,
+            0.03
+        )
+    }
+
+    private fun serverLevel(): ServerLevel = level() as ServerLevel
+
     private fun driverForBody(level: ServerLevel, bodyId: Long): ServerPlayer? {
         return level.players().firstOrNull { player ->
             val seat = player.vehicle as? BikeSeatEntity ?: return@firstOrNull false
@@ -174,6 +231,8 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         private const val PICKUP_RADIUS = 0.85
         private const val PICKUP_Y_OFFSET = 0.85
         private val RECHARGE_TICKS: EntityDataAccessor<Int> =
+            SynchedEntityData.defineId(ItemBoxEntity::class.java, EntityDataSerializers.INT)
+        private val FROZEN_ROTATION_TICK: EntityDataAccessor<Int> =
             SynchedEntityData.defineId(ItemBoxEntity::class.java, EntityDataSerializers.INT)
     }
 }

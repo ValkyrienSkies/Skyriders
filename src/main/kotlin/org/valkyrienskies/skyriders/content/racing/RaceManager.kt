@@ -3,6 +3,9 @@ package org.valkyrienskies.skyriders.content.racing
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
@@ -31,7 +34,7 @@ object RaceMarkerTypes {
 
 object RaceManager {
     private const val COUNTDOWN_TICKS = 80
-    private const val TICK_SOUND_INTERVAL = 20
+    private const val COUNTDOWN_MESSAGE_INTERVAL = 20
     private const val LINE_PARTICLE_SPACING = 0.55
     private const val START_CAPTURE_RANGE = 8.0
     private const val MIN_LINE_LENGTH = 0.75
@@ -57,7 +60,8 @@ object RaceManager {
         if (racesByKey[key]?.active == true || marker.countdownTicks > 0) return
         marker.countdownTicks = COUNTDOWN_TICKS
         marker.setChanged()
-        broadcastNear(level, marker.blockPos, "Race starting...")
+        playRaceStartSound(level, marker.blockPos)
+        broadcastActionBarNear(level, marker.blockPos, "Race starting...")
     }
 
     fun tickMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
@@ -88,10 +92,9 @@ object RaceManager {
         if (marker.countdownTicks <= 0) return
         marker.countdownTicks--
         val remaining = marker.countdownTicks
-        if (remaining > 0 && remaining % TICK_SOUND_INTERVAL == 0) {
-            val number = remaining / TICK_SOUND_INTERVAL
-            playCountdownSound(level, marker.blockPos, 0.75f + (3 - number) * 0.1f)
-            broadcastNear(level, marker.blockPos, number.toString())
+        if (remaining > 0 && remaining % COUNTDOWN_MESSAGE_INTERVAL == 0) {
+            val number = remaining / COUNTDOWN_MESSAGE_INTERVAL
+            broadcastTitleNear(level, marker.blockPos, number.toString(), fadeIn = 0, stay = 18, fadeOut = 2)
         }
         if (remaining == 0) {
             startRace(level, marker)
@@ -110,7 +113,7 @@ object RaceManager {
             .mapNotNull { vehicle -> createRacerIfNearStart(level, vehicle, line) }
             .associateByTo(LinkedHashMap()) { it.bodyId }
         if (participants.isEmpty()) {
-            broadcastNear(level, startMarker.blockPos, "No matching racers near start line.")
+            broadcastActionBarNear(level, startMarker.blockPos, "No matching racers near start line.")
             return
         }
         val race = ActiveRace(
@@ -133,8 +136,7 @@ object RaceManager {
         race.musicTrack?.let { track ->
             sendRaceMusicStartToRacers(level, race, track)
         }
-        playGoSound(level, startMarker.blockPos)
-        broadcastNear(level, startMarker.blockPos, "GO!")
+        broadcastTitleNear(level, startMarker.blockPos, "GO!", fadeIn = 0, stay = 24, fadeOut = 6)
     }
 
     private fun createRacerIfNearStart(level: ServerLevel, vehicle: IVehicle, line: RaceLine): RacerState? {
@@ -180,7 +182,7 @@ object RaceManager {
             racer.nextTarget = nextTarget(level, racer, race)
             successEffect(level, position)
             pulseEndpoint(level, marker)
-            driverForBody(level, racer.bodyId)?.sendSystemMessage(Component.literal("Checkpoint ${marker.checkpointIndex + 1}"))
+            driverForBody(level, racer.bodyId)?.sendActionBar("Checkpoint ${marker.checkpointIndex + 1}")
             return
         }
 
@@ -194,7 +196,7 @@ object RaceManager {
             val place = race.finishOrder.size
             val total = race.totalParticipants
             driverForBody(level, racer.bodyId)?.let { driver ->
-                driver.sendSystemMessage(Component.literal("Finished $place/$total"))
+                driver.sendTitle("Finished $place/$total", fadeIn = 4, stay = 42, fadeOut = 12)
                 SkyridersNetwork.sendRaceCompassTarget(driver, null)
                 SkyridersNetwork.sendRaceMusicStop(driver)
             }
@@ -299,19 +301,48 @@ object RaceManager {
         )
     }
 
-    private fun playCountdownSound(level: ServerLevel, pos: BlockPos, pitch: Float) {
-        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.BLOCKS, 0.9f, pitch)
+    private fun playRaceStartSound(level: ServerLevel, pos: BlockPos) {
+        level.playSound(null, pos, SkyridersSounds.RACE_START_SOUND.get(), SoundSource.BLOCKS, 1.0f, 1.0f)
     }
 
-    private fun playGoSound(level: ServerLevel, pos: BlockPos) {
-        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.BLOCKS, 1.15f, 1.65f)
-    }
-
-    private fun broadcastNear(level: ServerLevel, pos: BlockPos, message: String) {
+    private fun broadcastActionBarNear(level: ServerLevel, pos: BlockPos, message: String) {
         val center = Vec3.atCenterOf(pos)
         level.players().filter { it.position().distanceToSqr(center) < 80.0 * 80.0 }.forEach {
-            it.displayClientMessage(Component.literal(message), true)
+            it.sendActionBar(message)
         }
+    }
+
+    private fun broadcastTitleNear(
+        level: ServerLevel,
+        pos: BlockPos,
+        title: String,
+        subtitle: String? = null,
+        fadeIn: Int = 0,
+        stay: Int = 20,
+        fadeOut: Int = 5
+    ) {
+        val center = Vec3.atCenterOf(pos)
+        level.players().filter { it.position().distanceToSqr(center) < 80.0 * 80.0 }.forEach {
+            it.sendTitle(title, subtitle, fadeIn, stay, fadeOut)
+        }
+    }
+
+    private fun ServerPlayer.sendActionBar(message: String) {
+        displayClientMessage(Component.literal(message), true)
+    }
+
+    private fun ServerPlayer.sendTitle(
+        title: String,
+        subtitle: String? = null,
+        fadeIn: Int = 0,
+        stay: Int = 20,
+        fadeOut: Int = 5
+    ) {
+        connection.send(ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut))
+        if (subtitle != null) {
+            connection.send(ClientboundSetSubtitleTextPacket(Component.literal(subtitle)))
+        }
+        connection.send(ClientboundSetTitleTextPacket(Component.literal(title)))
     }
 
     private fun collectMarkers(level: ServerLevel, colorId: Int): List<RaceMarkerBlockEntity> {
