@@ -67,6 +67,11 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
 
     private fun applyOrientation(entity: T, entityYaw: Float, poseStack: PoseStack) {
         if (entity is SugarRocketEntity) {
+            if (!entity.ignited) {
+                poseStack.mulPose(Axis.YP.rotationDegrees(-entity.yRot))
+                poseStack.mulPose(Axis.XP.rotationDegrees(entity.xRot))
+                return
+            }
             val velocity = entity.deltaMovement
             if (velocity.lengthSqr() > 1.0e-8) {
                 val horizontal = kotlin.math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
