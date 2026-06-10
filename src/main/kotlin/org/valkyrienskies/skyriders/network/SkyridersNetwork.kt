@@ -28,6 +28,7 @@ import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
+import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
 import org.valkyrienskies.skyriders.content.WheeledVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
@@ -425,7 +426,7 @@ object SkyridersNetwork {
                 val player = context.sender ?: return@enqueueWork
                 val seat = player.vehicle as? BikeSeatEntity ?: return@enqueueWork
                 if (!seat.isDriverSeat()) return@enqueueWork
-                VehicleManager.updateInput(player.level().dimensionId, seat.bodyId) { input.copy(riderPresent = true) }
+                VehicleImpairmentEffects.handleDriverInput(player, seat, input)
             }
             context.packetHandled = true
         }

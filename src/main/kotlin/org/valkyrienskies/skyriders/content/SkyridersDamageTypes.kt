@@ -20,6 +20,11 @@ object SkyridersDamageTypes {
         "death.attack.skyriders.vehicle_impact.variant_2",
         "death.attack.skyriders.vehicle_impact.variant_3"
     )
+    private val VEHICLE_IMPACT_DRUNK_VARIANTS = arrayOf(
+        "death.attack.skyriders.vehicle_impact.drunk",
+        "death.attack.skyriders.vehicle_impact.drunk_1",
+        "death.attack.skyriders.vehicle_impact.drunk_2"
+    )
 
     val VEHICLE_IMPACT: ResourceKey<DamageType> = ResourceKey.create(
         Registries.DAMAGE_TYPE,
@@ -29,9 +34,12 @@ object SkyridersDamageTypes {
     fun vehicleImpact(level: ServerLevel, driver: Entity? = null): DamageSource {
         val damageTypes = level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE)
         val holder = damageTypes.getHolderOrThrow(VEHICLE_IMPACT)
-        val variantKey = VEHICLE_IMPACT_VARIANTS
-            .takeIf { level.random.nextFloat() < VEHICLE_IMPACT_VARIANT_CHANCE }
-            ?.let { variants -> variants[level.random.nextInt(variants.size)] }
+        val variants = if (VehicleImpairmentEffects.hasTipsy(driver as? LivingEntity)) {
+            VEHICLE_IMPACT_DRUNK_VARIANTS
+        } else {
+            VEHICLE_IMPACT_VARIANTS.takeIf { level.random.nextFloat() < VEHICLE_IMPACT_VARIANT_CHANCE }
+        }
+        val variantKey = variants?.let { it[level.random.nextInt(it.size)] }
         return VehicleImpactDamageSource(holder, driver, variantKey)
     }
 

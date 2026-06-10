@@ -57,7 +57,7 @@ object VehicleImpactDamageHandler {
 
                 if (!sweptBox.intersects(target.boundingBox.inflate(0.05))) continue
 
-                val damage = impactDamage(vehicle, relativeSpeed)
+                val damage = impactDamage(vehicle, relativeSpeed, driver)
                 if (damage <= 0.0) continue
 
                 if (target.hurt(SkyridersDamageTypes.vehicleImpact(level, driver), damage.toFloat())) {
@@ -68,13 +68,14 @@ object VehicleImpactDamageHandler {
         }
     }
 
-    private fun impactDamage(vehicle: IVehicle, relativeSpeed: Double): Double {
+    private fun impactDamage(vehicle: IVehicle, relativeSpeed: Double, driver: LivingEntity?): Double {
         val body = vehicle.vehicleDefinition.body
         val speedOverThreshold = relativeSpeed - MIN_DAMAGE_SPEED
         val massScale = sqrt(body.mass / 300.0).coerceIn(0.65, 2.3)
         val footprint = max(0.1, body.collisionBoxSize.x * body.collisionBoxSize.z)
         val sizeScale = sqrt(footprint / 1.6).coerceIn(0.75, 1.9)
-        return (speedOverThreshold * DAMAGE_PER_SPEED_OVER_THRESHOLD * massScale * sizeScale)
+        return (speedOverThreshold * DAMAGE_PER_SPEED_OVER_THRESHOLD * massScale * sizeScale *
+            VehicleImpairmentEffects.impactDamageMultiplier(driver))
             .coerceIn(0.0, MAX_DAMAGE)
     }
 

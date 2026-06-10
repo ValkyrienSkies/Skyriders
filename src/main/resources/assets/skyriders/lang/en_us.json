@@ -32,5 +32,14 @@
   "death.attack.skyriders.vehicle_impact.variant_2.item": "%1$s failed to yield to %2$s and %3$s",
   "death.attack.skyriders.vehicle_impact.variant_3": "%1$s forgot to look both ways",
   "death.attack.skyriders.vehicle_impact.variant_3.player": "%1$s forgot to look both ways before %2$s arrived",
-  "death.attack.skyriders.vehicle_impact.variant_3.item": "%1$s forgot to look both ways before %2$s arrived with %3$s"
+  "death.attack.skyriders.vehicle_impact.variant_3.item": "%1$s forgot to look both ways before %2$s arrived with %3$s",
+  "death.attack.skyriders.vehicle_impact.drunk": "%1$s got run over like a reindeer",
+  "death.attack.skyriders.vehicle_impact.drunk.player": "%1$s got run over like a reindeer by %2$s",
+  "death.attack.skyriders.vehicle_impact.drunk.item": "%1$s got run over like a reindeer by %2$s and %3$s",
+  "death.attack.skyriders.vehicle_impact.drunk_1": "%1$s bore witness to impeccable driving",
+  "death.attack.skyriders.vehicle_impact.drunk_1.player": "%1$s bore witness to %2$s's impeccable driving",
+  "death.attack.skyriders.vehicle_impact.drunk_1.item": "%1$s bore witness to %2$s's impeccable driving with %3$s",
+  "death.attack.skyriders.vehicle_impact.drunk_2": "%1$s was a casualty of incredible steering",
+  "death.attack.skyriders.vehicle_impact.drunk_2.player": "%1$s was a casualty of %2$s's incredible steering",
+  "death.attack.skyriders.vehicle_impact.drunk_2.item": "%1$s was a casualty of %2$s's incredible steering and %3$s"
 }

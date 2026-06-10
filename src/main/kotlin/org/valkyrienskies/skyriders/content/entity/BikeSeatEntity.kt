@@ -8,6 +8,7 @@ import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
@@ -24,6 +25,7 @@ import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSeatDefinition
 import org.valkyrienskies.skyriders.content.VehicleSeatRole
+import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.atan2
 
@@ -46,6 +48,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         super.tick()
         if (!level().isClientSide && passengers.isEmpty()) {
             VehicleManager.clearInput(level().dimensionId, bodyId)
+            (level() as? ServerLevel)?.let { VehicleImpairmentEffects.clear(it, bodyId) }
             kill()
             return
         }
@@ -124,8 +127,13 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         if (!isDriverSeat()) return
 
         val passenger = controllingPassenger ?: return
-        VehicleManager.updateInput(level().dimensionId, bodyId) {
-            it.copy(riderPresent = true)
+        val serverLevel = level() as? ServerLevel
+        if (serverLevel != null) {
+            VehicleImpairmentEffects.tickDriverInput(serverLevel, bodyId, passenger)
+        } else {
+            VehicleManager.updateInput(level().dimensionId, bodyId) {
+                it.copy(riderPresent = true)
+            }
         }
     }
 
