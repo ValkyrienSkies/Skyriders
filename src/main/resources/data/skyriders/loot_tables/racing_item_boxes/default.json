@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:generic",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "type": "minecraft:item", "name": "skyriders:honey_canister", "weight": 8 },
+        { "type": "minecraft:item", "name": "skyriders:cavendish", "weight": 7 },
+        { "type": "minecraft:item", "name": "skyriders:sugar_rocket", "weight": 5 },
+        { "type": "minecraft:item", "name": "skyriders:homing_sugar_rocket", "weight": 3 },
+        { "type": "minecraft:item", "name": "skyriders:thunderbolt", "weight": 2 }
+      ]
+    }
+  ]
+}

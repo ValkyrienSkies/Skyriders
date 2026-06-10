@@ -40,11 +40,13 @@ import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
+import org.valkyrienskies.skyriders.content.entity.ItemBoxEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
+import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
@@ -127,6 +129,9 @@ object SkyridersMod {
     val RACE_FLAG: RegistryObject<Item> = ITEMS.register("flag") {
         RaceFlagItem(Item.Properties().stacksTo(16))
     }
+    val ITEM_BOX: RegistryObject<Item> = ITEMS.register("item_box") {
+        ItemBoxItem(Item.Properties().stacksTo(16))
+    }
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))
     }
@@ -167,6 +172,13 @@ object SkyridersMod {
             .clientTrackingRange(12)
             .updateInterval(1)
             .build("$MOD_ID:cavendish")
+    }
+    val ITEM_BOX_ENTITY: RegistryObject<EntityType<ItemBoxEntity>> = ENTITIES.register("item_box") {
+        EntityType.Builder.of(::ItemBoxEntity, MobCategory.MISC)
+            .sized(1.25f, 1.65f)
+            .clientTrackingRange(12)
+            .updateInterval(1)
+            .build("$MOD_ID:item_box")
     }
     val SUGAR_ROCKET_ENTITY: RegistryObject<EntityType<SugarRocketEntity>> = ENTITIES.register("sugar_rocket") {
         EntityType.Builder.of(::SugarRocketEntity, MobCategory.MISC)
