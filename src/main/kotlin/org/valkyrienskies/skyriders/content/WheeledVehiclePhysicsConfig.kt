@@ -106,7 +106,7 @@ data class WheeledVehiclePhysicsConfig(
                 )
             ),
             wheelSweepTime = 0.06,
-            wheelTopSpeed = 17.0,
+            wheelTopSpeed = 28.0,
             maxSteerLowSpeedRad = Math.toRadians(34.0),
             maxSteerHighSpeedRad = Math.toRadians(18.0),
             steeringHighSpeedStart = 5.0,
@@ -142,7 +142,16 @@ data class WheeledVehiclePhysicsConfig(
             driftBoostChargeTimes = listOf(0.78, 1.55, 2.45),
             driftBoostForces = listOf(3600.0, 5600.0, 7600.0),
             driftBoostDurations = listOf(0.28, 0.45, 0.62),
-            transmission = VehicleTransmissionConfig.DEFAULT_AUTOMATIC
+            transmission = VehicleTransmissionConfig(
+                automatic = true,
+                forwardGears = listOf(
+                    VehicleTransmissionGearConfig(maxSpeed = 8.5, torqueMultiplier = 1.5, upshiftSpeed = 5.4),
+                    VehicleTransmissionGearConfig(maxSpeed = 17.5, torqueMultiplier = 1.0, upshiftSpeed = 10.0, downshiftSpeed = 4.7),
+                    VehicleTransmissionGearConfig(maxSpeed = 28.0, torqueMultiplier = 0.72, downshiftSpeed = 8.8)
+                ),
+                reverseTopSpeed = 7.5,
+                reverseTorqueMultiplier = 0.72
+            )
         )
 
         val CAR = WheeledVehiclePhysicsConfig(

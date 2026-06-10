@@ -31,7 +31,7 @@ object KartDefinitions {
     private val SPEEDSTER_PHYSICS = KART_PHYSICS.copy(
         collisionBoxSize = Vector3d(1.5, 0.58, 1.72),
         collisionBoxOffset = Vector3d(0.0, 0.3, -0.14),
-        wheelTopSpeed = 26.8,
+        wheelTopSpeed = 30.0,
         driveForce = 9800.0,
         brakeForce = 6400.0,
         maxSteerHighSpeedRad = Math.toRadians(13.0),
@@ -51,7 +51,7 @@ object KartDefinitions {
                 VehicleTransmissionGearConfig(maxSpeed = 8.0, torqueMultiplier = 1.55, launchTorqueScale = 1.0, gearRatio = 3.0),
                 VehicleTransmissionGearConfig(maxSpeed = 14.5, torqueMultiplier = 1.12, launchTorqueScale = 0.58, gearRatio = 2.0),
                 VehicleTransmissionGearConfig(maxSpeed = 21.0, torqueMultiplier = 0.84, launchTorqueScale = 0.26, gearRatio = 1.35),
-                VehicleTransmissionGearConfig(maxSpeed = 26.8, torqueMultiplier = 0.66, launchTorqueScale = 0.12, gearRatio = 1.0)
+                VehicleTransmissionGearConfig(maxSpeed = 30.0, torqueMultiplier = 0.66, launchTorqueScale = 0.12, gearRatio = 1.0)
             ),
             reverseTopSpeed = 6.0,
             reverseTorqueMultiplier = 0.74,
