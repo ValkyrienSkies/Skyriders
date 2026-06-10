@@ -43,8 +43,8 @@ data class WheeledVehiclePhysicsConfig(
     companion object {
         val ATV = WheeledVehiclePhysicsConfig(
             mass = 285.0,
-            collisionBoxSize = Vector3d(1.05, 0.62, 1.55),
-            collisionBoxOffset = Vector3d(0.0, 0.28, -0.04),
+            collisionBoxSize = Vector3d(1.15, 0.70, 1.75),
+            collisionBoxOffset = Vector3d(0.0, 0.25, -0.04),
             axles = listOf(
                 WheelAxleConfig(
                     id = "front",
@@ -52,7 +52,7 @@ data class WheeledVehiclePhysicsConfig(
                     halfTrackWidth = 0.48,
                     localY = -0.16,
                     wheelRadius = 0.29,
-                    wheelWidth = 0.2,
+                    wheelWidth = 0.24,
                     driven = true,
                     driveBias = 0.46,
                     steerable = true,
@@ -72,7 +72,7 @@ data class WheeledVehiclePhysicsConfig(
                     halfTrackWidth = 0.48,
                     localY = -0.16,
                     wheelRadius = 0.29,
-                    wheelWidth = 0.2,
+                    wheelWidth = 0.24,
                     driven = true,
                     driveBias = 0.54,
                     steerable = false,

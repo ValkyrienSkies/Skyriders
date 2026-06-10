@@ -350,9 +350,9 @@ object WheeledVehicleDefinitions {
 
     private fun atvRender(): VehicleRenderDefinition {
         return VehicleRenderDefinition(
-            model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_body"),
-            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/kart.png"),
-            seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/karts/kart.png"),
+            model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_body"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/atv.png"),
+            seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/atv.png"),
             showWheels = true,
             modelYawRad = 0.0,
             modelScale = 1.28,
@@ -362,31 +362,42 @@ object WheeledVehicleDefinitions {
             wheelParts = listOf(
                 VehicleWheelRenderDefinition(
                     id = "front_left_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_left_wheel"),
-                    pivot = Vector3d(0.1175, 0.3175, 0.9244),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_flw"),
+                    pivot = Vector3d(0.8453125, 0.234375, 0.0625),
+                    visualOffset = Vector3d(-0.7203125, 0.0546875, 0.96875),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
                 ),
                 VehicleWheelRenderDefinition(
                     id = "front_right_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_front_right_wheel"),
-                    pivot = Vector3d(0.8756, 0.3175, 0.9244),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_frw"),
+                    pivot = Vector3d(0.8453125, 0.234375, 0.0625),
+                    visualOffset = Vector3d(0.0296875, 0.0546875, 0.96875),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
                 ),
                 VehicleWheelRenderDefinition(
                     id = "rear_left_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_left_wheel"),
-                    pivot = Vector3d(0.1175, 0.3175, 0.0688),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_blw"),
+                    pivot = Vector3d(0.8453125, 0.234375, 0.0625),
+                    visualOffset = Vector3d(-0.7203125, 0.0546875, -0.09375),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),
                 VehicleWheelRenderDefinition(
                     id = "rear_right_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "karts/debug_kart_rear_right_wheel"),
-                    pivot = Vector3d(0.8756, 0.3175, 0.0688),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_brw"),
+                    pivot = Vector3d(0.8453125, 0.234375, 0.0625),
+                    visualOffset = Vector3d(0.0296875, 0.0546875, -0.09375),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "steering_handle",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "vehicles/atv/atv_steer"),
+                    pivot = Vector3d(0.5, 0.81022625, 0.289041875),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.NONE
                 )
             ),
             exhaustPoints = listOf(
