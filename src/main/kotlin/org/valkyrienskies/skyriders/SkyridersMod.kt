@@ -184,10 +184,10 @@ object SkyridersMod {
         var chance = 0.05f
         if (VehicleImpairmentEffects.hasTipsy(source.entity as? LivingEntity)) {
             // 100%
-            chance = 1.01f
+            chance = 1.0f
         }
 
-        if (entity.level().random.nextFloat() < chance) {
+        if (entity.level().random.nextFloat() <= chance) {
             val stack = ItemStack(BERGEN_DISC.get())
 
             event.drops.add(
