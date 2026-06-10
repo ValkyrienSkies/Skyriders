@@ -1,20 +1,25 @@
 package org.valkyrienskies.skyriders
 
+import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.MobCategory
+import net.minecraft.world.entity.animal.horse.Horse
+import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.Item
-import net.minecraft.world.entity.EntityType
-import net.minecraft.world.entity.MobCategory
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Rarity
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.SoundType
 import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.level.material.MapColor
-import net.minecraft.sounds.SoundEvent
-import net.minecraft.resources.ResourceLocation
+import net.minecraftforge.common.MinecraftForge
+import net.minecraftforge.event.RegisterCommandsEvent
+import net.minecraftforge.event.entity.living.LivingDropsEvent
+import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
 import net.minecraftforge.fml.loading.FMLEnvironment
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.event.RegisterCommandsEvent
 import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
@@ -23,7 +28,9 @@ import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.client.SkyridersModClient
 import org.valkyrienskies.skyriders.command.SkyridersCommands
 import org.valkyrienskies.skyriders.content.BikeLifecycle
+import org.valkyrienskies.skyriders.content.SkyridersDamageTypes
 import org.valkyrienskies.skyriders.content.SkyridersSounds
+import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
@@ -32,12 +39,14 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
+import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
+
 
 @Mod("skyriders")
 object SkyridersMod {
@@ -87,6 +96,10 @@ object SkyridersMod {
         SugarRocketItem(Item.Properties().stacksTo(16), homing = true)
     }
 
+    val BERGEN_DISC: RegistryObject<Item> = ITEMS.register(BergenDisc.BURGEN_TRUCK.path) {
+        BergenDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
+    }
+
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
             .sized(0.05f, 0.05f)
@@ -131,6 +144,7 @@ object SkyridersMod {
         MinecraftForge.EVENT_BUS.register(BikeLifecycle)
         MinecraftForge.EVENT_BUS.register(VehicleInteractionHandler)
         MinecraftForge.EVENT_BUS.addListener { event: RegisterCommandsEvent -> SkyridersCommands.register(event) }
+        MinecraftForge.EVENT_BUS.addListener(::onLivingDrops)
         if (FMLEnvironment.dist.isClient) {
             modEventBus.addListener(SkyridersModClient::clientInit)
             modEventBus.addListener(SkyridersModClient::registerKeyMappings)
@@ -156,5 +170,35 @@ object SkyridersMod {
         val blockRegistry = BLOCKS.register(registryName, blockSupplier)
         ITEMS.register(registryName) { BlockItem(blockRegistry.get(), Item.Properties()) }
         return blockRegistry
+    }
+
+    fun onLivingDrops(event: LivingDropsEvent) {
+        val entity = event.entity
+
+        if (entity !is Horse) return
+
+        val source = event.source
+        if (!source.`is`(SkyridersDamageTypes.VEHICLE_IMPACT)) return
+
+        // 5%
+        var chance = 0.05f
+        if (VehicleImpairmentEffects.hasTipsy(source.entity as? LivingEntity)) {
+            // 100%
+            chance = 1.0f
+        }
+
+        if (entity.level().random.nextFloat() <= chance) {
+            val stack = ItemStack(BERGEN_DISC.get())
+
+            event.drops.add(
+                ItemEntity(
+                    entity.level(),
+                    entity.x,
+                    entity.y,
+                    entity.z,
+                    stack
+                )
+            )
+        }
     }
 }

@@ -7,6 +7,7 @@ import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
 import org.valkyrienskies.skyriders.SkyridersMod.MOD_ID
+import org.valkyrienskies.skyriders.content.item.BergenDisc
 
 object SkyridersSounds {
     private val SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID)
@@ -73,6 +74,10 @@ object SkyridersSounds {
     }
     val SUGAR_ROCKET_EXPLODE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("sugar_rocket_explode") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "sugar_rocket_explode"))
+    }
+
+    val BERGEN_DISC_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register(BergenDisc.BURGEN_TRUCK.path) {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, BergenDisc.BURGEN_TRUCK.path))
     }
 
     @JvmStatic

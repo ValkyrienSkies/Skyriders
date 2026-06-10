@@ -193,5 +193,13 @@
       }
     ],
     "subtitle": "skyriders.subtitle.thunderbolt"
+  },
+  "bergen_disc": {
+    "sounds": [
+      {
+        "name": "skyriders:bergen_disc",
+        "stream": true
+      }
+    ]
   }
 }
