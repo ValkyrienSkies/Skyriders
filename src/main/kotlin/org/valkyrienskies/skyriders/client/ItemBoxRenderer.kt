@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
+import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.resources.ResourceLocation
 import org.joml.Matrix3f
 import org.joml.Matrix4f
@@ -153,7 +154,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         buffer.vertex(matrix, x, y, z)
             .color(red, green, blue, alpha)
             .uv(finalU, finalV)
-            .overlayCoords(0)
+            .overlayCoords(OverlayTexture.NO_OVERLAY)
             .uv2(packedLight)
             .normal(normal, normalX, normalY, normalZ)
             .endVertex()
