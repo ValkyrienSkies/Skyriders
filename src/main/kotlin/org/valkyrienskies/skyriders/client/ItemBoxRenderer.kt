@@ -6,6 +6,7 @@ import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
+import net.minecraft.client.renderer.Sheets
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
 import net.minecraft.client.renderer.texture.TextureAtlasSprite
@@ -28,7 +29,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         val recharging = entity.recharging
         val alpha = if (recharging) 0.34f else 0.92f
         val boxBuffer = bufferSource.getBuffer(RenderType.entityTranslucent(BOX_TEXTURE))
-        val baseBuffer = bufferSource.getBuffer(RenderType.cutout())
+        val baseBuffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet())
         val baseSprite = Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(BASE_SPRITE)
 
         poseStack.pushPose()
