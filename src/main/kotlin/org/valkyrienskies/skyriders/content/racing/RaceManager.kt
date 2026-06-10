@@ -60,7 +60,6 @@ object RaceManager {
         if (racesByKey[key]?.active == true || marker.countdownTicks > 0) return
         marker.countdownTicks = COUNTDOWN_TICKS
         marker.setChanged()
-        playRaceStartSound(level, marker.blockPos)
         broadcastActionBarNear(level, marker.blockPos, "Race starting...")
     }
 
@@ -97,6 +96,9 @@ object RaceManager {
         val remaining = marker.countdownTicks
         if (remaining > 0 && remaining % COUNTDOWN_MESSAGE_INTERVAL == 0) {
             val number = remaining / COUNTDOWN_MESSAGE_INTERVAL
+            if (number == 3) {
+                playRaceStartSound(level, marker.blockPos)
+            }
             broadcastTitleNear(level, marker.blockPos, number.toString(), fadeIn = 0, stay = 18, fadeOut = 2)
         }
         if (remaining == 0) {
@@ -132,6 +134,7 @@ object RaceManager {
             totalParticipants = participants.size
         )
         participants.values.forEach { racer ->
+            racer.lapStartedAtGameTime = level.gameTime
             racer.nextCheckpointIndex = race.firstCheckpointIndex()
             racer.nextTarget = nextTarget(level, racer, race)
             racer.previousDistances[startMarker.blockPos.asLong()] = line.signedDistance(racer.position)
@@ -196,6 +199,7 @@ object RaceManager {
             if (race.finishOrder.contains(racer.bodyId)) return
             if (racer.currentLap < race.totalLaps) {
                 racer.currentLap++
+                racer.lapStartedAtGameTime = level.gameTime
                 racer.crossedCheckpoints.clear()
                 racer.nextCheckpointIndex = race.firstCheckpointIndex()
                 racer.nextTarget = nextTarget(level, racer, race)
@@ -251,7 +255,15 @@ object RaceManager {
         activeStandings(level, race).forEachIndexed { index, racer ->
             val place = race.finishOrder.size + index + 1
             driverForBody(level, racer.bodyId)?.let { driver ->
-                SkyridersNetwork.sendRaceHudPosition(driver, racer.bodyId, place, race.totalParticipants)
+                SkyridersNetwork.sendRaceHudPosition(
+                    player = driver,
+                    bodyId = racer.bodyId,
+                    place = place,
+                    total = race.totalParticipants,
+                    lap = racer.currentLap,
+                    totalLaps = race.totalLaps,
+                    lapElapsedTicks = (level.gameTime - racer.lapStartedAtGameTime).coerceAtLeast(0L)
+                )
             }
         }
     }
@@ -481,6 +493,7 @@ object RaceManager {
         val driverName: String,
         var position: Vector3d,
         var currentLap: Int = 1,
+        var lapStartedAtGameTime: Long = 0L,
         var nextCheckpointIndex: Int = 0,
         val crossedCheckpoints: MutableSet<Int> = HashSet(),
         val previousDistances: MutableMap<Long, Double> = HashMap(),

@@ -466,12 +466,20 @@ object SkyridersNetwork {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
     }
 
-    fun sendRaceHudPosition(player: ServerPlayer, bodyId: Long, place: Int, total: Int) {
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(true, bodyId, place, total))
+    fun sendRaceHudPosition(
+        player: ServerPlayer,
+        bodyId: Long,
+        place: Int,
+        total: Int,
+        lap: Int,
+        totalLaps: Int,
+        lapElapsedTicks: Long
+    ) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(true, bodyId, place, total, lap, totalLaps, lapElapsedTicks))
     }
 
     fun sendRaceHudClear(player: ServerPlayer) {
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(false, -1L, 0, 0))
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(false, -1L, 0, 0, 0, 0, 0L))
     }
 
     fun sendRocketExplosionSound(player: ServerPlayer, position: Vec3, volume: Float, pitch: Float) {
@@ -1211,13 +1219,24 @@ object SkyridersNetwork {
         }
     }
 
-    data class RaceHudPacket(val active: Boolean, val bodyId: Long, val place: Int, val total: Int) {
+    data class RaceHudPacket(
+        val active: Boolean,
+        val bodyId: Long,
+        val place: Int,
+        val total: Int,
+        val lap: Int,
+        val totalLaps: Int,
+        val lapElapsedTicks: Long
+    ) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeBoolean(active)
             if (active) {
                 buf.writeLong(bodyId)
                 buf.writeInt(place)
                 buf.writeInt(total)
+                buf.writeInt(lap)
+                buf.writeInt(totalLaps)
+                buf.writeLong(lapElapsedTicks)
             }
         }
 
@@ -1226,7 +1245,7 @@ object SkyridersNetwork {
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
                     Runnable {
-                        RaceHudClientState.update(active, bodyId, place, total)
+                        RaceHudClientState.update(active, bodyId, place, total, lap, totalLaps, lapElapsedTicks)
                     }
                 }
             }
@@ -1241,9 +1260,9 @@ object SkyridersNetwork {
             fun decode(buf: FriendlyByteBuf): RaceHudPacket {
                 val active = buf.readBoolean()
                 return if (active) {
-                    RaceHudPacket(active, buf.readLong(), buf.readInt(), buf.readInt())
+                    RaceHudPacket(active, buf.readLong(), buf.readInt(), buf.readInt(), buf.readInt(), buf.readInt(), buf.readLong())
                 } else {
-                    RaceHudPacket(active, -1L, 0, 0)
+                    RaceHudPacket(active, -1L, 0, 0, 0, 0, 0L)
                 }
             }
 

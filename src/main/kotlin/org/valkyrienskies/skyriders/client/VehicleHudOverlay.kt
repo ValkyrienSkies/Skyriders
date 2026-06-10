@@ -237,10 +237,20 @@ object VehicleHudOverlay {
 
     private fun renderRacePlacement(guiGraphics: GuiGraphics, screenWidth: Int, snapshot: VehicleHudSnapshot) {
         val placement = RaceHudClientState.placementFor(snapshot.bodyId) ?: return
-        val minecraft = Minecraft.getInstance()
-        val text = "${ordinal(placement.place)} / ${placement.total}"
-        val x = screenWidth - minecraft.font.width(text) - 8
-        guiGraphics.drawString(minecraft.font, text, x, 8, 0xFFFFF6A8.toInt(), true)
+        drawTopRightText(guiGraphics, screenWidth, 8, "${ordinal(placement.place)} / ${placement.total}", 0xFFFFF6A8.toInt(), scale = 2.0f)
+        drawTopRightText(guiGraphics, screenWidth, 30, "Lap ${placement.lap}/${placement.totalLaps}", 0xFFFFFFFF.toInt())
+        drawTopRightText(guiGraphics, screenWidth, 42, formatLapTime(placement.lapElapsedTicks), 0xFFE0F7FF.toInt())
+    }
+
+    private fun drawTopRightText(guiGraphics: GuiGraphics, screenWidth: Int, y: Int, text: String, color: Int, scale: Float = 1.0f) {
+        val font = Minecraft.getInstance().font
+        val x = screenWidth - (font.width(text) * scale).roundToInt() - 8
+        val pose = guiGraphics.pose()
+        pose.pushPose()
+        pose.translate(x.toDouble(), y.toDouble(), 0.0)
+        pose.scale(scale, scale, 1.0f)
+        guiGraphics.drawString(font, text, 0, 0, color, true)
+        pose.popPose()
     }
 
     private fun consumeRenderDt(): Double {
@@ -456,6 +466,14 @@ object VehicleHudOverlay {
             }
         }
         return "$value$suffix"
+    }
+
+    private fun formatLapTime(ticks: Long): String {
+        val totalCentiseconds = (ticks.coerceAtLeast(0L) * 5L)
+        val minutes = totalCentiseconds / 6000L
+        val seconds = (totalCentiseconds / 100L) % 60L
+        val centiseconds = totalCentiseconds % 100L
+        return "%d:%02d.%02d".format(minutes, seconds, centiseconds)
     }
 
     private data class VehicleHudSnapshot(
