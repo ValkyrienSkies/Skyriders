@@ -36,6 +36,6 @@ class BergenDisc : RecordItem {
     private val secondDisplay = Component.translatable(this.descriptionId + ".desc.second")
 
     companion object {
-        val BURGEN_TRUCK = ResourceLocation.fromNamespaceAndPath(SkyridersMod.MOD_ID, "bergen_disc")
+        val BURGEN_TRUCK = ResourceLocation(SkyridersMod.MOD_ID, "bergen_disc")
     }
 }
