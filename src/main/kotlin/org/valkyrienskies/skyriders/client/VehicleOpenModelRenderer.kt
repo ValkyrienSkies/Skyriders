@@ -35,11 +35,13 @@ object VehicleOpenModelRenderer {
 
         model.faces.forEach { face ->
             val sprite = spriteLookup.apply(face.texture)
+            val shade = faceShade(face.normal)
+            val color = (shade * 255.0f).toInt().coerceIn(0, 255)
             for (i in 0 until 4) {
                 val vertex = face.vertices[i]
                 val uv = face.uvs[i]
                 consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
-                    .color(255, 255, 255, 255)
+                    .color(color, color, color, 255)
                     .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
                     .overlayCoords(OverlayTexture.NO_OVERLAY)
                     .uv2(packedLight)
@@ -48,6 +50,13 @@ object VehicleOpenModelRenderer {
             }
         }
         return true
+    }
+
+    private fun faceShade(normal: Vector3f): Float {
+        val up = normal.y().coerceIn(-1.0f, 1.0f)
+        val horizontal = (1.0f - kotlin.math.abs(up)).coerceIn(0.0f, 1.0f)
+        val sideDirection = (normal.x() * 0.35f + normal.z() * 0.18f).coerceIn(-0.35f, 0.35f)
+        return (0.74f + up * 0.18f + horizontal * sideDirection).coerceIn(0.56f, 1.0f)
     }
 
     private fun getModel(modelLocation: ResourceLocation): OpenModel? {

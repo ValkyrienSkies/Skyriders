@@ -148,7 +148,7 @@ data class BikeRenderDefinition(
                 VehicleWheelRenderDefinition(
                     id = "front_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_fwheel"),
-                    visualOffset = Vector3d(0.0, -0.25, 0.0),
+                    visualOffset = Vector3d(0.0, -0.125, 0.0),
                     pivot = Vector3d(0.5, 0.234375, -0.0625),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
@@ -156,7 +156,7 @@ data class BikeRenderDefinition(
                 VehicleWheelRenderDefinition(
                     id = "rear_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "bikes/dirt_bike/dirt_bike_bwheel"),
-                    visualOffset = Vector3d(0.0, -0.25, 0.0),
+                    visualOffset = Vector3d(0.0, -0.125, 0.0),
                     pivot = Vector3d(0.5, 0.234375, 1.03125),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
