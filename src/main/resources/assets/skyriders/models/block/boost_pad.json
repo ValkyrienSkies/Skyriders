@@ -1,8 +1,8 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "minecraft:block/diamond_block",
-    "top": "minecraft:block/diamond_block",
+    "particle": "skyriders:block/boostpad",
+    "top": "skyriders:block/boostpad",
     "side": "minecraft:block/iron_block",
     "bottom": "minecraft:block/iron_block"
   },
