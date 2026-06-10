@@ -97,21 +97,21 @@ object SkyridersMod {
     val CAVENDISH_ENTITY: RegistryObject<EntityType<CavendishEntity>> = ENTITIES.register("cavendish") {
         EntityType.Builder.of(::CavendishEntity, MobCategory.MISC)
             .sized(0.35f, 0.18f)
-            .clientTrackingRange(48)
-            .updateInterval(2)
+            .clientTrackingRange(12)
+            .updateInterval(1)
             .build("$MOD_ID:cavendish")
     }
     val SUGAR_ROCKET_ENTITY: RegistryObject<EntityType<SugarRocketEntity>> = ENTITIES.register("sugar_rocket") {
         EntityType.Builder.of(::SugarRocketEntity, MobCategory.MISC)
             .sized(0.35f, 0.35f)
-            .clientTrackingRange(96)
+            .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:sugar_rocket")
     }
     val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
         EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)
             .sized(0.1f, 0.1f)
-            .clientTrackingRange(96)
+            .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:bad_explosion")
     }

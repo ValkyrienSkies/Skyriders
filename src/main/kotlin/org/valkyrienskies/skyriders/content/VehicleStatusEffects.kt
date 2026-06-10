@@ -16,10 +16,12 @@ import kotlin.math.max
 
 object VehicleStatusEffects {
     private const val DEFAULT_SPIN_OUT_DURATION = 2.0
-    private const val DEFAULT_SPIN_OUT_YAW_SPEED = 11.0
+    private const val DEFAULT_SPIN_OUT_YAW_SPEED = 5.5
     private const val SPIN_OUT_IMMUNITY_SECONDS = 0.4
-    private const val SPIN_OUT_YAW_RESPONSE = 260.0
-    private const val SPIN_OUT_PLANAR_DAMPING = 4.25
+    private const val SPIN_OUT_YAW_RESPONSE = 34.0
+    private const val SPIN_OUT_PLANAR_DAMPING = 2.1
+    private const val SPIN_OUT_MAX_DAMPING_ACCELERATION = 18.0
+    private const val SPIN_OUT_MAX_TORQUE_PER_MASS = 4200.0
     private const val DEFAULT_BOOST_DURATION = 0.75
     private const val DEFAULT_BOOST_ACCELERATION = 30.0
     private const val DEFAULT_BOOST_TARGET_SPEED = 32.0
@@ -112,7 +114,12 @@ object VehicleStatusEffects {
         val velocity = body.kinematics.velocity
         val planarVelocity = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, up), up)
         if (VehiclePhysicsMath.isFinite(planarVelocity)) {
-            val dampingForce = planarVelocity.mul(-vehicle.vehicleDefinition.body.mass * SPIN_OUT_PLANAR_DAMPING)
+            val dampingAcceleration = planarVelocity.length().coerceAtMost(SPIN_OUT_MAX_DAMPING_ACCELERATION)
+            val dampingForce = if (planarVelocity.lengthSquared() > 1.0e-8) {
+                planarVelocity.normalize().mul(-vehicle.vehicleDefinition.body.mass * dampingAcceleration * SPIN_OUT_PLANAR_DAMPING)
+            } else {
+                Vector3d()
+            }
             VehiclePhysicsMath.safeApplyWorldForce(body, dampingForce, body.kinematics.position)
         }
 
@@ -121,7 +128,8 @@ object VehicleStatusEffects {
         val yawTorque = (targetYawVelocity - currentYawVelocity) *
             vehicle.vehicleDefinition.body.mass *
             SPIN_OUT_YAW_RESPONSE
-        VehiclePhysicsMath.safeApplyWorldTorque(body, Vector3d(up).mul(yawTorque))
+        val maxTorque = vehicle.vehicleDefinition.body.mass * SPIN_OUT_MAX_TORQUE_PER_MASS
+        VehiclePhysicsMath.safeApplyWorldTorque(body, Vector3d(up).mul(yawTorque.coerceIn(-maxTorque, maxTorque)))
     }
 
     private fun applyBoostForce(vehicle: IVehicle, body: PhysVsBody, state: RuntimeState) {

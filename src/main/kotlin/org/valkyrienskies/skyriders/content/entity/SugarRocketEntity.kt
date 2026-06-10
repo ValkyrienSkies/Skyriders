@@ -202,7 +202,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             val radius = BLAST_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(explosionPos) > radius * radius) return@forEach
             val duration = if (vehicle.bodyId == directTarget?.bodyId) 2.25 else 1.45
-            VehicleStatusEffects.applySpinOut(vehicle, duration = duration, yawSpeed = 12.0)
+            VehicleStatusEffects.applySpinOut(vehicle, duration = duration, yawSpeed = 6.0)
         }
         discard()
     }

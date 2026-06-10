@@ -48,7 +48,7 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
             if (target.bodyId == vehicle.bodyId) return@forEach
             val targetBody = level.shipWorld?.allBodies?.getById(target.bodyId) ?: return@forEach
             if (targetBody.kinematics.position.distanceSquared(sourcePosition) > RADIUS * RADIUS) return@forEach
-            VehicleStatusEffects.applySpinOut(target, duration = 2.15, yawSpeed = 12.5)
+            VehicleStatusEffects.applySpinOut(target, duration = 2.15, yawSpeed = 6.0)
         }
         return true
     }

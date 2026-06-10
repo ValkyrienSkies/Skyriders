@@ -1,9 +1,9 @@
 {
 	"animation": {
-		"frametime": 10,
+		"frametime": 4,
 		"width": 16,
 		"height": 16,
-		"interpolate": true,
+		"interpolate": false,
 		"frames": [0, 1, 2, 3]
 	}
 }

@@ -54,7 +54,7 @@ class CavendishEntity(type: EntityType<CavendishEntity>, level: Level) : Entity(
             val hitRadius = TRIGGER_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(peelPos) > hitRadius * hitRadius) continue
 
-            VehicleStatusEffects.applySpinOut(vehicle, duration = 1.85, yawSpeed = 11.5)
+            VehicleStatusEffects.applySpinOut(vehicle, duration = 1.85, yawSpeed = 5.75)
             discard()
             return
         }
