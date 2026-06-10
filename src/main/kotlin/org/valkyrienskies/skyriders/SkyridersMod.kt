@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.level.material.MapColor
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.item.Rarity
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
 import net.minecraftforge.fml.loading.FMLEnvironment
@@ -32,6 +33,7 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
+import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
@@ -85,6 +87,10 @@ object SkyridersMod {
     }
     val HOMING_SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("homing_sugar_rocket") {
         SugarRocketItem(Item.Properties().stacksTo(16), homing = true)
+    }
+
+    val BERGEN_DISC: RegistryObject<Item> = ITEMS.register(BergenDisc.BURGEN_TRUCK.path) {
+        BergenDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     }
 
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
