@@ -25,6 +25,7 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
+import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.acos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -249,16 +250,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     }
 
     private fun explode(level: ServerLevel, position: Vec3, directTarget: IVehicle? = null) {
-        level.playSound(
-            null,
-            position.x,
-            position.y,
-            position.z,
-            SkyridersSounds.SUGAR_ROCKET_EXPLODE_SOUND.get(),
-            SoundSource.NEUTRAL,
-            0.95f,
-            1.0f
-        )
+        playExplosionSound(level, position)
         SkyridersMod.BAD_EXPLOSION_ENTITY.get().create(level)?.let { effect ->
             effect.moveTo(position.x, position.y + EXPLOSION_VISUAL_Y_OFFSET, position.z, random.nextFloat() * 360.0f, 0.0f)
             level.addFreshEntity(effect)
@@ -276,6 +268,16 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             VehicleStatusEffects.applySpinOut(vehicle, duration = duration, yawSpeed = 6.0)
         }
         discard()
+    }
+
+    private fun playExplosionSound(level: ServerLevel, position: Vec3) {
+        level.players().forEach { player ->
+            val distance = player.position().distanceTo(position)
+            if (distance > EXPLOSION_SOUND_RADIUS) return@forEach
+            val falloff = (1.0 - distance / EXPLOSION_SOUND_RADIUS).coerceIn(0.0, 1.0)
+            val volume = (0.35 + falloff * 0.75).toFloat()
+            SkyridersNetwork.sendRocketExplosionSound(player, position, volume, 1.0f)
+        }
     }
 
     private fun updateVelocity(fueled: Boolean) {
@@ -403,6 +405,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 3.25
+        private const val EXPLOSION_SOUND_RADIUS = 128.0
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0
         private const val HOMING_LATERAL_ACCELERATION = 0.18

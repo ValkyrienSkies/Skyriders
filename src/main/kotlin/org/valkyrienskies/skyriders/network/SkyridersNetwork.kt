@@ -20,6 +20,7 @@ import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.client.RaceCompassClientState
 import org.valkyrienskies.skyriders.client.RaceMusicClientState
+import org.valkyrienskies.skyriders.client.RacingClientSounds
 import org.valkyrienskies.skyriders.client.VehicleHudOverlay
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
@@ -149,6 +150,13 @@ object SkyridersNetwork {
             RaceMusicPacket::encode,
             RaceMusicPacket::decode,
             RaceMusicPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            RocketExplosionSoundPacket::class.java,
+            RocketExplosionSoundPacket::encode,
+            RocketExplosionSoundPacket::decode,
+            RocketExplosionSoundPacket::handle
         )
     }
 
@@ -448,6 +456,10 @@ object SkyridersNetwork {
 
     fun sendRaceMusicStop(player: ServerPlayer) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
+    }
+
+    fun sendRocketExplosionSound(player: ServerPlayer, position: Vec3, volume: Float, pitch: Float) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RocketExplosionSoundPacket(position, volume, pitch))
     }
 
     data class VehicleInputPacket(val input: VehicleInput) {
@@ -1178,6 +1190,43 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: RaceMusicPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class RocketExplosionSoundPacket(val position: Vec3, val volume: Float, val pitch: Float) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeDouble(position.x)
+            buf.writeDouble(position.y)
+            buf.writeDouble(position.z)
+            buf.writeFloat(volume)
+            buf.writeFloat(pitch)
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { RacingClientSounds.playRocketExplosion(position, volume, pitch) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: RocketExplosionSoundPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): RocketExplosionSoundPacket {
+                val position = Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble())
+                val volume = buf.readFloat()
+                val pitch = buf.readFloat()
+                return RocketExplosionSoundPacket(position, volume, pitch)
+            }
+
+            fun handle(packet: RocketExplosionSoundPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }
