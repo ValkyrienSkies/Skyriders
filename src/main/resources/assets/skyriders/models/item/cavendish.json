@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "skyriders:items/cavendish"
+    "layer0": "skyriders:item/cavendish"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "skyriders:items/sugar_rocket_homing"
+    "layer0": "skyriders:item/sugar_rocket_homing"
   }
 }
