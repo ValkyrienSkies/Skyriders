@@ -246,24 +246,24 @@ object VehicleStatusEffects {
 
     private data class VehicleKey(val dimension: DimensionId, val bodyId: BodyId)
 
-    private data class RuntimeState(
-        var spinOutTimeRemaining: Double = 0.0,
-        var spinOutDuration: Double = 0.0,
-        var spinOutYawSpeed: Double = 0.0,
-        var spinOutDirection: Double = 1.0,
-        var spinOutEngineWasOn: Boolean = false,
-        var spinOutImmunityRemaining: Double = 0.0,
-        var boostTimeRemaining: Double = 0.0,
-        var boostDuration: Double = 0.0,
-        var boostAcceleration: Double = 0.0,
-        var boostTargetSpeed: Double = 0.0,
-        var boostFadeRange: Double = 0.0,
-        var pullTimeRemaining: Double = 0.0,
-        var pullDuration: Double = 0.0,
-        var pullAcceleration: Double = 0.0,
-        var pullMaxSpeed: Double = 0.0,
+    private class RuntimeState {
+        var spinOutTimeRemaining: Double = 0.0
+        var spinOutDuration: Double = 0.0
+        var spinOutYawSpeed: Double = 0.0
+        var spinOutDirection: Double = 1.0
+        var spinOutEngineWasOn: Boolean = false
+        var spinOutImmunityRemaining: Double = 0.0
+        var boostTimeRemaining: Double = 0.0
+        var boostDuration: Double = 0.0
+        var boostAcceleration: Double = 0.0
+        var boostTargetSpeed: Double = 0.0
+        var boostFadeRange: Double = 0.0
+        var pullTimeRemaining: Double = 0.0
+        var pullDuration: Double = 0.0
+        var pullAcceleration: Double = 0.0
+        var pullMaxSpeed: Double = 0.0
         var pullTarget: Vector3d? = null
-    ) {
+
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
                 spinOutImmunityRemaining <= 0.0 &&

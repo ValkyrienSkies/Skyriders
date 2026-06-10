@@ -404,7 +404,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val OUT_OF_FUEL_DRAG = 0.975
         private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
-        private const val BLAST_RADIUS = 3.25
+        private const val BLAST_RADIUS = 4.75
         private const val EXPLOSION_SOUND_RADIUS = 128.0
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0
