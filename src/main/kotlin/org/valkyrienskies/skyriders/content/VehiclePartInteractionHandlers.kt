@@ -5,7 +5,6 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.nbt.CompoundTag
-import org.valkyrienskies.skyriders.SkyridersMod
 import java.util.concurrent.ConcurrentHashMap
 
 fun interface VehiclePartInteractionHandler {
@@ -80,8 +79,7 @@ object VehiclePartInteractionHandlers {
     private fun refuelWithJerryCan(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone): Boolean {
         if (zone.partId != VehicleInteractionDefinition.FUEL_CAP) return false
         val level = player.level() as? ServerLevel ?: return false
-        val can = SkyridersMod.CREATIVE_JERRY_CAN.get()
-        if (!player.mainHandItem.`is`(can) && !player.offhandItem.`is`(can)) return false
+        if (!VehicleRefuelSources.hasActiveRefuelSource(player, vehicle, zone)) return false
 
         val added = VehicleFuel.refill(vehicle)
         if (added <= 0.0) {

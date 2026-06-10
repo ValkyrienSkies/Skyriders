@@ -4,8 +4,6 @@ import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.resources.ResourceLocation
-import net.minecraftforge.client.event.RenderGuiOverlayEvent
-import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -172,9 +170,7 @@ object VehicleHudOverlay {
         )
     }
 
-    @SubscribeEvent
-    fun onRenderOverlay(event: RenderGuiOverlayEvent.Post) {
-        if (event.overlay.id.path != "player_list") return
+    fun render(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int) {
         val minecraft = Minecraft.getInstance()
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: run {
@@ -191,8 +187,8 @@ object VehicleHudOverlay {
         val dt = consumeRenderDt()
         val fuelSlosh = updateFuelTankSlosh(current, dt)
 
-        renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt, fuelSlosh)
-        renderMeters(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
+        renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh)
+        renderMeters(guiGraphics, screenWidth, screenHeight, current, dt)
     }
 
     private fun renderDashboard(

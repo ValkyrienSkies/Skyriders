@@ -5,6 +5,7 @@ import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.entity.EntityRenderers
 import net.minecraftforge.client.event.InputEvent
+import net.minecraftforge.client.event.RegisterGuiOverlaysEvent
 import net.minecraftforge.client.event.ModelEvent
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent
@@ -72,7 +73,6 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.BIKE_SEAT_ENTITY.get(), ::BikeSeatRenderer)
             MinecraftForge.EVENT_BUS.register(ClientEvents)
             MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
-            MinecraftForge.EVENT_BUS.register(VehicleHudOverlay)
             MinecraftForge.EVENT_BUS.register(VehicleWorldRenderer)
         }
     }
@@ -99,6 +99,13 @@ object SkyridersModClient {
             }
             .distinct()
             .forEach(event::register)
+    }
+
+    @JvmStatic
+    fun registerGuiOverlays(event: RegisterGuiOverlaysEvent) {
+        event.registerAboveAll("vehicle_hud") { _, guiGraphics, _, screenWidth, screenHeight ->
+            VehicleHudOverlay.render(guiGraphics, screenWidth, screenHeight)
+        }
     }
 
     object ClientEvents {

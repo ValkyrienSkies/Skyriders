@@ -20,6 +20,7 @@ import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleRefuelSources
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
@@ -152,7 +153,9 @@ object BikeWorldRenderer {
         bufferSource: MultiBufferSource
     ) {
         if (vehicle.vehicleDefinition.id.toString() !in TEMP_FUEL_CAP_MARKER_IDS) return
+        val player = Minecraft.getInstance().player ?: return
         val zone = vehicle.vehicleDefinition.interactions.zone(VehicleInteractionDefinition.FUEL_CAP) ?: return
+        if (!VehicleRefuelSources.hasActiveRefuelSource(player, vehicle, zone)) return
         if (!zone.center.isFinite() || !zone.size.isFinite()) return
         val halfX = zone.size.x * 0.5
         val halfY = zone.size.y * 0.5
@@ -169,9 +172,9 @@ object BikeWorldRenderer {
             poseStack,
             bufferSource.getBuffer(RenderType.lines()),
             box,
-            0.02f,
-            0.02f,
-            0.02f,
+            0.8f,
+            0.1f,
+            0.8f,
             1.0f
         )
     }

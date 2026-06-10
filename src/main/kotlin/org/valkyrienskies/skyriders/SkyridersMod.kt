@@ -132,6 +132,7 @@ object SkyridersMod {
             modEventBus.addListener(SkyridersModClient::clientInit)
             modEventBus.addListener(SkyridersModClient::registerKeyMappings)
             modEventBus.addListener(SkyridersModClient::registerAdditionalModels)
+            modEventBus.addListener(SkyridersModClient::registerGuiOverlays)
         }
     }
 
