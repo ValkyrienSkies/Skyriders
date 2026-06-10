@@ -6,9 +6,13 @@ import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.event.RenderGuiOverlayEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
+import org.joml.Vector3d
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import kotlin.math.asin
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -43,6 +47,9 @@ object VehicleHudOverlay {
     private const val METER_WIDGET_PIVOT_Y = 48.0
     private const val METER_SMOOTH_THRESHOLD = 0.25
     private const val METER_SMOOTH_RESPONSE = 22.0
+    private const val FUEL_SLOSH_STIFFNESS = 46.0
+    private const val FUEL_SLOSH_DAMPING = 11.5
+    private const val FUEL_SLOSH_MAX_TILT_PIXELS = 45.0
 
     /*
      * These atlas constants are intentionally easy to retarget after the actual
@@ -138,6 +145,9 @@ object VehicleHudOverlay {
     private var lastRenderMillis = 0L
     private var visualSteeringDegrees = 0.0
     private var visualSteeringVelocityDegrees = 0.0
+    private var visualFuelTiltPixels = 0.0
+    private var visualFuelTiltVelocity = 0.0
+    private var previousFuelForwardSpeed: Double? = null
     private val visualMeterValues = HashMap<String, Double>()
 
     fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
@@ -179,16 +189,24 @@ object VehicleHudOverlay {
 //            return
 //        }
         val dt = consumeRenderDt()
+        val fuelSlosh = updateFuelTankSlosh(current, dt)
 
-        renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
+        renderDashboard(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt, fuelSlosh)
         renderMeters(event.guiGraphics, event.window.guiScaledWidth, event.window.guiScaledHeight, current, dt)
     }
 
-    private fun renderDashboard(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
+    private fun renderDashboard(
+        guiGraphics: GuiGraphics,
+        screenWidth: Int,
+        screenHeight: Int,
+        snapshot: VehicleHudSnapshot,
+        dt: Double,
+        fuelSlosh: FuelSloshState
+    ) {
         val x = 0
         val y = screenHeight - DASHBOARD_BASE.height
         val steeringDegrees = updateVisualSteeringDegrees(snapshot.steer, dt)
-        drawFuelTank(guiGraphics, x + 117, y + 8, 44, 22, snapshot.fuel)
+        drawFuelTank(guiGraphics, x + 117, y + 8, 44, 22, snapshot.fuel, fuelSlosh)
         guiGraphics.blitRegion(DASHBOARD_TEXTURE, DASHBOARD_BASE, x, y, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT)
         drawRotatedRegion(
             guiGraphics = guiGraphics,
@@ -232,6 +250,9 @@ object VehicleHudOverlay {
         lastRenderMillis = 0L
         visualSteeringDegrees = 0.0
         visualSteeringVelocityDegrees = 0.0
+        visualFuelTiltPixels = 0.0
+        visualFuelTiltVelocity = 0.0
+        previousFuelForwardSpeed = null
         visualMeterValues.clear()
     }
 
@@ -249,17 +270,81 @@ object VehicleHudOverlay {
         return visualSteeringDegrees
     }
 
-    private fun drawFuelTank(guiGraphics: GuiGraphics, x: Int, y: Int, width: Int, height: Int, fuel: Double) {
+    private fun updateFuelTankSlosh(snapshot: VehicleHudSnapshot, dt: Double): FuelSloshState {
+        val motion = readVehicleMotion(snapshot.bodyId)
+        val safeDt = dt.coerceIn(0.0, 0.1)
+        val previousSpeed = previousFuelForwardSpeed
+        val acceleration = if (previousSpeed != null && safeDt > 1.0e-4) {
+            ((snapshot.forwardSpeed - previousSpeed) / safeDt).coerceIn(-10.0, 10.0)
+        } else {
+            0.0
+        }
+        previousFuelForwardSpeed = snapshot.forwardSpeed
+
+        val turnSlosh = (motion.lateralShove * 1.35).coerceIn(-10.0, 10.0)
+        val accelerationSlosh = -acceleration * 0.35
+        val targetTilt = (motion.rollRad * 20.0 + turnSlosh + accelerationSlosh)
+            .coerceIn(-FUEL_SLOSH_MAX_TILT_PIXELS, FUEL_SLOSH_MAX_TILT_PIXELS)
+
+        val tilt = updateFuelSpring(visualFuelTiltPixels, visualFuelTiltVelocity, targetTilt, safeDt)
+        visualFuelTiltPixels = tilt.value
+        visualFuelTiltVelocity = tilt.velocity
+        return FuelSloshState(visualFuelTiltPixels)
+    }
+
+    private fun updateFuelSpring(current: Double, velocity: Double, target: Double, dt: Double): SpringValue {
+        val acceleration = (target - current) * FUEL_SLOSH_STIFFNESS - velocity * FUEL_SLOSH_DAMPING
+        val nextVelocity = velocity + acceleration * dt
+        val next = current + nextVelocity * dt
+        return SpringValue(next, nextVelocity)
+    }
+
+    private fun readVehicleMotion(bodyId: Long): VehicleMotion {
+        val level = Minecraft.getInstance().level ?: return VehicleMotion.ZERO
+        val vehicle = VehicleManager.getVehicle(level, bodyId) ?: return VehicleMotion.ZERO
+        val rotation = try {
+            vehicle.getRenderTransform().rotation
+        } catch (_: IllegalStateException) {
+            return VehicleMotion.ZERO
+        }
+        val right = Vector3d(1.0, 0.0, 0.0).rotate(rotation)
+        val roll = asin((-right.y).coerceIn(-1.0, 1.0))
+        val kinematics = level.shipWorld?.allBodies?.getById(bodyId)?.kinematics
+        val lateralShove = if (kinematics != null) {
+            val velocity = Vector3d(kinematics.velocity)
+            val angularVelocity = Vector3d(kinematics.angularVelocity)
+            if (velocity.isFinite() && angularVelocity.isFinite()) {
+                Vector3d(velocity).cross(angularVelocity).dot(right).coerceIn(-12.0, 12.0)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+        return VehicleMotion(roll, lateralShove)
+    }
+
+    private fun drawFuelTank(
+        guiGraphics: GuiGraphics,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        fuel: Double,
+        slosh: FuelSloshState
+    ) {
         val filledHeight = (height * fuel.coerceIn(0.0, 1.0)).roundToInt().coerceIn(0, height)
         if (filledHeight <= 0) return
         val filledY = y + height - filledHeight
         val bottom = y + height
         val time = System.currentTimeMillis() / 1000.0
+        val widthDenominator = (width - 1).coerceAtLeast(1).toDouble()
         for (column in 0 until width) {
+            val horizontalT = column / widthDenominator - 0.5
             val lazySlosh = sin(column * 0.16 + time * 1.05) * 1.15
             val roundSwell = sin(column * 0.31 - time * 1.85 + 1.4) * 0.75
             val smallRipple = sin(column * 0.67 + time * 2.65 + 0.8) * 0.32
-            val wave = lazySlosh + roundSwell + smallRipple
+            val wave = lazySlosh + roundSwell + smallRipple + horizontalT * slosh.tiltPixels
             val surfaceY = (filledY + wave.roundToInt()).coerceIn(y, bottom)
             guiGraphics.fill(x + column, surfaceY, x + column + 1, bottom, 0xF7F4B626.toInt())
             if (surfaceY < bottom) {
@@ -303,6 +388,10 @@ object VehicleHudOverlay {
     private fun positiveModulo(value: Double, modulus: Double): Double {
         val result = value % modulus
         return if (result < 0.0) result + modulus else result
+    }
+
+    private fun Vector3d.isFinite(): Boolean {
+        return x.isFinite() && y.isFinite() && z.isFinite()
     }
 
     private fun updateVisualMeterValue(key: String, target: Double, dt: Double): Double {
@@ -425,6 +514,24 @@ object VehicleHudOverlay {
         val x: Int,
         val phase: Double,
         val size: Int
+    )
+
+    private data class FuelSloshState(
+        val tiltPixels: Double
+    )
+
+    private data class VehicleMotion(
+        val rollRad: Double,
+        val lateralShove: Double
+    ) {
+        companion object {
+            val ZERO = VehicleMotion(0.0, 0.0)
+        }
+    }
+
+    private data class SpringValue(
+        val value: Double,
+        val velocity: Double
     )
 
     private data class RoundMeterWidget(
