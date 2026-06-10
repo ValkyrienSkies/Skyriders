@@ -55,8 +55,9 @@ class RaceMarkerBlock(properties: Properties) : BaseEntityBlock(properties) {
         val stack = player.getItemInHand(hand)
         if (stack.item is RaceFlagItem) {
             if (!level.isClientSide) {
-                marker.setColor(RaceFlagItem.getColor(stack))
-                player.displayClientMessage(Component.literal("Race marker color set to ${RaceFlagItem.getColor(stack).name}"), true)
+                val color = RaceFlagItem.getColor(stack)
+                marker.setColor(color)
+                player.displayClientMessage(Component.literal("Race marker color set to ${RaceFlagItem.describeColor(color)}"), true)
                 if (!player.abilities.instabuild) stack.shrink(1)
             }
             return InteractionResult.sidedSuccess(level.isClientSide)

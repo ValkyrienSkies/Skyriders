@@ -23,8 +23,10 @@ class RaceFlagItem(properties: Properties) : RacingVehicleItem(properties) {
 
     companion object {
         const val FLAG_CLOTH_TINT_INDEX = 0
-        private const val COLOR_KEY = "RaceFlagColor"
-        private val DYE_RGB = intArrayOf(
+        const val DEFAULT_COLOR_RGB = 0xB02E26
+        private const val COLOR_RGB_KEY = "RaceFlagColorRgb"
+        private const val LEGACY_COLOR_KEY = "RaceFlagColor"
+        val DYE_RGB = intArrayOf(
             0xF9FFFE,
             0xF9801D,
             0xC74EBD,
@@ -43,21 +45,36 @@ class RaceFlagItem(properties: Properties) : RacingVehicleItem(properties) {
             0x1D1D21
         )
 
-        fun getColor(stack: ItemStack): DyeColor {
-            val id = stack.tag?.getInt(COLOR_KEY) ?: DyeColor.RED.id
-            return DyeColor.byId(id)
+        fun getColor(stack: ItemStack): Int {
+            val tag = stack.tag
+            if (tag?.contains(COLOR_RGB_KEY) == true) {
+                return tag.getInt(COLOR_RGB_KEY) and 0xFFFFFF
+            }
+            if (tag?.contains(LEGACY_COLOR_KEY) == true) {
+                return getDyeColorRgb(DyeColor.byId(tag.getInt(LEGACY_COLOR_KEY)))
+            }
+            return DEFAULT_COLOR_RGB
         }
 
         fun setColor(stack: ItemStack, color: DyeColor) {
-            stack.orCreateTag.putInt(COLOR_KEY, color.id)
+            setColor(stack, getDyeColorRgb(color))
+        }
+
+        fun setColor(stack: ItemStack, colorRgb: Int) {
+            stack.orCreateTag.putInt(COLOR_RGB_KEY, colorRgb and 0xFFFFFF)
+            stack.orCreateTag.remove(LEGACY_COLOR_KEY)
         }
 
         fun getColorRgb(stack: ItemStack): Int {
-            return getColorRgb(getColor(stack))
+            return getColor(stack)
         }
 
-        fun getColorRgb(color: DyeColor): Int {
+        fun getDyeColorRgb(color: DyeColor): Int {
             return DYE_RGB.getOrElse(color.id) { DYE_RGB[DyeColor.RED.id] }
+        }
+
+        fun describeColor(colorRgb: Int): String {
+            return "#%06X".format(colorRgb and 0xFFFFFF)
         }
     }
 }

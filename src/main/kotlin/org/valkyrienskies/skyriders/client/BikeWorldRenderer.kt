@@ -10,7 +10,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.resources.model.BakedModel
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.ItemDisplayContext
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.AABB
@@ -40,7 +39,7 @@ object BikeWorldRenderer {
         "skyriders:atv"
     )
     private val visualStatesByBodyId = HashMap<Long, RenderVisualState>()
-    private val flagStacksByColorId = HashMap<Int, ItemStack>()
+    private val flagStacksByColorRgb = HashMap<Int, ItemStack>()
     private val flagAttachments = mapOf(
         "skyriders:dirt_bike" to FlagAttachment(
             localPos = Vector3d(0.18, 0.72, -0.62),
@@ -209,9 +208,10 @@ object BikeWorldRenderer {
         )
     }
 
-    private fun flagStack(color: DyeColor): ItemStack {
-        return flagStacksByColorId.getOrPut(color.id) {
-            ItemStack(SkyridersMod.RACE_FLAG.get()).also { RaceFlagItem.setColor(it, color) }
+    private fun flagStack(colorRgb: Int): ItemStack {
+        val normalizedColor = colorRgb and 0xFFFFFF
+        return flagStacksByColorRgb.getOrPut(normalizedColor) {
+            ItemStack(SkyridersMod.RACE_FLAG.get()).also { RaceFlagItem.setColor(it, normalizedColor) }
         }
     }
 

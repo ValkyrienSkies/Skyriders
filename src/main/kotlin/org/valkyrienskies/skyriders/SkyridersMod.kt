@@ -9,6 +9,8 @@ import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Rarity
+import net.minecraft.world.item.crafting.RecipeSerializer
+import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.SoundType
 import net.minecraft.world.level.block.entity.BlockEntityType
@@ -50,6 +52,7 @@ import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlock
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockEntity
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockItem
+import org.valkyrienskies.skyriders.content.racing.RaceFlagColoringRecipe
 import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlock
 import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlockEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -66,6 +69,7 @@ object SkyridersMod {
     private val ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MOD_ID)
     private val ENTITIES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MOD_ID)
     private val BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID)
+    private val RECIPE_SERIALIZERS = DeferredRegister.create(ForgeRegistries.RECIPE_SERIALIZERS, MOD_ID)
     // Put RegistryObjects here:
     val BOOST_PAD_BLOCK: RegistryObject<Block> = registerBlockAndItem("boost_pad") {
         BoostPadBlock(
@@ -121,7 +125,7 @@ object SkyridersMod {
         CreativeJerryCanItem(Item.Properties().stacksTo(1))
     }
     val RACE_FLAG: RegistryObject<Item> = ITEMS.register("flag") {
-        RaceFlagItem(Item.Properties().stacksTo(1))
+        RaceFlagItem(Item.Properties().stacksTo(16))
     }
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))
@@ -141,6 +145,10 @@ object SkyridersMod {
     val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
         RaceCompassItem(Item.Properties().stacksTo(1))
     }
+    val RACE_FLAG_COLORING_RECIPE_SERIALIZER: RegistryObject<RecipeSerializer<RaceFlagColoringRecipe>> =
+        RECIPE_SERIALIZERS.register("crafting_special_race_flag_coloring") {
+            SimpleCraftingRecipeSerializer(::RaceFlagColoringRecipe)
+        }
 
     val BERGEN_DISC: RegistryObject<Item> = ITEMS.register(BergenDisc.BURGEN_TRUCK.path) {
         BergenDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
@@ -184,6 +192,7 @@ object SkyridersMod {
         ITEMS.register(modEventBus)
         ENTITIES.register(modEventBus)
         BLOCK_ENTITIES.register(modEventBus)
+        RECIPE_SERIALIZERS.register(modEventBus)
         SkyridersSounds.register(modEventBus)
 
         modEventBus.addListener(::init)

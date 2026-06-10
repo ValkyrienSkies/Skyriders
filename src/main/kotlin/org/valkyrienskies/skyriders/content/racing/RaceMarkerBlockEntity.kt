@@ -8,8 +8,8 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.item.DyeColor
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 
 class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(SkyridersMod.RACE_MARKER_BLOCK_ENTITY.get(), pos, state) {
     var endpointPos: BlockPos? = null
@@ -29,8 +29,8 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         markDirtyAndSync()
     }
 
-    fun setColor(color: DyeColor) {
-        colorId = color.id
+    fun setColor(colorRgb: Int) {
+        colorId = colorRgb and 0xFFFFFF
         markDirtyAndSync()
     }
 
@@ -91,7 +91,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
     override fun getUpdatePacket(): ClientboundBlockEntityDataPacket = ClientboundBlockEntityDataPacket.create(this)
 
     fun describe(): Component {
-        val color = if (colorId >= 0) DyeColor.byId(colorId).name else "none"
+        val color = if (colorId >= 0) RaceFlagItem.describeColor(colorId) else "none"
         val endpoint = endpointPos?.let { "${it.x}, ${it.y}, ${it.z}" } ?: "unlinked"
         return Component.literal("Race marker: $markerType checkpoint=$checkpointIndex color=$color endpoint=$endpoint")
     }

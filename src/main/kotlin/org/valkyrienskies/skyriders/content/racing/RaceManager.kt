@@ -8,7 +8,6 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.player.Player
-import net.minecraft.world.item.DyeColor
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
@@ -96,7 +95,7 @@ object RaceManager {
     }
 
     private fun startRace(level: ServerLevel, startMarker: RaceMarkerBlockEntity) {
-        val color = DyeColor.byId(startMarker.colorId)
+        val color = startMarker.colorId and 0xFFFFFF
         val line = startMarker.line(level) ?: return
         val checkpoints = collectMarkers(level, startMarker.colorId)
             .filter { it.markerType == RaceMarkerTypes.CHECKPOINT && it.endpointPos != null }
