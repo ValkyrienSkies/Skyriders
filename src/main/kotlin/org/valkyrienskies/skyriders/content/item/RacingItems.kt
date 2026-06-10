@@ -1,15 +1,18 @@
 package org.valkyrienskies.skyriders.content.item
 
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import org.joml.Vector3d
+import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.VsBody
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
@@ -43,12 +46,15 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
         val sourceBody = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
         val sourcePosition = sourceBody.kinematics.position
         playThunderboltSound(level, player)
+        spawnThunderboltBurst(level, sourcePosition)
 
         VehicleManager.getVehicles(level).forEach { target ->
             if (target.bodyId == vehicle.bodyId) return@forEach
             val targetBody = level.shipWorld?.allBodies?.getById(target.bodyId) ?: return@forEach
-            if (targetBody.kinematics.position.distanceSquared(sourcePosition) > RADIUS * RADIUS) return@forEach
+            val targetPosition = targetBody.kinematics.position
+            if (targetPosition.distanceSquared(sourcePosition) > RADIUS * RADIUS) return@forEach
             VehicleStatusEffects.applySpinOut(target, duration = 2.15, yawSpeed = 6.0)
+            spawnVehicleStrike(level, targetPosition)
         }
         return true
     }
@@ -66,8 +72,68 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
         )
     }
 
+    private fun spawnThunderboltBurst(level: ServerLevel, center: Vector3dc) {
+        val random = level.random
+        repeat(BURST_SPARK_COUNT) {
+            val direction = randomDirection()
+            val distance = random.nextDouble() * RADIUS
+            val x = center.x() + direction.x * distance
+            val y = center.y() + 0.75 + direction.y * distance * 0.45
+            val z = center.z() + direction.z * distance
+            level.sendParticles(
+                ParticleTypes.ELECTRIC_SPARK,
+                x,
+                y,
+                z,
+                1,
+                0.08,
+                0.08,
+                0.08,
+                0.18
+            )
+        }
+    }
+
+    private fun spawnVehicleStrike(level: ServerLevel, position: Vector3dc) {
+        val lightning = EntityType.LIGHTNING_BOLT.create(level)
+        if (lightning != null) {
+            lightning.setVisualOnly(true)
+            lightning.moveTo(position.x(), position.y() + LIGHTNING_Y_OFFSET, position.z())
+            level.addFreshEntity(lightning)
+        }
+
+        level.sendParticles(
+            ParticleTypes.ELECTRIC_SPARK,
+            position.x(),
+            position.y() + STRIKE_SPARK_Y_OFFSET,
+            position.z(),
+            STRIKE_SPARK_COUNT,
+            0.65,
+            0.85,
+            0.65,
+            0.22
+        )
+    }
+
+    private fun randomDirection(): Vector3d {
+        val random = java.util.concurrent.ThreadLocalRandom.current()
+        val direction = Vector3d(
+            random.nextDouble(-1.0, 1.0),
+            random.nextDouble(-1.0, 1.0),
+            random.nextDouble(-1.0, 1.0)
+        )
+        if (direction.lengthSquared() < 1.0E-6) {
+            return Vector3d(0.0, 1.0, 0.0)
+        }
+        return direction.normalize()
+    }
+
     private companion object {
         const val RADIUS = 10.0
+        const val BURST_SPARK_COUNT = 96
+        const val STRIKE_SPARK_COUNT = 32
+        const val STRIKE_SPARK_Y_OFFSET = 0.85
+        const val LIGHTNING_Y_OFFSET = 0.1
     }
 }
 
