@@ -26,6 +26,9 @@ object VehicleStatusEffects {
     private const val DEFAULT_BOOST_ACCELERATION = 30.0
     private const val DEFAULT_BOOST_TARGET_SPEED = 32.0
     private const val DEFAULT_BOOST_FADE_RANGE = 8.0
+    private const val DEFAULT_PULL_DURATION = 0.55
+    private const val DEFAULT_PULL_ACCELERATION = 42.0
+    private const val DEFAULT_PULL_MAX_SPEED = 24.0
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -66,6 +69,22 @@ object VehicleStatusEffects {
         playOneShot(vehicle, SkyridersSounds.BOOST_SOUND.get(), 0.75f, randomPitch(0.94f, 1.04f))
     }
 
+    fun applyPullToPoint(
+        vehicle: IVehicle,
+        target: Vector3d,
+        duration: Double = DEFAULT_PULL_DURATION,
+        acceleration: Double = DEFAULT_PULL_ACCELERATION,
+        maxSpeed: Double = DEFAULT_PULL_MAX_SPEED
+    ) {
+        if (!VehiclePhysicsMath.isFinite(target)) return
+        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+        state.pullTarget = Vector3d(target)
+        state.pullDuration = duration.coerceAtLeast(0.05)
+        state.pullTimeRemaining = max(state.pullTimeRemaining, state.pullDuration)
+        state.pullAcceleration = acceleration.coerceAtLeast(0.0)
+        state.pullMaxSpeed = maxSpeed.coerceAtLeast(0.0)
+    }
+
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
         return if (isSpinningOut(vehicle)) {
             VehicleInput.EMPTY.copy(
@@ -104,6 +123,13 @@ object VehicleStatusEffects {
             applyBoostForce(vehicle, body, state)
             state.boostTimeRemaining = (state.boostTimeRemaining - safeDt).coerceAtLeast(0.0)
         }
+        if (state.pullTimeRemaining > 0.0) {
+            applyPullForce(vehicle, body, state)
+            state.pullTimeRemaining = (state.pullTimeRemaining - safeDt).coerceAtLeast(0.0)
+            if (state.pullTimeRemaining <= 0.0) {
+                state.pullTarget = null
+            }
+        }
         if (state.isIdle()) {
             states.remove(key(vehicle), state)
         }
@@ -141,6 +167,23 @@ object VehicleStatusEffects {
         if (speedScale <= 0.0) return
 
         val force = driveForward.mul(vehicle.vehicleDefinition.body.mass * state.boostAcceleration * speedScale)
+        VehiclePhysicsMath.safeApplyWorldForce(body, force, body.kinematics.position)
+    }
+
+    private fun applyPullForce(vehicle: IVehicle, body: PhysVsBody, state: RuntimeState) {
+        val target = state.pullTarget ?: return
+        val offset = Vector3d(target).sub(body.kinematics.position)
+        if (!VehiclePhysicsMath.isFinite(offset) || offset.lengthSquared() < 1.0e-6) return
+        val direction = offset.normalize()
+        val speedTowardTarget = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, direction))
+        val speedScale = if (state.pullMaxSpeed <= 0.0) {
+            1.0
+        } else {
+            (1.0 - speedTowardTarget / state.pullMaxSpeed).coerceIn(0.0, 1.0)
+        }
+        if (speedScale <= 0.0) return
+        val ramp = (state.pullTimeRemaining / state.pullDuration.coerceAtLeast(0.001)).coerceIn(0.15, 1.0)
+        val force = direction.mul(vehicle.vehicleDefinition.body.mass * state.pullAcceleration * speedScale * ramp)
         VehiclePhysicsMath.safeApplyWorldForce(body, force, body.kinematics.position)
     }
 
@@ -214,12 +257,18 @@ object VehicleStatusEffects {
         var boostDuration: Double = 0.0,
         var boostAcceleration: Double = 0.0,
         var boostTargetSpeed: Double = 0.0,
-        var boostFadeRange: Double = 0.0
+        var boostFadeRange: Double = 0.0,
+        var pullTimeRemaining: Double = 0.0,
+        var pullDuration: Double = 0.0,
+        var pullAcceleration: Double = 0.0,
+        var pullMaxSpeed: Double = 0.0,
+        var pullTarget: Vector3d? = null
     ) {
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
                 spinOutImmunityRemaining <= 0.0 &&
-                boostTimeRemaining <= 0.0
+                boostTimeRemaining <= 0.0 &&
+                pullTimeRemaining <= 0.0
         }
     }
 }

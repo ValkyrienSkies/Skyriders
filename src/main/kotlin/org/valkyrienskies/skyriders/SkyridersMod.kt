@@ -40,11 +40,13 @@ import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
+import org.valkyrienskies.skyriders.content.entity.GlassoEntity
 import org.valkyrienskies.skyriders.content.entity.ItemBoxEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
+import org.valkyrienskies.skyriders.content.item.GlassoItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
@@ -145,6 +147,9 @@ object SkyridersMod {
     val CAVENDISH: RegistryObject<Item> = ITEMS.register("cavendish") {
         CavendishItem(Item.Properties().stacksTo(16))
     }
+    val GLASSO: RegistryObject<Item> = ITEMS.register("glasso") {
+        GlassoItem(Item.Properties().stacksTo(16))
+    }
     val SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("sugar_rocket") {
         SugarRocketItem(Item.Properties().stacksTo(16), homing = false)
     }
@@ -190,6 +195,13 @@ object SkyridersMod {
             .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:sugar_rocket")
+    }
+    val GLASSO_ENTITY: RegistryObject<EntityType<GlassoEntity>> = ENTITIES.register("glasso") {
+        EntityType.Builder.of(::GlassoEntity, MobCategory.MISC)
+            .sized(0.35f, 0.35f)
+            .clientTrackingRange(16)
+            .updateInterval(1)
+            .build("$MOD_ID:glasso")
     }
     val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
         EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)

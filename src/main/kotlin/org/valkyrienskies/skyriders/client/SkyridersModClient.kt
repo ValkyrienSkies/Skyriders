@@ -83,6 +83,7 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.SUGAR_ROCKET_ENTITY.get()) { context ->
                 RacingOpenModelEntityRenderer.sugarRocket(context)
             }
+            EntityRenderers.register(SkyridersMod.GLASSO_ENTITY.get(), ::GlassoRenderer)
             ItemProperties.register(SkyridersMod.RACE_COMPASS.get(), ResourceLocation("angle")) { _, _, entity, seed ->
                 RaceCompassClientState.angle(entity, seed)
             }

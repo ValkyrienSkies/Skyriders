@@ -212,6 +212,39 @@ class SugarRocketItem(
     }
 }
 
+class GlassoItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.GLASSO_ENTITY.get().create(level) ?: return false
+        val direction = player.lookAngle.normalize()
+        val bodyPosition = body.kinematics.position
+        val inheritedVelocity = body.kinematics.velocity
+        val origin = net.minecraft.world.phys.Vec3(
+            bodyPosition.x() + direction.x * 1.0,
+            bodyPosition.y() + 0.65 + direction.y * 0.45,
+            bodyPosition.z() + direction.z * 1.0
+        )
+        entity.launch(
+            origin = origin,
+            direction = direction,
+            inheritedVelocity = net.minecraft.world.phys.Vec3(
+                inheritedVelocity.x() / TICKS_PER_SECOND,
+                inheritedVelocity.y() / TICKS_PER_SECOND,
+                inheritedVelocity.z() / TICKS_PER_SECOND
+            ),
+            ownerBodyId = vehicle.bodyId,
+            ownerPlayerId = player.uuid
+        )
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
+    }
+}
+
 abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder<ItemStack> {
         val stack = player.getItemInHand(hand)
