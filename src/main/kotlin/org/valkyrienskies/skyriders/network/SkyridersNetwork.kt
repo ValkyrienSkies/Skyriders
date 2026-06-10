@@ -212,16 +212,19 @@ object SkyridersNetwork {
         }
         val drifting = when (vehicle) {
             is KartVehicle -> vehicle.kartState.drifting
+            is WheeledVehicle -> vehicle.wheeledState.drifting
             is IBike -> vehicle.state.debugDrifting
             else -> false
         }
         val driftBoostCharge = when (vehicle) {
             is KartVehicle -> vehicle.kartState.driftBoostCharge
+            is WheeledVehicle -> vehicle.wheeledState.driftBoostCharge
             is IBike -> vehicle.state.driftBoostCharge
             else -> 0.0
         }
         val driftBoostLevel = when (vehicle) {
             is KartVehicle -> vehicle.kartState.driftBoostLevel
+            is WheeledVehicle -> vehicle.wheeledState.driftBoostLevel
             is IBike -> vehicle.state.driftBoostLevel
             else -> 0
         }
@@ -244,6 +247,7 @@ object SkyridersNetwork {
         }
         val driftBoostTimeRemaining = when (vehicle) {
             is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
+            is WheeledVehicle -> vehicle.wheeledState.driftBoostTimeRemaining
             is IBike -> vehicle.state.driftBoostTimeRemaining
             else -> 0.0
         }

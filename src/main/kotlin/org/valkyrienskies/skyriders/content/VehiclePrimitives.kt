@@ -52,7 +52,8 @@ data class VehicleFuelDefinition(
     val throttleUsePerSecond: Double = 0.075,
     val motionWorkUsePerSpeedPerSecond: Double = 0.0025,
     val driveWorkUsePerWorkSecond: Double = 0.001,
-    val stepAssistUsePerWorkSecond: Double = 0.012
+    val stepAssistUsePerWorkSecond: Double = 0.012,
+    val driftBoostUsePerForceSecond: Double = 0.0002
 )
 
 data class VehicleBodyDefinition(

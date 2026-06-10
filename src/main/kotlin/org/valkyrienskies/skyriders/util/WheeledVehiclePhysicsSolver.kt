@@ -40,9 +40,12 @@ object WheeledVehiclePhysicsSolver {
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
+        val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
+        val driftSpeed = planarSpeed(body, contactUp)
+        val driftGripActive = updateDriftState(state, activeInput, driftSpeed, dt, config)
+        updateDriftBoost(body, state, activeInput.riderPresent, driftGripActive, forward, config, dt)
         val driveCommand = updateTransmission(activeInput, forwardSpeed, config, state, dt)
         val steerRad = updateSteerAngle(state, activeInput.steer, forwardSpeed, config, dt)
-        val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val wheels = expandWheels(config)
         val contacts = wheels.map { wheel ->
             val axleSteer = if (wheel.axle.steerable) steerRad * wheel.axle.steerScale else 0.0
@@ -70,15 +73,19 @@ object WheeledVehiclePhysicsSolver {
         state.debugDriveWork = 0.0
         state.debugStepAssistWork = 0.0
 
-        loaded.forEach { applyLateralGrip(body, it, config) }
+        loaded.forEach { applyLateralGrip(body, it, driftGripActive, config) }
         val parkingBrakeActive = state.parkingBrakeEngaged || activeInput.handbrake > 0.0
         if (activeInput.riderPresent) {
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driftGripActive, config, state, dt)
             if (parkingBrakeActive) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
             if (stabilizedGrounded) {
-                applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
+                if (state.drifting) {
+                    applyDriftAssist(body, activeInput, forwardSpeed, terrainUp, state, config)
+                } else {
+                    applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
+                }
                 val activeStepWheels = loaded.count { it.contact.grounded && it.wheel.axle.stepAssist }.coerceAtLeast(1)
                 loaded.forEach { state.debugStepAssistWork += applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config, activeStepWheels) }
             }
@@ -86,11 +93,11 @@ object WheeledVehiclePhysicsSolver {
             if (state.parkingBrakeEngaged) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driftGripActive, config, state, dt)
         }
 
         if (stabilizedGrounded) {
-            applyUpright(body, up, terrainUp, config)
+            applyUpright(body, up, terrainUp, driftGripActive, config)
         }
 
         updateDebugState(body, state, loaded, activeInput, steerRad, forwardSpeed)
@@ -525,14 +532,30 @@ object WheeledVehiclePhysicsSolver {
         return normalForce
     }
 
-    private fun applyLateralGrip(body: PhysVsBody, loaded: LoadedWheelContact, config: WheeledVehiclePhysicsConfig) {
+    private fun applyLateralGrip(
+        body: PhysVsBody,
+        loaded: LoadedWheelContact,
+        drifting: Boolean,
+        config: WheeledVehiclePhysicsConfig
+    ) {
         val contact = loaded.contact
         if (!contact.grounded || loaded.normalForce <= 0.0) return
         val lateralSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelRightWorld)
         val forwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
         val slip = lateralSpeed / max(abs(forwardSpeed), 1.5)
         val shapedSlip = slip / (abs(slip) + config.lateralSlipShape.coerceAtLeast(1.0e-4))
-        val maxForce = loaded.normalForce * config.tireFrictionCoefficient * contact.surfaceFriction * loaded.wheel.axle.lateralGrip
+        val driftGripScale = if (!drifting) {
+            1.0
+        } else if (loaded.wheel.axle.steerable) {
+            config.driftSteerableGripScale
+        } else {
+            config.driftNonSteerableGripScale
+        }
+        val maxForce = loaded.normalForce *
+            config.tireFrictionCoefficient *
+            contact.surfaceFriction *
+            loaded.wheel.axle.lateralGrip *
+            driftGripScale.coerceAtLeast(0.0)
         VehicleWheelPhysics.applyContactForce(
             body,
             contact,
@@ -544,12 +567,17 @@ object WheeledVehiclePhysicsSolver {
         body: PhysVsBody,
         contacts: List<LoadedWheelContact>,
         driveCommand: DriveCommand,
+        drifting: Boolean,
         config: WheeledVehiclePhysicsConfig,
         state: WheeledVehicleRuntimeState,
         dt: Double
     ) {
         val throttle = driveCommand.throttle.coerceIn(-1.0, 1.0)
-        val brake = driveCommand.brake.coerceIn(0.0, 1.0)
+        val brake = if (drifting) {
+            driveCommand.brake.coerceIn(0.0, 1.0) * config.driftBrakeScale.coerceIn(0.0, 1.0)
+        } else {
+            driveCommand.brake.coerceIn(0.0, 1.0)
+        }
         val driveBiasTotal = config.axles.filter(WheelAxleConfig::driven).sumOf { it.driveBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val brakeBiasTotal = config.axles.sumOf { it.brakeBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val stepDt = dt.coerceIn(0.0, 0.1)
@@ -557,7 +585,10 @@ object WheeledVehiclePhysicsSolver {
         contacts.forEach { loaded ->
             val axle = loaded.wheel.axle
             val radius = max(axle.wheelRadius, 0.05)
-            val topSpeed = max(driveCommand.wheelTopSpeed, 1.0)
+            val topSpeed = max(
+                driveCommand.wheelTopSpeed * if (drifting) config.driftTopSpeedMultiplier.coerceAtLeast(0.1) else 1.0,
+                1.0
+            )
             val maxOmega = topSpeed * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
             val groundSpeed = if (loaded.contact.grounded) {
                 VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
@@ -587,7 +618,8 @@ object WheeledVehiclePhysicsSolver {
                 val slip = slipVelocity / max(abs(groundSpeed), 1.5)
                 val shapedSlip = slip / (abs(slip) + config.longitudinalSlipShape.coerceAtLeast(1.0e-4))
                 val driveForceScale = if (axle.driven && abs(throttle) > 0.0) {
-                    driveCommand.torqueMultiplier.coerceIn(0.0, 1.75)
+                    driveCommand.torqueMultiplier.coerceIn(0.0, 1.75) *
+                        if (drifting) config.driftDriveScale.coerceAtLeast(0.0) else 1.0
                 } else {
                     0.35
                 }
@@ -666,11 +698,44 @@ object WheeledVehiclePhysicsSolver {
         VehiclePhysicsMath.safeApplyWorldTorque(body, torque)
     }
 
-    private fun applyUpright(body: PhysVsBody, up: Vector3d, terrainUp: Vector3d, config: WheeledVehiclePhysicsConfig) {
+    private fun applyDriftAssist(
+        body: PhysVsBody,
+        input: VehicleInput,
+        forwardSpeed: Double,
+        terrainUp: Vector3d,
+        state: WheeledVehicleRuntimeState,
+        config: WheeledVehiclePhysicsConfig
+    ) {
+        val speed = abs(forwardSpeed)
+        if (speed < config.yawAssistMinSpeed || abs(state.driftDirection) < 0.05) return
+
+        val steerBias = input.steer.coerceIn(-1.0, 1.0) * state.driftDirection
+        val biasScale = when {
+            steerBias > 0.15 -> 1.05
+            steerBias < -0.15 -> 0.28
+            else -> 0.58
+        }
+        val speedT = smoothstep(config.driftMinSpeed, config.yawAssistMaxSpeed, speed)
+        val highSpeedSoftening = lerp(1.0, 0.68, smoothstep(config.yawAssistMaxSpeed * 0.7, config.yawAssistMaxSpeed * 1.35, speed))
+        val torque = Vector3d(terrainUp).mul(
+            state.driftDirection * forwardSpeed.signOrZero() * config.driftYawAssist * speedT * biasScale * highSpeedSoftening
+        )
+        VehiclePhysicsMath.safeApplyWorldTorque(body, torque)
+    }
+
+    private fun applyUpright(
+        body: PhysVsBody,
+        up: Vector3d,
+        terrainUp: Vector3d,
+        drifting: Boolean,
+        config: WheeledVehiclePhysicsConfig
+    ) {
         val axis = Vector3d(up).cross(terrainUp)
         if (!VehiclePhysicsMath.isFinite(axis) || axis.lengthSquared() < VehiclePhysicsMath.MIN_DIRECTION_LENGTH_SQUARED) return
-        val correction = axis.mul(config.uprightStrength)
-        val damping = Vector3d(body.kinematics.angularVelocity).mul(-config.uprightDamping)
+        val strengthScale = if (drifting) config.driftUprightStrengthScale else 1.0
+        val dampingScale = if (drifting) config.driftUprightDampingScale else 1.0
+        val correction = axis.mul(config.uprightStrength * strengthScale)
+        val damping = Vector3d(body.kinematics.angularVelocity).mul(-config.uprightDamping * dampingScale)
         VehiclePhysicsMath.safeApplyWorldTorque(body, correction.add(damping))
     }
 
@@ -944,6 +1009,133 @@ object WheeledVehiclePhysicsSolver {
         val axle = loaded.wheel.axle
         val springLength = loaded.contact.hitDistance - axle.wheelRadius
         return (axle.suspensionRestLength - springLength).coerceIn(0.0, axle.suspensionTravel)
+    }
+
+    private fun updateDriftState(
+        state: WheeledVehicleRuntimeState,
+        input: VehicleInput,
+        driftSpeed: Double,
+        dt: Double,
+        config: WheeledVehiclePhysicsConfig
+    ): Boolean {
+        if (!config.driftEnabled) {
+            clearDriftState(state)
+            return false
+        }
+
+        val brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
+        val steer = input.steer.coerceIn(-1.0, 1.0)
+        val speed = abs(driftSpeed)
+
+        if (brake <= 0.05 || speed < config.driftMinSpeed) {
+            if (state.drifting) {
+                state.driftExitTimeRemaining = config.driftExitSmoothingTime
+            }
+            state.drifting = false
+            state.driftDirection = 0.0
+            state.driftExitTimeRemaining = max(0.0, state.driftExitTimeRemaining - dt)
+            return state.driftExitTimeRemaining > 0.0
+        }
+
+        if (!state.drifting) {
+            if (abs(steer) < config.driftStartSteer) return false
+            state.driftDirection = steer.signOrZero()
+        }
+
+        state.drifting = true
+        state.driftExitTimeRemaining = 0.0
+        return true
+    }
+
+    private fun updateDriftBoost(
+        body: PhysVsBody,
+        state: WheeledVehicleRuntimeState,
+        riderPresent: Boolean,
+        drifting: Boolean,
+        forward: Vector3d,
+        config: WheeledVehiclePhysicsConfig,
+        dt: Double
+    ) {
+        if (!config.driftEnabled || !config.driftBoostEnabled || !riderPresent) {
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+            return
+        }
+
+        if (drifting && state.drifting) {
+            state.driftBoostCharge += dt
+            state.driftBoostLevel = computeDriftBoostLevel(state.driftBoostCharge, config)
+            state.driftBoostTimeRemaining = 0.0
+            state.driftBoostForce = 0.0
+        } else if (!drifting && state.driftBoostCharge > 0.0) {
+            val boostLevel = state.driftBoostLevel.coerceIn(0, driftBoostLevelCount(config))
+            if (boostLevel > 0) {
+                state.driftBoostForce = driftBoostForce(boostLevel, config)
+                state.driftBoostTimeRemaining = driftBoostDuration(boostLevel, config)
+            }
+            state.driftBoostCharge = 0.0
+            state.driftBoostLevel = 0
+        }
+
+        if (state.driftBoostTimeRemaining <= 0.0 || state.driftBoostForce <= 0.0) return
+
+        VehiclePhysicsMath.safeApplyWorldForce(
+            body,
+            Vector3d(forward).mul(state.driftBoostForce),
+            body.kinematics.position
+        )
+        state.driftBoostTimeRemaining = max(0.0, state.driftBoostTimeRemaining - dt)
+        if (state.driftBoostTimeRemaining <= 0.0) {
+            state.driftBoostForce = 0.0
+        }
+    }
+
+    private fun clearDriftState(state: WheeledVehicleRuntimeState) {
+        state.drifting = false
+        state.driftDirection = 0.0
+        state.driftExitTimeRemaining = 0.0
+        state.driftBoostCharge = 0.0
+        state.driftBoostLevel = 0
+        state.driftBoostTimeRemaining = 0.0
+        state.driftBoostForce = 0.0
+    }
+
+    private fun computeDriftBoostLevel(charge: Double, config: WheeledVehiclePhysicsConfig): Int {
+        var level = 0
+        val maxLevel = driftBoostLevelCount(config)
+        for (index in 0 until maxLevel) {
+            if (charge >= config.driftBoostChargeTimes[index]) {
+                level = index + 1
+            }
+        }
+        return level
+    }
+
+    private fun driftBoostForce(level: Int, config: WheeledVehiclePhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostForces.indices) config.driftBoostForces[index] else 0.0
+    }
+
+    private fun driftBoostDuration(level: Int, config: WheeledVehiclePhysicsConfig): Double {
+        val index = level - 1
+        return if (index in config.driftBoostDurations.indices) config.driftBoostDurations[index] else 0.0
+    }
+
+    private fun driftBoostLevelCount(config: WheeledVehiclePhysicsConfig): Int {
+        return min(
+            config.driftBoostMaxLevel,
+            min(config.driftBoostChargeTimes.size, min(config.driftBoostForces.size, config.driftBoostDurations.size))
+        ).coerceAtLeast(0)
+    }
+
+    private fun planarSpeed(body: PhysVsBody, terrainUp: Vector3d): Double {
+        val velocity = body.kinematics.velocity
+        if (!VehiclePhysicsMath.isFinite(velocity)) return 0.0
+        val vertical = VehiclePhysicsMath.safeDot(velocity, terrainUp)
+        val planar = Vector3d(velocity).fma(-vertical, terrainUp)
+        return if (VehiclePhysicsMath.isFinite(planar)) planar.length() else 0.0
     }
 
     private fun smoothstep(edge0: Double, edge1: Double, value: Double): Double {

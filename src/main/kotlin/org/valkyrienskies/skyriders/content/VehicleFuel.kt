@@ -63,12 +63,14 @@ object VehicleFuel {
         val throttle = abs(input.throttle.coerceIn(-1.0, 1.0))
         val driveWork = driveWork(vehicle)
         val stepAssistWork = stepAssistWork(vehicle)
+        val driftBoostWork = driftBoostWork(vehicle)
         val fuel = definition.fuel
         val rate =
             fuel.idleUsePerSecond.coerceAtLeast(0.0) +
                 throttle * fuel.throttleUsePerSecond.coerceAtLeast(0.0) +
                 driveWork * fuel.driveWorkUsePerWorkSecond.coerceAtLeast(0.0) +
-                stepAssistWork * fuel.stepAssistUsePerWorkSecond.coerceAtLeast(0.0)
+                stepAssistWork * fuel.stepAssistUsePerWorkSecond.coerceAtLeast(0.0) +
+                driftBoostWork * fuel.driftBoostUsePerForceSecond.coerceAtLeast(0.0)
         val next = (current - rate * safeDt).coerceAtLeast(0.0)
         setAmount(vehicle, next)
         if (next <= EPSILON) {
@@ -118,16 +120,31 @@ object VehicleFuel {
         }.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
     }
 
+    private fun driftBoostWork(vehicle: IVehicle): Double {
+        return when (vehicle) {
+            is IBike -> vehicle.state.driftBoostForce
+            is KartVehicle -> vehicle.kartState.driftBoostForce
+            is WheeledVehicle -> vehicle.wheeledState.driftBoostForce
+            else -> 0.0
+        }.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+    }
+
     private fun stallOutOfFuel(vehicle: IVehicle) {
         when (vehicle) {
             is IBike -> vehicle.state.engineOn = false
-            is KartVehicle -> vehicle.kartState.engineOn = false
+            is KartVehicle -> {
+                vehicle.kartState.engineOn = false
+                vehicle.kartState.driftBoostForce = 0.0
+                vehicle.kartState.driftBoostTimeRemaining = 0.0
+            }
             is WheeledVehicle -> {
                 vehicle.wheeledState.engineOn = false
                 vehicle.wheeledState.engineStalled = true
                 vehicle.wheeledState.debugEngineStalled = true
                 vehicle.wheeledState.engineRpm = 0.0
                 vehicle.wheeledState.debugEngineRpm = 0.0
+                vehicle.wheeledState.driftBoostForce = 0.0
+                vehicle.wheeledState.driftBoostTimeRemaining = 0.0
             }
         }
     }
