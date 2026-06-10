@@ -100,9 +100,10 @@ object BikeManager {
     fun physTick(physLevel: PhysLevel, dt: Double) {
         serverBikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
             val body = physLevel.getBodyById(bike.bodyId) ?: return@forEach
-            val input = getInput(physLevel.dimension, bike.bodyId)
-            VehicleFuel.consume(bike, body, input.toVehicleInput(), dt)
-            bike.physTick(physLevel, body, input, dt)
+            val vehicleInput = VehicleStatusEffects.modifyInput(bike, getInput(physLevel.dimension, bike.bodyId).toVehicleInput())
+            VehicleFuel.consume(bike, body, vehicleInput, dt)
+            bike.physTick(physLevel, body, vehicleInput.toBikeInput(), dt)
+            VehicleStatusEffects.physTick(bike, body, dt)
         }
     }
 

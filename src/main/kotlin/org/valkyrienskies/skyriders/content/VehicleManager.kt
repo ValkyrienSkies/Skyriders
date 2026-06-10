@@ -390,9 +390,10 @@ object VehicleManager {
         BikeManager.physTick(physLevel, dt)
         serverVehiclesByDimension[physLevel.dimension]?.values?.forEach { vehicle ->
             val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
-            val input = getInput(physLevel.dimension, vehicle.bodyId)
+            val input = VehicleStatusEffects.modifyInput(vehicle, getInput(physLevel.dimension, vehicle.bodyId))
             VehicleFuel.consume(vehicle, body, input, dt)
             vehicle.physTick(physLevel, body, input, dt)
+            VehicleStatusEffects.physTick(vehicle, body, dt)
         }
         BoostPadHandler.physTick(physLevel, getVehicles(physLevel.dimension), dt)
     }

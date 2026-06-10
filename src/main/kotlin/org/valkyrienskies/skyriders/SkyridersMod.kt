@@ -29,6 +29,8 @@ import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
+import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
+import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
@@ -63,6 +65,12 @@ object SkyridersMod {
     }
     val CREATIVE_JERRY_CAN: RegistryObject<Item> = ITEMS.register("creative_jerry_can") {
         CreativeJerryCanItem(Item.Properties().stacksTo(1))
+    }
+    val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
+        HoneyCanisterItem(Item.Properties().stacksTo(16))
+    }
+    val THUNDERBOLT: RegistryObject<Item> = ITEMS.register("thunderbolt") {
+        ThunderboltItem(Item.Properties().stacksTo(16))
     }
 
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
