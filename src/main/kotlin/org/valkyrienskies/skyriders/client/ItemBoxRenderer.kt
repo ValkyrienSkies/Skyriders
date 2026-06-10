@@ -3,11 +3,14 @@ package org.valkyrienskies.skyriders.client
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.math.Axis
+import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
+import net.minecraft.client.renderer.texture.TextureAtlasSprite
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.inventory.InventoryMenu
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -25,7 +28,8 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         val recharging = entity.recharging
         val alpha = if (recharging) 0.34f else 0.92f
         val boxBuffer = bufferSource.getBuffer(RenderType.entityTranslucent(BOX_TEXTURE))
-        val baseBuffer = bufferSource.getBuffer(RenderType.entityCutout(BASE_TEXTURE))
+        val baseBuffer = bufferSource.getBuffer(RenderType.cutout())
+        val baseSprite = Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(BASE_SPRITE)
 
         poseStack.pushPose()
         poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw))
@@ -42,7 +46,8 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
             green = 1.0f,
             blue = 1.0f,
             alpha = 1.0f,
-            packedLight = packedLight
+            packedLight = packedLight,
+            sprite = baseSprite
         )
         poseStack.popPose()
 
@@ -91,17 +96,18 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         green: Float,
         blue: Float,
         alpha: Float,
-        packedLight: Int
+        packedLight: Int,
+        sprite: TextureAtlasSprite? = null
     ) {
         val pose = poseStack.last()
         val matrix = pose.pose()
         val normal = pose.normal()
-        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight)
-        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight)
-        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight)
-        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight)
-        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight)
-        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight)
+        face(buffer, matrix, normal, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, 0.0f, 0.0f, 1.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, 0.0f, 0.0f, -1.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, -1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, 1.0f, 0.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, 0.0f, 1.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
+        face(buffer, matrix, normal, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, 0.0f, -1.0f, 0.0f, red, green, blue, alpha, packedLight, sprite)
     }
 
     private fun face(
@@ -127,12 +133,13 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         green: Float,
         blue: Float,
         alpha: Float,
-        packedLight: Int
+        packedLight: Int,
+        sprite: TextureAtlasSprite? = null
     ) {
-        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight)
-        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight)
-        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight)
-        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight)
+        vertex(buffer, matrix, normal, x1, y1, z1, 0.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
+        vertex(buffer, matrix, normal, x2, y2, z2, 1.0f, 1.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
+        vertex(buffer, matrix, normal, x3, y3, z3, 1.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
+        vertex(buffer, matrix, normal, x4, y4, z4, 0.0f, 0.0f, normalX, normalY, normalZ, red, green, blue, alpha, packedLight, sprite)
     }
 
     private fun vertex(
@@ -151,11 +158,14 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         green: Float,
         blue: Float,
         alpha: Float,
-        packedLight: Int
+        packedLight: Int,
+        sprite: TextureAtlasSprite? = null
     ) {
+        val finalU = sprite?.getU((u * 16.0f).toDouble()) ?: u
+        val finalV = sprite?.getV((v * 16.0f).toDouble()) ?: v
         buffer.vertex(matrix, x, y, z)
             .color(red, green, blue, alpha)
-            .uv(u, v)
+            .uv(finalU, finalV)
             .overlayCoords(0)
             .uv2(packedLight)
             .normal(normal, normalX, normalY, normalZ)
@@ -164,7 +174,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
 
     companion object {
         private val BOX_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/item_box.png")
-        private val BASE_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/block/boostpad.png")
+        private val BASE_SPRITE = ResourceLocation(SkyridersMod.MOD_ID, "block/boostpad")
         private val TEXTURE = BOX_TEXTURE
     }
 }
