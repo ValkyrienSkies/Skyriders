@@ -20,5 +20,11 @@
   "skyriders.subtitle.engine_stop": "Vehicle engine stops",
   "skyriders.subtitle.gearshift": "Vehicle gear shifts",
   "skyriders.subtitle.handbrake_engage": "Vehicle handbrake engages",
-  "skyriders.subtitle.handbrake_disengage": "Vehicle handbrake disengages"
+  "skyriders.subtitle.handbrake_disengage": "Vehicle handbrake disengages",
+  "death.attack.skyriders.vehicle_impact": "%1$s was run over",
+  "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",
+  "death.attack.skyriders.vehicle_impact.item": "%1$s was run over by %2$s using %3$s",
+  "death.attack.skyriders.vehicle_impact.variant_1": "%1$s politely greeted the front bumper",
+  "death.attack.skyriders.vehicle_impact.variant_2": "%1$s failed to yield",
+  "death.attack.skyriders.vehicle_impact.variant_3": "%1$s forgot to look both ways"
 }

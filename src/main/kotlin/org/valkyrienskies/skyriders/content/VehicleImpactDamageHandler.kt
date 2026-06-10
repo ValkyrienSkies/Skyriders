@@ -16,6 +16,7 @@ object VehicleImpactDamageHandler {
     private const val MIN_DAMAGE_SPEED = 3.5
     private const val DAMAGE_COOLDOWN_TICKS = 10L
     private const val QUERY_INFLATION = 0.25
+    private const val DRIVER_QUERY_INFLATION = 4.0
     private const val DAMAGE_PER_SPEED_OVER_THRESHOLD = 1.15
     private const val MAX_DAMAGE = 20.0
     private const val ENTITY_VELOCITY_TICKS_PER_SECOND = 20.0
@@ -37,6 +38,7 @@ object VehicleImpactDamageHandler {
             val currentBox = transformedBodyBox(bodyDef, body.kinematics.transform.toWorld)
             val previousBox = transformedBodyBox(bodyDef, body.prevTickKinematics.transform.toWorld)
             val sweptBox = union(currentBox, previousBox).inflate(QUERY_INFLATION)
+            val driver = findDriver(level, vehicle, sweptBox)
             val targets = level.getEntitiesOfClass(LivingEntity::class.java, sweptBox) { target ->
                 target != null && canDamage(target)
             }
@@ -58,7 +60,7 @@ object VehicleImpactDamageHandler {
                 val damage = impactDamage(vehicle, relativeSpeed)
                 if (damage <= 0.0) continue
 
-                if (target.hurt(level.damageSources().generic(), damage.toFloat())) {
+                if (target.hurt(SkyridersDamageTypes.vehicleImpact(level, driver), damage.toFloat())) {
                     lastDamageTickByImpact[ImpactKey(vehicle.bodyId, target.id)] = now
                     pushTarget(target, relativeVelocity, relativeSpeed, damage)
                 }
@@ -79,6 +81,12 @@ object VehicleImpactDamageHandler {
     private fun canDamage(target: LivingEntity): Boolean {
         if (!target.isAlive || target.isRemoved) return false
         return target.vehicle !is BikeSeatEntity
+    }
+
+    private fun findDriver(level: ServerLevel, vehicle: IVehicle, sweptBox: AABB): LivingEntity? {
+        return level.getEntitiesOfClass(BikeSeatEntity::class.java, sweptBox.inflate(DRIVER_QUERY_INFLATION)) { seat ->
+            seat != null && seat.bodyId == vehicle.bodyId && seat.isDriverSeat()
+        }.firstNotNullOfOrNull { seat -> seat.controllingPassenger }
     }
 
     private fun isOnCooldown(vehicle: IVehicle, target: LivingEntity, now: Long): Boolean {
