@@ -85,10 +85,10 @@ object VehiclePartInteractionHandlers {
 
         val added = VehicleFuel.refill(vehicle)
         if (added <= 0.0) {
-            player.sendSystemMessage(Component.literal("${vehicle.vehicleDefinition.displayName} tank is already full"))
+            player.displayClientMessage(Component.literal("${vehicle.vehicleDefinition.displayName} tank is already full"), true)
             return true
         }
-        player.sendSystemMessage(Component.literal("Refueled ${vehicle.vehicleDefinition.displayName}"))
+        player.displayClientMessage(Component.literal("Refueled ${vehicle.vehicleDefinition.displayName}"), true)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
         return true
