@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.content.racing
 
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.InteractionHand
@@ -118,6 +119,31 @@ class RaceEndpointBlock(properties: Properties) : BaseEntityBlock(properties) {
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
     override fun getShape(state: BlockState, level: BlockGetter, pos: BlockPos, context: CollisionContext): VoxelShape = SHAPE
+
+    override fun <T : BlockEntity> getTicker(
+        level: Level,
+        state: BlockState,
+        blockEntityType: BlockEntityType<T>
+    ): BlockEntityTicker<T>? {
+        if (level.isClientSide || blockEntityType != SkyridersMod.RACE_ENDPOINT_BLOCK_ENTITY.get()) return null
+        @Suppress("UNCHECKED_CAST")
+        return object : BlockEntityTicker<T> {
+            override fun tick(tickLevel: Level, tickPos: BlockPos, tickState: BlockState, blockEntity: T) {
+                RaceEndpointBlockEntity.serverTick(tickLevel, tickPos, tickState, blockEntity as RaceEndpointBlockEntity)
+            }
+        }
+    }
+
+    override fun isSignalSource(state: BlockState): Boolean = true
+
+    override fun getSignal(state: BlockState, level: BlockGetter, pos: BlockPos, direction: Direction): Int {
+        val endpoint = level.getBlockEntity(pos) as? RaceEndpointBlockEntity ?: return 0
+        return if (endpoint.pulseTicks > 0) 15 else 0
+    }
+
+    override fun getDirectSignal(state: BlockState, level: BlockGetter, pos: BlockPos, direction: Direction): Int {
+        return getSignal(state, level, pos, direction)
+    }
 
     override fun setPlacedBy(
         level: Level,

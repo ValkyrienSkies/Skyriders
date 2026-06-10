@@ -179,6 +179,7 @@ object RaceManager {
             racer.nextCheckpointIndex = race.nextCheckpointIndexAfter(marker.checkpointIndex)
             racer.nextTarget = nextTarget(level, racer, race)
             successEffect(level, position)
+            pulseEndpoint(level, marker)
             driverForBody(level, racer.bodyId)?.sendSystemMessage(Component.literal("Checkpoint ${marker.checkpointIndex + 1}"))
             return
         }
@@ -189,6 +190,7 @@ object RaceManager {
             if (race.finishOrder.contains(racer.bodyId)) return
             race.finishOrder.add(racer.bodyId)
             successEffect(level, position)
+            pulseEndpoint(level, marker)
             val place = race.finishOrder.size
             val total = race.totalParticipants
             driverForBody(level, racer.bodyId)?.let { driver ->
@@ -230,6 +232,11 @@ object RaceManager {
             .filter { it.checkpointIndex == racer.nextCheckpointIndex }
             .minByOrNull { it.blockPos.distSqr(BlockPos.containing(racer.position.x, racer.position.y, racer.position.z)) }
         return nextCheckpoint?.line(level)?.center ?: (level.getBlockEntity(race.startMarkerPos) as? RaceMarkerBlockEntity)?.line(level)?.center
+    }
+
+    private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerBlockEntity) {
+        val endpointPos = marker.endpointPos ?: return
+        (level.getBlockEntity(endpointPos) as? RaceEndpointBlockEntity)?.pulse()
     }
 
     private fun spawnLineParticles(level: ServerLevel, marker: RaceMarkerBlockEntity, race: ActiveRace) {

@@ -112,6 +112,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
 
         fun serverTick(level: Level, pos: BlockPos, state: BlockState, blockEntity: RaceMarkerBlockEntity) {
             val serverLevel = level as? ServerLevel ?: return
+            RaceManager.registerMarker(serverLevel, pos)
             RaceManager.tickMarker(serverLevel, blockEntity)
         }
     }
