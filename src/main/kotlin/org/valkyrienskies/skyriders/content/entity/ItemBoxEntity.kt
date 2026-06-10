@@ -7,6 +7,7 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
@@ -26,6 +27,7 @@ import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import kotlin.math.sqrt
 
 class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type, level) {
@@ -62,6 +64,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             if (grantPickup(serverLevel, driver)) {
                 rechargeTicks = RECHARGE_TICKS_DEFAULT
                 playPickupSound(serverLevel)
+                spawnPickupBurst(serverLevel)
                 return
             }
         }
@@ -93,7 +96,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         val generated = table?.getRandomItems(params).orEmpty()
         val stacks = if (generated.isEmpty()) fallbackItems(level) else generated
         if (stacks.isEmpty()) return false
-        stacks.forEach { stack -> giveOrDrop(driver, stack.copy()) }
+        stacks.forEach { stack -> giveOrDrop(driver, RacingRouletteItem.create(stack.copy())) }
         return true
     }
 
@@ -125,6 +128,31 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             SoundSource.PLAYERS,
             0.85f,
             1.0f
+        )
+    }
+
+    private fun spawnPickupBurst(level: ServerLevel) {
+        level.sendParticles(
+            ParticleTypes.END_ROD,
+            x,
+            y + PICKUP_Y_OFFSET,
+            z,
+            28,
+            0.45,
+            0.35,
+            0.45,
+            0.08
+        )
+        level.sendParticles(
+            ParticleTypes.ELECTRIC_SPARK,
+            x,
+            y + PICKUP_Y_OFFSET,
+            z,
+            18,
+            0.35,
+            0.25,
+            0.35,
+            0.11
         )
     }
 

@@ -48,6 +48,7 @@ import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
+import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
@@ -131,6 +132,9 @@ object SkyridersMod {
     }
     val ITEM_BOX: RegistryObject<Item> = ITEMS.register("item_box") {
         ItemBoxItem(Item.Properties().stacksTo(16))
+    }
+    val RACING_ROULETTE: RegistryObject<Item> = ITEMS.register("racing_roulette") {
+        RacingRouletteItem(Item.Properties().stacksTo(1))
     }
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))

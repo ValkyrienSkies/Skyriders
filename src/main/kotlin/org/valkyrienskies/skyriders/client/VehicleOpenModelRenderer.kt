@@ -278,10 +278,10 @@ object VehicleOpenModelRenderer {
 
     private fun FaceUv.vertices(): Array<Vector3f> {
         return arrayOf(
-            Vector3f(maxU.toFloat(), maxV.toFloat(), 0.0f),
-            Vector3f(minU.toFloat(), maxV.toFloat(), 0.0f),
-            Vector3f(minU.toFloat(), minV.toFloat(), 0.0f),
-            Vector3f(maxU.toFloat(), minV.toFloat(), 0.0f)
+            Vector3f(u2.toFloat(), v2.toFloat(), 0.0f),
+            Vector3f(u1.toFloat(), v2.toFloat(), 0.0f),
+            Vector3f(u1.toFloat(), v1.toFloat(), 0.0f),
+            Vector3f(u2.toFloat(), v1.toFloat(), 0.0f)
         )
     }
 
@@ -297,10 +297,10 @@ object VehicleOpenModelRenderer {
     private fun JsonObject.getUv(): FaceUv {
         val uv = getAsJsonArray("uv")
         return FaceUv(
-            minU = uv[0].asDouble,
-            minV = uv[1].asDouble,
-            maxU = uv[2].asDouble,
-            maxV = uv[3].asDouble
+            u1 = uv[0].asDouble,
+            v1 = uv[1].asDouble,
+            u2 = uv[2].asDouble,
+            v2 = uv[3].asDouble
         )
     }
 
@@ -332,10 +332,10 @@ object VehicleOpenModelRenderer {
     )
 
     private data class FaceUv(
-        val minU: Double,
-        val minV: Double,
-        val maxU: Double,
-        val maxV: Double
+        val u1: Double,
+        val v1: Double,
+        val u2: Double,
+        val v2: Double
     )
 
     private sealed interface ComponentTransform {

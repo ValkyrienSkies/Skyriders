@@ -70,6 +70,9 @@ object RaceManager {
         if (level.gameTime % 5L == 0L) {
             spawnLineParticles(level, marker, race)
         }
+        if (marker.blockPos == race.startMarkerPos && level.gameTime % 40L == 0L) {
+            race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
+        }
     }
 
     fun compassTarget(level: ServerLevel, player: ServerPlayer): Vector3d? {

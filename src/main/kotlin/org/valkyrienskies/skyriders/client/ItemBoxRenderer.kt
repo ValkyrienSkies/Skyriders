@@ -24,22 +24,23 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
     ) {
         val recharging = entity.recharging
         val alpha = if (recharging) 0.34f else 0.92f
-        val buffer = bufferSource.getBuffer(RenderType.entityTranslucent(TEXTURE))
+        val boxBuffer = bufferSource.getBuffer(RenderType.entityTranslucent(BOX_TEXTURE))
+        val baseBuffer = bufferSource.getBuffer(RenderType.entityCutout(BASE_TEXTURE))
 
         poseStack.pushPose()
         poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw))
         addBox(
             poseStack = poseStack,
-            buffer = buffer,
+            buffer = baseBuffer,
             minX = -0.55f,
             minY = 0.0f,
             minZ = -0.55f,
             maxX = 0.55f,
             maxY = 0.14f,
             maxZ = 0.55f,
-            red = 0.42f,
-            green = 0.42f,
-            blue = 0.46f,
+            red = 1.0f,
+            green = 1.0f,
+            blue = 1.0f,
             alpha = 1.0f,
             packedLight = packedLight
         )
@@ -57,7 +58,7 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
         }
         addBox(
             poseStack = poseStack,
-            buffer = buffer,
+            buffer = boxBuffer,
             minX = -0.43f,
             minY = -0.43f,
             minZ = -0.43f,
@@ -162,6 +163,8 @@ class ItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRenderer<
     }
 
     companion object {
-        private val TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/item_box.png")
+        private val BOX_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/item_box.png")
+        private val BASE_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/block/boostpad.png")
+        private val TEXTURE = BOX_TEXTURE
     }
 }

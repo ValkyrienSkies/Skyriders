@@ -23,7 +23,8 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
     private val textureLocation: ResourceLocation,
     private val scale: Float = 1.0f,
     private val yOffset: Double = 0.0,
-    private val modelSelector: (T) -> ResourceLocation = { modelLocation }
+    private val modelSelector: (T) -> ResourceLocation = { modelLocation },
+    private val textureSelector: (T) -> ResourceLocation = { textureLocation }
 ) : EntityRenderer<T>(context) {
     override fun render(
         entity: T,
@@ -36,6 +37,7 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         val minecraft = Minecraft.getInstance()
         val light = LevelRenderer.getLightColor(entity.level(), BlockPos.containing(entity.x, entity.y, entity.z))
         val selectedModel = modelSelector(entity)
+        val selectedTexture = textureSelector(entity)
 
         poseStack.pushPose()
         poseStack.translate(0.0, yOffset, 0.0)
@@ -43,7 +45,7 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         poseStack.translate(-0.5, 0.0, -0.5)
         poseStack.scale(scale, scale, scale)
 
-        if (!VehicleOpenModelRenderer.renderTexturedIfNeeded(selectedModel, textureLocation, poseStack, bufferSource, light)) {
+        if (!VehicleOpenModelRenderer.renderTexturedIfNeeded(selectedModel, selectedTexture, poseStack, bufferSource, light)) {
             val model = minecraft.modelManager.getModel(selectedModel)
             minecraft.blockRenderer.modelRenderer.renderModel(
                 poseStack.last(),
@@ -63,7 +65,7 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight)
     }
 
-    override fun getTextureLocation(entity: T): ResourceLocation = textureLocation
+    override fun getTextureLocation(entity: T): ResourceLocation = textureSelector(entity)
 
     private fun applyOrientation(entity: T, entityYaw: Float, poseStack: PoseStack) {
         if (entity is SugarRocketEntity) {
@@ -91,6 +93,7 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         val HOMING_SUGAR_ROCKET_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/homing_sugar_rocket")
         private val CAVENDISH_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/cavendish.png")
         private val SUGAR_ROCKET_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/sugar_rocket.png")
+        private val HOMING_SUGAR_ROCKET_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/sugar_rocket_homing.png")
 
         fun cavendish(context: EntityRendererProvider.Context): RacingOpenModelEntityRenderer<CavendishEntity> {
             return RacingOpenModelEntityRenderer(
@@ -108,7 +111,8 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
                 modelLocation = SUGAR_ROCKET_MODEL,
                 textureLocation = SUGAR_ROCKET_TEXTURE,
                 scale = 1.0f,
-                modelSelector = { entity -> if (entity.homing) HOMING_SUGAR_ROCKET_MODEL else SUGAR_ROCKET_MODEL }
+                modelSelector = { entity -> if (entity.homing) HOMING_SUGAR_ROCKET_MODEL else SUGAR_ROCKET_MODEL },
+                textureSelector = { entity -> if (entity.homing) HOMING_SUGAR_ROCKET_TEXTURE else SUGAR_ROCKET_TEXTURE }
             )
         }
     }

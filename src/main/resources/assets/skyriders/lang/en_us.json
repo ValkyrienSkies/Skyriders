@@ -14,6 +14,7 @@
   "item.skyriders.creative_jerry_can": "Creative Jerry Can",
   "item.skyriders.flag": "Race Flag",
   "item.skyriders.item_box": "Item Box",
+  "item.skyriders.racing_roulette": "Racing Roulette",
   "item.skyriders.race_compass": "Race Compass",
   "item.skyriders.bergen_disc": "Music Disc",
   "item.skyriders.bergen_disc.desc": "Bergentrück",
@@ -41,6 +42,8 @@
 
   "skyriders.subtitle.racing_item_get": "Racing item picked up",
   "skyriders.subtitle.racing_item_use": "Racing item used",
+  "skyriders.subtitle.roulette_spin": "Racing roulette spins",
+  "skyriders.subtitle.roulette_win": "Racing roulette resolves",
 
   "skyriders.subtitle.thunderbolt": "Thunderbolt used",
   "skyriders.subtitle.sugar_rocket_explode": "Sugar rocket explodes",

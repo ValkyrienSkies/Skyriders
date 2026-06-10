@@ -68,6 +68,12 @@ object SkyridersSounds {
     val RACING_ITEM_USE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("racing_item_use") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "racing_item_use"))
     }
+    val ROULETTE_SPIN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("roulette_spin") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "roulette_spin"))
+    }
+    val ROULETTE_WIN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("roulette_win") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "roulette_win"))
+    }
 
     val THUNDERBOLT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("thunderbolt") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "thunderbolt"))

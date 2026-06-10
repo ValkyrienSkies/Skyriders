@@ -174,6 +174,27 @@
     ],
     "subtitle": "skyriders.subtitle.racing_item_use"
   },
+  "roulette_spin": {
+    "sounds": [
+      {
+        "name": "skyriders:roulette_spin",
+        "type": "file",
+        "attenuation_distance": 16,
+        "stream": true
+      }
+    ],
+    "subtitle": "skyriders.subtitle.roulette_spin"
+  },
+  "roulette_win": {
+    "sounds": [
+      {
+        "name": "skyriders:roulette_win",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.roulette_win"
+  },
   "spinout": {
     "sounds": [
       {
