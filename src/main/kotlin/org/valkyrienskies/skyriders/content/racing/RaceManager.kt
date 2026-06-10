@@ -77,6 +77,9 @@ object RaceManager {
         if (marker.blockPos == race.startMarkerPos && level.gameTime % 40L == 0L) {
             race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
         }
+        if (marker.blockPos == race.startMarkerPos && level.gameTime % 5L == 0L) {
+            sendRaceHudPositions(level, race)
+        }
     }
 
     fun compassTarget(level: ServerLevel, player: ServerPlayer): Vector3d? {
@@ -198,7 +201,9 @@ object RaceManager {
             driverForBody(level, racer.bodyId)?.let { driver ->
                 driver.sendTitle("Finished $place/$total", fadeIn = 4, stay = 42, fadeOut = 12)
                 SkyridersNetwork.sendRaceCompassTarget(driver, null)
+                SkyridersNetwork.sendRaceHudClear(driver)
                 SkyridersNetwork.sendRaceMusicStop(driver)
+                notifyOtherRacersFinished(level, race, racer.bodyId, driver.gameProfile.name, place)
             }
             race.racers.remove(racer.bodyId)
             if (race.racers.isEmpty()) {
@@ -225,7 +230,54 @@ object RaceManager {
     private fun sendRaceMusicStopToRacers(level: ServerLevel, race: ActiveRace) {
         race.racers.values
             .mapNotNull { racer -> driverForBody(level, racer.bodyId) }
-            .forEach { driver -> SkyridersNetwork.sendRaceMusicStop(driver) }
+            .forEach { driver ->
+                SkyridersNetwork.sendRaceHudClear(driver)
+                SkyridersNetwork.sendRaceMusicStop(driver)
+            }
+    }
+
+    private fun sendRaceHudPositions(level: ServerLevel, race: ActiveRace) {
+        activeStandings(level, race).forEachIndexed { index, racer ->
+            val place = race.finishOrder.size + index + 1
+            driverForBody(level, racer.bodyId)?.let { driver ->
+                SkyridersNetwork.sendRaceHudPosition(driver, racer.bodyId, place, race.totalParticipants)
+            }
+        }
+    }
+
+    private fun activeStandings(level: ServerLevel, race: ActiveRace): List<RacerState> {
+        race.racers.values.forEach { racer ->
+            refreshRacerPosition(level, racer, race)
+        }
+        return race.racers.values.sortedWith(
+            compareByDescending<RacerState> { it.crossedCheckpoints.size }
+                .thenBy { distanceToNextTarget(it) }
+        )
+    }
+
+    private fun refreshRacerPosition(level: ServerLevel, racer: RacerState, race: ActiveRace) {
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return
+        racer.position = Vector3d(body.kinematics.position)
+        racer.nextTarget = nextTarget(level, racer, race)
+    }
+
+    private fun distanceToNextTarget(racer: RacerState): Double {
+        return racer.nextTarget?.distance(racer.position) ?: Double.MAX_VALUE
+    }
+
+    private fun notifyOtherRacersFinished(
+        level: ServerLevel,
+        race: ActiveRace,
+        finishedBodyId: Long,
+        playerName: String,
+        place: Int
+    ) {
+        val message = "$playerName finished in ${ordinal(place)} place!"
+        race.racers.values
+            .filter { it.bodyId != finishedBodyId }
+            .mapNotNull { racer -> driverForBody(level, racer.bodyId) }
+            .forEach { driver -> driver.sendActionBar(message) }
     }
 
     private fun nextTarget(level: ServerLevel, racer: RacerState, race: ActiveRace): Vector3d? {
@@ -372,6 +424,21 @@ object RaceManager {
         if (!previous.isFinite() || !current.isFinite()) return false
         if (abs(previous) < 1.0E-4 || abs(current) < 1.0E-4) return false
         return previous < 0.0 && current > 0.0 || previous > 0.0 && current < 0.0
+    }
+
+    private fun ordinal(value: Int): String {
+        val mod100 = value % 100
+        val suffix = if (mod100 in 11..13) {
+            "th"
+        } else {
+            when (value % 10) {
+                1 -> "st"
+                2 -> "nd"
+                3 -> "rd"
+                else -> "th"
+            }
+        }
+        return "$value$suffix"
     }
 
     private data class RaceKey(val dimension: String, val colorId: Int)

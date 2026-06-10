@@ -19,6 +19,7 @@ import org.valkyrienskies.skyriders.client.BikeClientHoistState
 import org.valkyrienskies.skyriders.client.BikeDebugOverlay
 import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.client.RaceCompassClientState
+import org.valkyrienskies.skyriders.client.RaceHudClientState
 import org.valkyrienskies.skyriders.client.RaceMusicClientState
 import org.valkyrienskies.skyriders.client.RacingClientSounds
 import org.valkyrienskies.skyriders.client.VehicleHudOverlay
@@ -150,6 +151,13 @@ object SkyridersNetwork {
             RaceMusicPacket::encode,
             RaceMusicPacket::decode,
             RaceMusicPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            RaceHudPacket::class.java,
+            RaceHudPacket::encode,
+            RaceHudPacket::decode,
+            RaceHudPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -456,6 +464,14 @@ object SkyridersNetwork {
 
     fun sendRaceMusicStop(player: ServerPlayer) {
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
+    }
+
+    fun sendRaceHudPosition(player: ServerPlayer, bodyId: Long, place: Int, total: Int) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(true, bodyId, place, total))
+    }
+
+    fun sendRaceHudClear(player: ServerPlayer) {
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(false, -1L, 0, 0))
     }
 
     fun sendRocketExplosionSound(player: ServerPlayer, position: Vec3, volume: Float, pitch: Float) {
@@ -1190,6 +1206,48 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: RaceMusicPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class RaceHudPacket(val active: Boolean, val bodyId: Long, val place: Int, val total: Int) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(active)
+            if (active) {
+                buf.writeLong(bodyId)
+                buf.writeInt(place)
+                buf.writeInt(total)
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable {
+                        RaceHudClientState.update(active, bodyId, place, total)
+                    }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: RaceHudPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): RaceHudPacket {
+                val active = buf.readBoolean()
+                return if (active) {
+                    RaceHudPacket(active, buf.readLong(), buf.readInt(), buf.readInt())
+                } else {
+                    RaceHudPacket(active, -1L, 0, 0)
+                }
+            }
+
+            fun handle(packet: RaceHudPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

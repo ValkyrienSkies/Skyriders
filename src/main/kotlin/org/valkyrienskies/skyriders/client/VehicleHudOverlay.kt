@@ -189,6 +189,7 @@ object VehicleHudOverlay {
 
         renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh)
         renderMeters(guiGraphics, screenWidth, screenHeight, current, dt)
+        renderRacePlacement(guiGraphics, screenWidth, current)
     }
 
     private fun renderDashboard(
@@ -232,6 +233,14 @@ object VehicleHudOverlay {
                 currentIndex++
             }
         }
+    }
+
+    private fun renderRacePlacement(guiGraphics: GuiGraphics, screenWidth: Int, snapshot: VehicleHudSnapshot) {
+        val placement = RaceHudClientState.placementFor(snapshot.bodyId) ?: return
+        val minecraft = Minecraft.getInstance()
+        val text = "${ordinal(placement.place)} / ${placement.total}"
+        val x = screenWidth - minecraft.font.width(text) - 8
+        guiGraphics.drawString(minecraft.font, text, x, 8, 0xFFFFF6A8.toInt(), true)
     }
 
     private fun consumeRenderDt(): Double {
@@ -432,6 +441,21 @@ object VehicleHudOverlay {
             gear == 0 -> "N"
             else -> gear.coerceIn(0, 9).toString()
         }
+    }
+
+    private fun ordinal(value: Int): String {
+        val mod100 = value % 100
+        val suffix = if (mod100 in 11..13) {
+            "th"
+        } else {
+            when (value % 10) {
+                1 -> "st"
+                2 -> "nd"
+                3 -> "rd"
+                else -> "th"
+            }
+        }
+        return "$value$suffix"
     }
 
     private data class VehicleHudSnapshot(
