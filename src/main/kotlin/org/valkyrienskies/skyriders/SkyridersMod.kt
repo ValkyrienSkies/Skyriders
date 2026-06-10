@@ -27,9 +27,14 @@ import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
+import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.entity.CavendishEntity
+import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
+import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
+import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
@@ -72,6 +77,15 @@ object SkyridersMod {
     val THUNDERBOLT: RegistryObject<Item> = ITEMS.register("thunderbolt") {
         ThunderboltItem(Item.Properties().stacksTo(16))
     }
+    val CAVENDISH: RegistryObject<Item> = ITEMS.register("cavendish") {
+        CavendishItem(Item.Properties().stacksTo(16))
+    }
+    val SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("sugar_rocket") {
+        SugarRocketItem(Item.Properties().stacksTo(16), homing = false)
+    }
+    val HOMING_SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("homing_sugar_rocket") {
+        SugarRocketItem(Item.Properties().stacksTo(16), homing = true)
+    }
 
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
@@ -79,6 +93,27 @@ object SkyridersMod {
             .clientTrackingRange(10)
             .updateInterval(1)
             .build("$MOD_ID:bike_seat")
+    }
+    val CAVENDISH_ENTITY: RegistryObject<EntityType<CavendishEntity>> = ENTITIES.register("cavendish") {
+        EntityType.Builder.of(::CavendishEntity, MobCategory.MISC)
+            .sized(0.35f, 0.18f)
+            .clientTrackingRange(48)
+            .updateInterval(2)
+            .build("$MOD_ID:cavendish")
+    }
+    val SUGAR_ROCKET_ENTITY: RegistryObject<EntityType<SugarRocketEntity>> = ENTITIES.register("sugar_rocket") {
+        EntityType.Builder.of(::SugarRocketEntity, MobCategory.MISC)
+            .sized(0.35f, 0.35f)
+            .clientTrackingRange(96)
+            .updateInterval(1)
+            .build("$MOD_ID:sugar_rocket")
+    }
+    val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
+        EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)
+            .sized(0.1f, 0.1f)
+            .clientTrackingRange(96)
+            .updateInterval(1)
+            .build("$MOD_ID:bad_explosion")
     }
 
     // end of RegistryObjects

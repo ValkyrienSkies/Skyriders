@@ -8,8 +8,11 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
+import org.joml.Vector3d
+import org.valkyrienskies.core.api.bodies.VsBody
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
@@ -57,6 +60,52 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
     }
 }
 
+class CavendishItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.CAVENDISH_ENTITY.get().create(level) ?: return false
+        val spawnPosition = dropPosition(body)
+        entity.ownerBodyId = vehicle.bodyId
+        entity.moveTo(spawnPosition.x, spawnPosition.y, spawnPosition.z, player.yRot, 0.0f)
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
+    }
+
+    private fun dropPosition(body: VsBody): Vector3d {
+        val transform = body.kinematics.transform
+        val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0)).normalize()
+        return transform.toWorld.transformPosition(Vector3d())
+            .sub(forward.mul(1.35))
+            .add(0.0, -0.15, 0.0)
+    }
+}
+
+class SugarRocketItem(
+    properties: Properties,
+    private val homing: Boolean = false
+) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.SUGAR_ROCKET_ENTITY.get().create(level) ?: return false
+        val direction = player.lookAngle.normalize()
+        val forwardOffset = Vector3d(direction.x, direction.y, direction.z).mul(1.1)
+        val bodyPosition = body.kinematics.position
+        val origin = net.minecraft.world.phys.Vec3(
+            bodyPosition.x() + forwardOffset.x,
+            bodyPosition.y() + 0.55 + forwardOffset.y,
+            bodyPosition.z() + forwardOffset.z
+        )
+
+        entity.ownerBodyId = vehicle.bodyId
+        entity.homing = homing
+        entity.launch(origin, direction)
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
+    }
+}
+
 abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder<ItemStack> {
         val stack = player.getItemInHand(hand)
@@ -91,7 +140,7 @@ abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
         )
     }
 
-    private fun playerDriverVehicle(player: Player): IVehicle? {
+    protected fun playerDriverVehicle(player: Player): IVehicle? {
         val seat = player.vehicle as? BikeSeatEntity ?: return null
         if (!seat.isDriverSeat()) return null
         return VehicleManager.getVehicle(player.level().dimensionId, seat.bodyId)

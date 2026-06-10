@@ -2,7 +2,7 @@
 	"credit": "Made with Blockbench",
 	"loader": "framework:open_model",
 	"textures": {
-		"cavendish": "block/cavendish"
+		"cavendish": "skyriders:entity/cavendish"
 	},
 	"components": [
 		{

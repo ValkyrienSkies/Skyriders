@@ -71,6 +71,13 @@ object SkyridersModClient {
     fun clientInit(event: FMLClientSetupEvent) {
         event.enqueueWork {
             EntityRenderers.register(SkyridersMod.BIKE_SEAT_ENTITY.get(), ::BikeSeatRenderer)
+            EntityRenderers.register(SkyridersMod.BAD_EXPLOSION_ENTITY.get(), ::BadExplosionRenderer)
+            EntityRenderers.register(SkyridersMod.CAVENDISH_ENTITY.get()) { context ->
+                RacingOpenModelEntityRenderer.cavendish(context)
+            }
+            EntityRenderers.register(SkyridersMod.SUGAR_ROCKET_ENTITY.get()) { context ->
+                RacingOpenModelEntityRenderer.sugarRocket(context)
+            }
             MinecraftForge.EVENT_BUS.register(ClientEvents)
             MinecraftForge.EVENT_BUS.register(BikeDebugOverlay)
             MinecraftForge.EVENT_BUS.register(VehicleWorldRenderer)
@@ -99,6 +106,9 @@ object SkyridersModClient {
             }
             .distinct()
             .forEach(event::register)
+        event.register(RacingOpenModelEntityRenderer.CAVENDISH_MODEL)
+        event.register(RacingOpenModelEntityRenderer.SUGAR_ROCKET_MODEL)
+        event.register(RacingOpenModelEntityRenderer.HOMING_SUGAR_ROCKET_MODEL)
     }
 
     @JvmStatic
