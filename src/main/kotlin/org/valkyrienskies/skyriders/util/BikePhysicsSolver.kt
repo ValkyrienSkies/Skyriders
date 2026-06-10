@@ -117,8 +117,8 @@ object BikePhysicsSolver {
         if (grounded && riderPresent) {
             applyJumpChargeAndRelease(body, contacts, forward, terrainUp, activeInput, config, state, dt)
             applyPendingJumpRelease(body, contacts, state, dt)
-            applyStepAssist(body, physLevel, frontContact, forward, terrainUp, activeInput, config)
-            applyStepAssist(body, physLevel, rearContact, forward, terrainUp, activeInput, config)
+            state.debugStepAssistWork += applyStepAssist(body, physLevel, frontContact, forward, terrainUp, activeInput, config)
+            state.debugStepAssistWork += applyStepAssist(body, physLevel, rearContact, forward, terrainUp, activeInput, config)
         } else {
             applyPendingJumpRelease(body, contacts, state, dt)
         }
@@ -823,19 +823,19 @@ object BikePhysicsSolver {
         terrainUp: Vector3d,
         input: BikeInput,
         config: BikePhysicsConfig
-    ) {
-        if (!contact.grounded) return
-        if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
+    ): Double {
+        if (!contact.grounded) return 0.0
+        if (config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return 0.0
 
         val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
-        if (terrainForward.lengthSquared() < 1.0e-6) return
+        if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
 
         val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = projectOntoPlane(forward, terrainUp, forward)
         val throttleIntoStep = max(0.0, input.throttle.coerceIn(-1.0, 1.0) * safeDot(projectedForward, terrainForward))
         val crawlAmount = throttleIntoStep * (1.0 - smoothstep(0.8, 3.5, speedIntoStep))
         val effectiveStepSpeed = max(speedIntoStep, crawlAmount * 1.8)
-        if (effectiveStepSpeed < 0.35) return
+        if (effectiveStepSpeed < 0.35) return 0.0
 
         val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveStepSpeed)
         val probeLength = (config.wheelRadius + 0.45 + effectiveStepSpeed * 0.09)
@@ -843,8 +843,8 @@ object BikePhysicsSolver {
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(config.wheelRadius * 0.45, terrainUp)
             .fma(0.06 + speedLookahead * 0.24, terrainForward)
-        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
-        if (obstacle.hitBody.id == body.id) return
+        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return 0.0
+        if (obstacle.hitBody.id == body.id) return 0.0
 
         val step = findStepLandingSurface(
             physLevel = physLevel,
@@ -856,7 +856,7 @@ object BikePhysicsSolver {
             terrainUp = terrainUp,
             config = config,
             speedLookahead = speedLookahead
-        ) ?: return
+        ) ?: return 0.0
 
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
         val approachDistance = max(0.25, step.approachDistance)
@@ -881,7 +881,9 @@ object BikePhysicsSolver {
             speedLimitScale.coerceIn(0.0, 1.0) + crawlCarryForce
         val forwardForce = Vector3d(terrainForward).mul(carryForceMag)
 
-        applyContactForce(body, contact, liftForce.add(forwardForce), contact.contactPointWorld)
+        val assistForce = liftForce.add(forwardForce)
+        applyContactForce(body, contact, assistForce, contact.contactPointWorld)
+        return assistForce.length() / max(config.mass, 1.0)
     }
 
     private fun computeStepApproachDirection(
@@ -1096,6 +1098,7 @@ object BikePhysicsSolver {
         state.debugThrottle = input.throttle
         state.debugSteeringAngleRad = frontSteerRad
         state.debugDrifting = drifting
+        state.debugStepAssistWork = 0.0
     }
 
     private fun smoothGroundNormal(

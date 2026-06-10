@@ -62,11 +62,13 @@ object VehicleFuel {
         val safeDt = dt.coerceIn(0.0, 0.25)
         val throttle = abs(input.throttle.coerceIn(-1.0, 1.0))
         val speed = body.kinematics.velocity.length().takeIf { it.isFinite() } ?: 0.0
+        val stepAssistWork = stepAssistWork(vehicle)
         val fuel = definition.fuel
         val rate =
             fuel.idleUsePerSecond.coerceAtLeast(0.0) +
                 throttle * fuel.throttleUsePerSecond.coerceAtLeast(0.0) +
-                throttle * speed * fuel.motionWorkUsePerSpeedPerSecond.coerceAtLeast(0.0)
+                throttle * speed * fuel.motionWorkUsePerSpeedPerSecond.coerceAtLeast(0.0) +
+                stepAssistWork * fuel.stepAssistUsePerWorkSecond.coerceAtLeast(0.0)
         val next = (current - rate * safeDt).coerceAtLeast(0.0)
         setAmount(vehicle, next)
         if (next <= EPSILON) {
@@ -96,6 +98,15 @@ object VehicleFuel {
             is WheeledVehicle -> vehicle.wheeledState.engineOn
             else -> vehicle.vehicleState.engineOn
         }
+    }
+
+    private fun stepAssistWork(vehicle: IVehicle): Double {
+        return when (vehicle) {
+            is IBike -> vehicle.state.debugStepAssistWork
+            is KartVehicle -> vehicle.kartState.debugStepAssistWork
+            is WheeledVehicle -> vehicle.wheeledState.debugStepAssistWork
+            else -> 0.0
+        }.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
     }
 
     private fun stallOutOfFuel(vehicle: IVehicle) {

@@ -78,7 +78,7 @@ object WheeledVehiclePhysicsSolver {
             if (stabilizedGrounded) {
                 applySteeringAssist(body, steerRad, forwardSpeed, terrainUp, config)
                 val activeStepWheels = loaded.count { it.contact.grounded && it.wheel.axle.stepAssist }.coerceAtLeast(1)
-                loaded.forEach { applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config, activeStepWheels) }
+                loaded.forEach { state.debugStepAssistWork += applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config, activeStepWheels) }
             }
         } else {
             if (state.parkingBrakeEngaged) {
@@ -674,19 +674,19 @@ object WheeledVehiclePhysicsSolver {
         driveCommand: DriveCommand,
         config: WheeledVehiclePhysicsConfig,
         activeStepWheels: Int
-    ) {
+    ): Double {
         val contact = loaded.contact
         val axle = loaded.wheel.axle
-        if (!axle.stepAssist || !contact.grounded || config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return
+        if (!axle.stepAssist || !contact.grounded || config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return 0.0
         val driveDirection = driveCommand.throttle.coerceIn(-1.0, 1.0)
         val terrainForward = computeStepApproachDirection(body, forward, terrainUp, driveDirection)
-        if (terrainForward.lengthSquared() < 1.0e-6) return
+        if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
         val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
         val throttleIntoStep = max(0.0, driveDirection * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
         val crawlAmount = throttleIntoStep * (1.0 - smoothstep(0.8, 3.5, speedIntoStep))
         val effectiveSpeed = max(speedIntoStep, crawlAmount * 1.8)
-        if (effectiveSpeed < 0.35) return
+        if (effectiveSpeed < 0.35) return 0.0
 
         val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveSpeed)
         val probeLength = (axle.wheelRadius + 0.45 + effectiveSpeed * 0.09)
@@ -694,9 +694,9 @@ object WheeledVehiclePhysicsSolver {
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(axle.wheelRadius * 0.45, terrainUp)
             .fma(0.06 + speedLookahead * 0.24, terrainForward)
-        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return
-        if (obstacle.hitBody.id == body.id) return
-        val step = findStepLandingSurface(physLevel, body, contact, lowProbeStart, obstacle.distance, terrainForward, terrainUp, axle, config, speedLookahead) ?: return
+        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return 0.0
+        if (obstacle.hitBody.id == body.id) return 0.0
+        val step = findStepLandingSurface(physLevel, body, contact, lowProbeStart, obstacle.distance, terrainForward, terrainUp, axle, config, speedLookahead) ?: return 0.0
 
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
         val approachDistance = max(0.25, step.approachDistance)
@@ -729,7 +729,9 @@ object WheeledVehiclePhysicsSolver {
         val maxCarryForce = config.mass * (1.8 + speedLookahead * 3.8 + heightAmount * 1.2)
         val carry = Vector3d(terrainForward).mul(rawCarryForce.coerceIn(0.0, maxCarryForce) * wheelShare)
 
-        VehicleWheelPhysics.applyContactForce(body, contact, lift.add(carry))
+        val assistForce = lift.add(carry)
+        VehicleWheelPhysics.applyContactForce(body, contact, assistForce)
+        return assistForce.length() / max(config.mass, 1.0)
     }
 
     private fun findStepLandingSurface(
@@ -894,6 +896,7 @@ object WheeledVehiclePhysicsSolver {
         state.debugGroundedWheels = contacts.count { it.contact.grounded }
         state.debugSteerRad = steerRad
         state.debugThrottle = input.throttle
+        state.debugStepAssistWork = 0.0
         val grounded = contacts.filter { it.contact.grounded }
         state.debugLateralSlip = if (grounded.isEmpty()) {
             0.0

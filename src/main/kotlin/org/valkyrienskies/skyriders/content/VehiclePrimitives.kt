@@ -50,7 +50,8 @@ data class VehicleFuelDefinition(
     val capacity: Double = 100.0,
     val idleUsePerSecond: Double = 0.018,
     val throttleUsePerSecond: Double = 0.075,
-    val motionWorkUsePerSpeedPerSecond: Double = 0.0025
+    val motionWorkUsePerSpeedPerSecond: Double = 0.0025,
+    val stepAssistUsePerWorkSecond: Double = 0.012
 )
 
 data class VehicleBodyDefinition(

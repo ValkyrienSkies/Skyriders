@@ -35,5 +35,6 @@ data class BikeRuntimeState(
     var debugThrottle: Double = 0.0,
     var debugSteeringAngleRad: Double = 0.0,
     var debugDrifting: Boolean = false,
+    var debugStepAssistWork: Double = 0.0,
     val partStates: MutableMap<String, VehiclePartState> = HashMap()
 )
