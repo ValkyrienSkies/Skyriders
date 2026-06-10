@@ -46,6 +46,15 @@ object WheeledVehiclePhysicsSolver {
         updateDriftBoost(body, state, activeInput.riderPresent, driftGripActive, forward, config, dt)
         val driveCommand = updateTransmission(activeInput, forwardSpeed, config, state, dt)
         val steerRad = updateSteerAngle(state, activeInput.steer, forwardSpeed, config, dt)
+        val driveLimitSpeed = computeDriveLimitSpeed(
+            body = body,
+            forwardSpeed = forwardSpeed,
+            terrainUp = contactUp,
+            throttle = driveCommand.throttle,
+            steerInput = activeInput.steer,
+            steerRad = steerRad,
+            drifting = driftGripActive
+        )
         val wheels = expandWheels(config)
         val contacts = wheels.map { wheel ->
             val axleSteer = if (wheel.axle.steerable) steerRad * wheel.axle.steerScale else 0.0
@@ -76,7 +85,7 @@ object WheeledVehiclePhysicsSolver {
         loaded.forEach { applyLateralGrip(body, it, driftGripActive, config) }
         val parkingBrakeActive = state.parkingBrakeEngaged || activeInput.handbrake > 0.0
         if (activeInput.riderPresent) {
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driftGripActive, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt)
             if (parkingBrakeActive) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
@@ -93,7 +102,7 @@ object WheeledVehiclePhysicsSolver {
             if (state.parkingBrakeEngaged) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driftGripActive, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt)
         }
 
         if (stabilizedGrounded) {
@@ -567,6 +576,7 @@ object WheeledVehiclePhysicsSolver {
         body: PhysVsBody,
         contacts: List<LoadedWheelContact>,
         driveCommand: DriveCommand,
+        driveLimitSpeed: Double,
         drifting: Boolean,
         config: WheeledVehiclePhysicsConfig,
         state: WheeledVehicleRuntimeState,
@@ -581,14 +591,13 @@ object WheeledVehiclePhysicsSolver {
         val driveBiasTotal = config.axles.filter(WheelAxleConfig::driven).sumOf { it.driveBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val brakeBiasTotal = config.axles.sumOf { it.brakeBias.coerceAtLeast(0.0) }.coerceAtLeast(1.0e-6)
         val stepDt = dt.coerceIn(0.0, 0.1)
+        val limitedTopSpeed = driveCommand.wheelTopSpeed * if (drifting) config.driftTopSpeedMultiplier.coerceAtLeast(0.1) else 1.0
+        val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, limitedTopSpeed, config)
 
         contacts.forEach { loaded ->
             val axle = loaded.wheel.axle
             val radius = max(axle.wheelRadius, 0.05)
-            val topSpeed = max(
-                driveCommand.wheelTopSpeed * if (drifting) config.driftTopSpeedMultiplier.coerceAtLeast(0.1) else 1.0,
-                1.0
-            )
+            val topSpeed = max(limitedTopSpeed, 1.0)
             val maxOmega = topSpeed * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
             val groundSpeed = if (loaded.contact.grounded) {
                 VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
@@ -601,7 +610,14 @@ object WheeledVehiclePhysicsSolver {
 
             if (axle.driven && throttle != 0.0) {
                 val motorTarget = throttle * topSpeed * 1.08 / radius
-                val motorAlpha = 1.0 - exp(-stepDt * config.motorResponse * driveCommand.torqueMultiplier * abs(throttle) * (0.5 + driveShare * 2.0))
+                val motorAlpha = 1.0 - exp(
+                    -stepDt *
+                        config.motorResponse *
+                        driveCommand.torqueMultiplier *
+                        abs(throttle) *
+                        speedLimitScale *
+                        (0.5 + driveShare * 2.0)
+                )
                 omega = lerp(omega, motorTarget, motorAlpha)
             }
             if (brake > 0.0) {
@@ -619,7 +635,8 @@ object WheeledVehiclePhysicsSolver {
                 val shapedSlip = slip / (abs(slip) + config.longitudinalSlipShape.coerceAtLeast(1.0e-4))
                 val driveForceScale = if (axle.driven && abs(throttle) > 0.0) {
                     driveCommand.torqueMultiplier.coerceIn(0.0, 1.75) *
-                        if (drifting) config.driftDriveScale.coerceAtLeast(0.0) else 1.0
+                        (if (drifting) config.driftDriveScale.coerceAtLeast(0.0) else 1.0) *
+                        speedLimitScale
                 } else {
                     0.35
                 }
@@ -1100,6 +1117,39 @@ object WheeledVehiclePhysicsSolver {
         state.driftBoostLevel = 0
         state.driftBoostTimeRemaining = 0.0
         state.driftBoostForce = 0.0
+    }
+
+    private fun computeDriveLimitSpeed(
+        body: PhysVsBody,
+        forwardSpeed: Double,
+        terrainUp: Vector3d,
+        throttle: Double,
+        steerInput: Double,
+        steerRad: Double,
+        drifting: Boolean
+    ): Double {
+        val usePlanarLimit = drifting || abs(steerInput) > 0.05 || abs(steerRad) > Math.toRadians(1.0)
+        if (!usePlanarLimit) return forwardSpeed
+
+        val direction = forwardSpeed.signOrZero().takeIf { it != 0.0 } ?: throttle.signOrZero()
+        return planarSpeed(body, terrainUp) * direction
+    }
+
+    private fun computeSpeedLimitScale(
+        speed: Double,
+        throttle: Double,
+        topSpeed: Double,
+        config: WheeledVehiclePhysicsConfig
+    ): Double {
+        if (throttle == 0.0) return 0.0
+        if (!topSpeed.isFinite() || topSpeed <= 0.0) return 1.0
+
+        val signedSpeed = speed * throttle.signOrZero()
+        val softness = config.speedLimitSoftness.coerceIn(0.02, 0.8)
+        val softLimit = topSpeed * (1.0 - softness)
+        if (signedSpeed <= softLimit) return 1.0
+        if (signedSpeed >= topSpeed) return 0.0
+        return 1.0 - smoothstep(softLimit, topSpeed, signedSpeed)
     }
 
     private fun computeDriftBoostLevel(charge: Double, config: WheeledVehiclePhysicsConfig): Int {
