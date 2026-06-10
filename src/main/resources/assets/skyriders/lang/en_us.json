@@ -23,7 +23,6 @@
   "skyriders.subtitle.gearshift": "Vehicle gear shifts",
   "skyriders.subtitle.handbrake_engage": "Vehicle handbrake engages",
   "skyriders.subtitle.handbrake_disengage": "Vehicle handbrake disengages",
-  "skyriders.subtitle.engine_start_fail": "Vehicle engine fails to start",
   "death.attack.skyriders.vehicle_impact": "%1$s was run over",
   "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",
   "death.attack.skyriders.vehicle_impact.item": "%1$s was run over by %2$s using %3$s",

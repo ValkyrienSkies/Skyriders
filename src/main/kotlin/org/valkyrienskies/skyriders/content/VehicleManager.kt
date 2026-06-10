@@ -173,6 +173,7 @@ object VehicleManager {
                 kartState = KartRuntimeState(
                     engineOn = record.engineOn,
                     fuelAmount = VehicleFuel.initialAmount(definition, record.fuelAmount),
+                    transmissionGear = record.behaviorTag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
                     frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
                     rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
                     frontWheelAngularVelocity = record.behaviorTag.getDouble("front_wheel_angular_velocity"),
@@ -287,6 +288,28 @@ object VehicleManager {
         val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return false
         var changed = false
         when (vehicle) {
+            is KartVehicle -> {
+                val behavior = vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition ?: return false
+                val transmission = behavior.physics.transmission ?: return false
+                when (action) {
+                    VehicleControlActions.GEAR_UP -> {
+                        if (!transmission.automatic) {
+                            val maxGear = transmission.forwardGears.size
+                            vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear + 1).coerceAtMost(maxGear)
+                            vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                            changed = true
+                        }
+                    }
+                    VehicleControlActions.GEAR_DOWN -> {
+                        if (!transmission.automatic) {
+                            vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear - 1).coerceAtLeast(-1)
+                            vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                            changed = true
+                        }
+                    }
+                    else -> return false
+                }
+            }
             is WheeledVehicle -> {
                 val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition ?: return false
                 when (action) {

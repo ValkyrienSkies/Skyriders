@@ -7,6 +7,8 @@ import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.content.KartPhysicsConfig
 import org.valkyrienskies.skyriders.content.KartRuntimeState
 import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.VehicleTransmissionConfig
+import org.valkyrienskies.skyriders.content.VehicleTransmissionGearConfig
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
@@ -34,6 +36,7 @@ object KartPhysicsSolver {
         state: KartRuntimeState,
         dt: Double
     ) {
+        state.transmissionShiftCooldown = max(0.0, state.transmissionShiftCooldown - dt.coerceIn(0.0, 0.1))
         val forward = VehiclePhysicsMath.transformDirection(body, LOCAL_FORWARD, LOCAL_FORWARD)
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
@@ -301,10 +304,11 @@ object KartPhysicsSolver {
         config: KartPhysicsConfig,
         state: KartRuntimeState
     ) {
+        val driveCommand = updateKartDriveCommand(input, forwardSpeed, config, state)
         val rearContacts = contacts.filter { !it.front && it.contact.grounded && it.normalForce > 0.0 }
         if (rearContacts.isEmpty()) return
 
-        val throttle = input.throttle.coerceIn(-1.0, 1.0)
+        val throttle = driveCommand.throttle
         val usePlanarLimit = drifting || abs(input.steer) > 0.05 || abs(steerRad) > Math.toRadians(1.0)
         val driveLimitSpeed = if (usePlanarLimit) {
             val direction = forwardSpeed.signOrZero().takeIf { it != 0.0 } ?: throttle.signOrZero()
@@ -312,10 +316,10 @@ object KartPhysicsSolver {
         } else {
             forwardSpeed
         }
-        val topSpeed = if (drifting) config.wheelTopSpeed * config.driftTopSpeedMultiplier else config.wheelTopSpeed
+        val topSpeed = if (drifting) driveCommand.topSpeed * config.driftTopSpeedMultiplier else driveCommand.topSpeed
         val speedLimitScale = computeSpeedLimitScale(driveLimitSpeed, throttle, topSpeed, config)
         val driveScale = if (drifting) config.driftDriveScale else 1.0
-        val driveForce = throttle * config.driveForce * speedLimitScale * driveScale / rearContacts.size
+        val driveForce = throttle * config.driveForce * driveCommand.torqueMultiplier * speedLimitScale * driveScale / rearContacts.size
         rearContacts.forEach { kartContact ->
             if (driveForce != 0.0) {
                 val contact = kartContact.contact
@@ -336,7 +340,7 @@ object KartPhysicsSolver {
             }
         }
 
-        val rawBrake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
+        val rawBrake = driveCommand.brake
         val brake = if (drifting) rawBrake * config.driftBrakeScale else rawBrake
         contacts.filter { it.contact.grounded && it.normalForce > 0.0 }.forEach { kartContact ->
             val contact = kartContact.contact
@@ -822,6 +826,126 @@ object KartPhysicsSolver {
         return state.smoothedSteerRad
     }
 
+    private fun updateKartDriveCommand(
+        input: VehicleInput,
+        forwardSpeed: Double,
+        config: KartPhysicsConfig,
+        state: KartRuntimeState
+    ): KartDriveCommand {
+        val transmission = config.transmission
+        if (transmission == null) {
+            state.debugTransmissionGear = 0
+            state.debugEngineRpm = 0.0
+            return KartDriveCommand(
+                throttle = input.throttle.coerceIn(-1.0, 1.0),
+                brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0)),
+                topSpeed = config.wheelTopSpeed,
+                torqueMultiplier = 1.0
+            )
+        }
+
+        val maxForwardGear = transmission.forwardGears.size
+        state.transmissionGear = state.transmissionGear.coerceIn(-1, maxForwardGear)
+        if (state.transmissionGear == 0 && transmission.automatic) {
+            state.transmissionGear = 1
+        }
+
+        val rawThrottle = input.throttle.coerceIn(-1.0, 1.0)
+        var brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
+        var driveThrottle = 0.0
+        if (transmission.automatic) {
+            if (rawThrottle < -0.05) {
+                if (abs(forwardSpeed) <= transmission.automaticReverseSpeedThreshold || state.transmissionGear == -1) {
+                    state.transmissionGear = -1
+                    driveThrottle = rawThrottle
+                } else {
+                    brake = brake.coerceAtLeast(-rawThrottle)
+                }
+            } else {
+                if (state.transmissionGear < 1) {
+                    state.transmissionGear = 1
+                    state.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                }
+                if (rawThrottle > 0.05) {
+                    updateAutomaticKartGear(forwardSpeed, transmission, state)
+                    driveThrottle = rawThrottle
+                }
+            }
+        } else {
+            if (rawThrottle < -0.05) {
+                brake = brake.coerceAtLeast(-rawThrottle)
+            } else if (rawThrottle > 0.05) {
+                driveThrottle = when {
+                    state.transmissionGear > 0 -> rawThrottle
+                    state.transmissionGear < 0 -> -rawThrottle
+                    else -> 0.0
+                }
+            }
+        }
+
+        val gear = state.transmissionGear
+        val gearConfig = transmission.forwardGears.getOrNull(gear - 1)
+        val topSpeed = when {
+            gear > 0 && gearConfig != null -> gearConfig.maxSpeed
+            gear < 0 -> transmission.reverseTopSpeed
+            else -> config.wheelTopSpeed
+        }
+        val baseTorque = when {
+            gear > 0 && gearConfig != null -> gearConfig.torqueMultiplier * kartGearLaunchTorqueFactor(gearConfig, forwardSpeed)
+            gear < 0 -> transmission.reverseTorqueMultiplier
+            else -> transmission.neutralDrag
+        }
+
+        state.debugTransmissionGear = gear
+        state.debugEngineRpm = estimateKartEngineRpm(
+            forwardSpeed = forwardSpeed,
+            throttle = driveThrottle,
+            topSpeed = topSpeed,
+            gear = gear
+        )
+        return KartDriveCommand(
+            throttle = driveThrottle,
+            brake = brake,
+            topSpeed = topSpeed,
+            torqueMultiplier = baseTorque.coerceIn(0.0, 1.75)
+        )
+    }
+
+    private fun updateAutomaticKartGear(
+        forwardSpeed: Double,
+        transmission: VehicleTransmissionConfig,
+        state: KartRuntimeState
+    ) {
+        if (state.transmissionShiftCooldown > 0.0 || state.transmissionGear < 1) return
+        val gears = transmission.forwardGears
+        val speed = abs(forwardSpeed)
+        val gearIndex = (state.transmissionGear - 1).coerceIn(0, gears.lastIndex)
+        val gear = gears[gearIndex]
+        when {
+            state.transmissionGear < gears.size && speed >= gear.upshiftSpeed -> {
+                state.transmissionGear += 1
+                state.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+            }
+            state.transmissionGear > 1 && speed <= gear.downshiftSpeed -> {
+                state.transmissionGear -= 1
+                state.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+            }
+        }
+    }
+
+    private fun kartGearLaunchTorqueFactor(gear: VehicleTransmissionGearConfig, forwardSpeed: Double): Double {
+        val launchScale = gear.launchTorqueScale.coerceIn(0.0, 1.0)
+        val speedT = smoothstep(0.0, max(gear.downshiftSpeed, gear.maxSpeed * 0.35), abs(forwardSpeed))
+        return lerp(launchScale, 1.0, speedT).coerceIn(0.0, 1.0)
+    }
+
+    private fun estimateKartEngineRpm(forwardSpeed: Double, throttle: Double, topSpeed: Double, gear: Int): Double {
+        if (gear == 0) return if (throttle > 0.05) 2600.0 + throttle * 2600.0 else 950.0
+        val speedT = if (topSpeed > 1.0) (abs(forwardSpeed) / topSpeed).coerceIn(0.0, 1.15) else 0.0
+        val throttleLift = abs(throttle).coerceIn(0.0, 1.0) * 1450.0
+        return (950.0 + speedT * 5000.0 + throttleLift).coerceIn(700.0, 6800.0)
+    }
+
     private fun computeSpeedLimitScale(speed: Double, throttle: Double, topSpeed: Double, config: KartPhysicsConfig): Double {
         if (throttle == 0.0) return 0.0
         if (!topSpeed.isFinite() || topSpeed <= 0.0) return 1.0
@@ -1012,6 +1136,13 @@ object KartPhysicsSolver {
         val normal: Vector3d,
         val rise: Double,
         val allGrounded: Boolean
+    )
+
+    private data class KartDriveCommand(
+        val throttle: Double,
+        val brake: Double,
+        val topSpeed: Double,
+        val torqueMultiplier: Double
     )
 
     private data class StepOpportunity(

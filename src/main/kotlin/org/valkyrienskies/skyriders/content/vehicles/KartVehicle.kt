@@ -54,6 +54,7 @@ class KartVehicle(
         fuelAmount = kartState.fuelAmount,
         behaviorTag = CompoundTag().apply {
             putString("behavior_type", "kart")
+            putInt("transmission_gear", kartState.transmissionGear)
             putDouble("front_wheel_spin", kartState.frontWheelSpin)
             putDouble("rear_wheel_spin", kartState.rearWheelSpin)
             putDouble("front_wheel_angular_velocity", kartState.frontWheelAngularVelocity)

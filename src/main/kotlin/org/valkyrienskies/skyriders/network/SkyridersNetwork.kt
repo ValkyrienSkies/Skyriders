@@ -288,6 +288,7 @@ object SkyridersNetwork {
             else -> 0.0
         }
         val transmissionGear = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugTransmissionGear
             is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
             else -> 0
         }
@@ -296,6 +297,7 @@ object SkyridersNetwork {
             else -> false
         }
         val engineRpm = when (vehicle) {
+            is KartVehicle -> vehicle.kartState.debugEngineRpm
             is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
             else -> 0.0
         }
@@ -311,7 +313,11 @@ object SkyridersNetwork {
             is IBike -> vehicle.state.jumpCharge
             else -> 0.0
         }
-        val hasTransmission = vehicle is WheeledVehicle
+        val hasTransmission = when (vehicle) {
+            is KartVehicle -> (vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition)?.physics?.transmission != null
+            is WheeledVehicle -> true
+            else -> false
+        }
         val hasJump = vehicle.vehicleDefinition.behavior is BikeVehicleBehaviorDefinition
 
         CHANNEL.send(
