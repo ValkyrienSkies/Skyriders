@@ -108,11 +108,11 @@ class GlassoRenderer(context: EntityRendererProvider.Context) : EntityRenderer<G
         val buffer = bufferSource.getBuffer(RenderType.lines())
         val pose = poseStack.last()
         buffer.vertex(pose.pose(), 0.0f, 0.0f, 0.0f)
-            .color(0.72f, 0.92f, 1.0f, 0.95f)
+            .color(0.02f, 0.018f, 0.016f, 0.95f)
             .normal(pose.normal(), 0.0f, 1.0f, 0.0f)
             .endVertex()
         buffer.vertex(pose.pose(), dx, dy, dz)
-            .color(0.72f, 0.92f, 1.0f, 0.95f)
+            .color(0.02f, 0.018f, 0.016f, 0.95f)
             .normal(pose.normal(), 0.0f, 1.0f, 0.0f)
             .endVertex()
     }

@@ -33,6 +33,8 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
 
     private var ownerPlayerId: UUID? = null
     private var distanceTravelled = 0.0
+    private var latchedTargetBodyId: BodyId? = null
+    private var latchTicksRemaining = 0
 
     init {
         blocksBuilding = false
@@ -48,6 +50,11 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         }
 
         val serverLevel = level() as? ServerLevel ?: return
+        if (latchedTargetBodyId != null) {
+            tickVehicleLatch(serverLevel)
+            return
+        }
+
         if (tickCount > MAX_LIFETIME_TICKS || distanceTravelled > MAX_RANGE) {
             shatter(serverLevel)
             return
@@ -68,8 +75,7 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         }
 
         findHitVehicle(serverLevel, next)?.let { targetBodyId ->
-            yankVehicle(serverLevel, targetBodyId)
-            shatter(serverLevel)
+            latchVehicle(serverLevel, targetBodyId)
             return
         }
 
@@ -112,12 +118,20 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
             ownerPlayerId = compound.getUUID(OWNER_PLAYER_ID_KEY)
         }
         distanceTravelled = compound.getDouble(DISTANCE_TRAVELLED_KEY)
+        latchedTargetBodyId = if (compound.contains(LATCHED_TARGET_BODY_ID_KEY)) {
+            compound.getLong(LATCHED_TARGET_BODY_ID_KEY)
+        } else {
+            null
+        }
+        latchTicksRemaining = compound.getInt(LATCH_TICKS_REMAINING_KEY)
     }
 
     override fun addAdditionalSaveData(compound: CompoundTag) {
         compound.putLong(OWNER_BODY_ID_KEY, ownerBodyId)
         ownerPlayerId?.let { compound.putUUID(OWNER_PLAYER_ID_KEY, it) }
         compound.putDouble(DISTANCE_TRAVELLED_KEY, distanceTravelled)
+        latchedTargetBodyId?.let { compound.putLong(LATCHED_TARGET_BODY_ID_KEY, it) }
+        compound.putInt(LATCH_TICKS_REMAINING_KEY, latchTicksRemaining)
     }
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> = ClientboundAddEntityPacket(this)
@@ -157,18 +171,51 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         )
     }
 
-    private fun yankVehicle(level: ServerLevel, targetBodyId: BodyId) {
-        val shipWorld = level.shipWorld ?: return
+    private fun latchVehicle(level: ServerLevel, targetBodyId: BodyId) {
+        latchedTargetBodyId = targetBodyId
+        latchTicksRemaining = VEHICLE_LATCH_TICKS
+        tickVehicleLatch(level)
+    }
+
+    private fun tickVehicleLatch(level: ServerLevel) {
+        val targetBodyId = latchedTargetBodyId ?: return
+        val shipWorld = level.shipWorld ?: return shatter(level)
         val ownerBody = shipWorld.allBodies.getById(ownerBodyId) ?: return
+        val targetBody = shipWorld.allBodies.getById(targetBodyId) ?: return shatter(level)
+        val owner = VehicleManager.getVehicle(level, ownerBodyId) ?: return shatter(level)
         val target = VehicleManager.getVehicle(level, targetBodyId) ?: return
+
+        val targetPosition = Vector3d(targetBody.kinematics.position)
+        val ownerPosition = Vector3d(ownerBody.kinematics.position)
+        setPos(targetPosition.x, targetPosition.y + VEHICLE_LATCH_Y_OFFSET, targetPosition.z)
+        deltaMovement = Vec3(
+            targetBody.kinematics.velocity.x(),
+            targetBody.kinematics.velocity.y(),
+            targetBody.kinematics.velocity.z()
+        )
+
         VehicleStatusEffects.applyPullToPoint(
             vehicle = target,
-            target = Vector3d(ownerBody.kinematics.position),
-            duration = VEHICLE_PULL_DURATION,
-            acceleration = VEHICLE_PULL_ACCELERATION,
+            target = ownerPosition,
+            duration = VEHICLE_LATCH_PULL_DURATION,
+            acceleration = TARGET_VEHICLE_PULL_ACCELERATION,
             maxSpeed = PULL_MAX_SPEED
         )
-        VehicleStatusEffects.applySpinOut(target, duration = 1.55, yawSpeed = 4.8)
+        VehicleStatusEffects.applyPullToPoint(
+            vehicle = owner,
+            target = targetPosition,
+            duration = VEHICLE_LATCH_PULL_DURATION,
+            acceleration = OWNER_VEHICLE_PULL_ACCELERATION,
+            maxSpeed = PULL_MAX_SPEED
+        )
+        if (latchTicksRemaining == VEHICLE_LATCH_TICKS) {
+            VehicleStatusEffects.applySpinOut(target, duration = 1.55, yawSpeed = 4.8)
+        }
+
+        latchTicksRemaining--
+        if (latchTicksRemaining <= 0) {
+            shatter(level)
+        }
     }
 
     private fun yankEntity(level: ServerLevel, entity: LivingEntity) {
@@ -203,6 +250,8 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         private const val OWNER_BODY_ID_KEY = "OwnerBodyId"
         private const val OWNER_PLAYER_ID_KEY = "OwnerPlayerId"
         private const val DISTANCE_TRAVELLED_KEY = "DistanceTravelled"
+        private const val LATCHED_TARGET_BODY_ID_KEY = "LatchedTargetBodyId"
+        private const val LATCH_TICKS_REMAINING_KEY = "LatchTicksRemaining"
         private const val MAX_LIFETIME_TICKS = 40
         private const val MAX_RANGE = 20.0
         private const val PROJECTILE_SPEED = 1.55
@@ -213,8 +262,11 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         private const val VEHICLE_HIT_RADIUS = 0.25
         private const val TERRAIN_PULL_DURATION = 0.7
         private const val TERRAIN_PULL_ACCELERATION = 54.0
-        private const val VEHICLE_PULL_DURATION = 0.75
-        private const val VEHICLE_PULL_ACCELERATION = 44.0
+        private const val VEHICLE_LATCH_TICKS = 30
+        private const val VEHICLE_LATCH_Y_OFFSET = 0.35
+        private const val VEHICLE_LATCH_PULL_DURATION = 0.18
+        private const val TARGET_VEHICLE_PULL_ACCELERATION = 76.0
+        private const val OWNER_VEHICLE_PULL_ACCELERATION = 44.0
         private const val PULL_MAX_SPEED = 26.0
         private const val ENTITY_YANK_SPEED = 1.45
         private const val ENTITY_YANK_UPWARD = 0.28
