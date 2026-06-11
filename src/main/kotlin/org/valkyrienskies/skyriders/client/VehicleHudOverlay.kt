@@ -318,7 +318,7 @@ object VehicleHudOverlay {
         val level = Minecraft.getInstance().level ?: return VehicleMotion.ZERO
         val vehicle = VehicleManager.getVehicle(level, bodyId) ?: return VehicleMotion.ZERO
         val rotation = try {
-            vehicle.getRenderTransform().rotation
+            vehicle.getRenderTransform()?.rotation ?: return VehicleMotion.ZERO
         } catch (_: IllegalStateException) {
             return VehicleMotion.ZERO
         }

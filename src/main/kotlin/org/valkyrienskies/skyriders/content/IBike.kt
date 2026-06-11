@@ -24,7 +24,7 @@ interface IBike : IVehicle {
     fun getKinematics(): BodyKinematics
     fun getTransform(): BodyTransform
 
-    override fun getRenderTransform(): BodyTransform
+    override fun getRenderTransform(): BodyTransform?
 
     fun getTilt(): Double
 

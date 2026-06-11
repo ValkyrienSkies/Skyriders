@@ -24,7 +24,7 @@ object VehicleInteractionPicker {
 
     fun hitVehicleInteractionZones(vehicle: IVehicle, start: Vec3, end: Vec3): List<VehicleRayHit> {
         val transform = try {
-            vehicle.getRenderTransform()
+            vehicle.getRenderTransform() ?: return emptyList()
         } catch (_: IllegalStateException) {
             return emptyList()
         }

@@ -225,7 +225,7 @@ object VehicleStatusEffects {
     private fun playOneShot(vehicle: IVehicle, sound: net.minecraft.sounds.SoundEvent, volume: Float, pitch: Float) {
         val level = vehicle.level as? ServerLevel ?: return
         val position = try {
-            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: Vector3d()
         } catch (_: IllegalStateException) {
             Vector3d()
         }

@@ -94,7 +94,7 @@ object BikeWorldRenderer {
     ) {
         val minecraft = Minecraft.getInstance()
         val transform = try {
-            vehicle.getRenderTransform()
+            vehicle.getRenderTransform() ?: return
         } catch (_: IllegalStateException) {
             return
         }

@@ -18,7 +18,7 @@ interface IVehicle {
     val vehicleDefinition: VehicleDefinition
     val vehicleState: VehicleRuntimeState
 
-    fun getRenderTransform(): BodyTransform
+    fun getRenderTransform(): BodyTransform?
 
     fun tick()
     fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: VehicleInput, dt: Double)

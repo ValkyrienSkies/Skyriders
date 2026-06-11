@@ -41,8 +41,8 @@ open class DefaultBike(override val bodyId: BodyId,
         return getKinematics().transform
     }
 
-    override fun getRenderTransform(): BodyTransform {
-        val body = requireBody()
+    override fun getRenderTransform(): BodyTransform? {
+        val body = level.shipWorld?.allBodies?.getById(bodyId) ?: return null
         return if (body is ClientVsBody) body.renderTransform else body.kinematics.transform
     }
 

@@ -87,6 +87,11 @@ object BikeInteractionHandler {
                 player.sendSystemMessage(Component.literal(ex.message ?: "Vehicle body is missing."))
             }
             return false
+        } ?: run {
+            if (notifyPlayer) {
+                player.sendSystemMessage(Component.literal("Vehicle body is not ready yet."))
+            }
+            return false
         }
 
         val seatDefinition = vehicle.vehicleDefinition.seats.firstOrNull { it.interactionZone == interactionZoneId }

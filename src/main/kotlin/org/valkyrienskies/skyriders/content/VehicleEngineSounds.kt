@@ -14,7 +14,7 @@ object VehicleEngineSounds {
         val soundId = vehicle.vehicleDefinition.sounds.engineStartFail ?: DEFAULT_START_FAIL
         val sound = ForgeRegistries.SOUND_EVENTS.getValue(soundId) ?: return
         val position = try {
-            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: Vector3d()
         } catch (_: IllegalStateException) {
             Vector3d()
         }

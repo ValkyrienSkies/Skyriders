@@ -38,8 +38,8 @@ class WheeledVehicle(
             partStates = wheeledState.partStates
         )
 
-    override fun getRenderTransform(): BodyTransform {
-        val body = requireBody()
+    override fun getRenderTransform(): BodyTransform? {
+        val body = level.shipWorld?.allBodies?.getById(bodyId) ?: return null
         return if (body is ClientVsBody) body.renderTransform else body.kinematics.transform
     }
 
@@ -82,10 +82,6 @@ class WheeledVehicle(
         partStates = wheeledState.partStates
     )
 
-    private fun requireBody() =
-        requireNotNull(level.shipWorld?.allBodies?.getById(bodyId)) {
-            "Vehicle $id is bound to missing VS body $bodyId"
-        }
 }
 
 fun wheeledRuntimeStateFromTag(

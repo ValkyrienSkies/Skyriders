@@ -21,7 +21,8 @@ object VehicleInteractionSounds {
             ?: return false
         val sound = ForgeRegistries.SOUND_EVENTS.getValue(definition.sound) ?: return false
         val position = try {
-            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d(zone.center))
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d(zone.center))
+                ?: Vector3d(player.x, player.y, player.z)
         } catch (_: IllegalStateException) {
             Vector3d(player.x, player.y, player.z)
         }

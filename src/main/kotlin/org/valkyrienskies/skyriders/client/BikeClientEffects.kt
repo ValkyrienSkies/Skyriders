@@ -91,7 +91,7 @@ object BikeClientEffects {
 
     private fun spawnBikeEffects(level: ClientLevel, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
         val transform = try {
-            bike.getRenderTransform()
+            bike.getRenderTransform() ?: return
         } catch (_: IllegalStateException) {
             return
         }
@@ -143,7 +143,7 @@ object BikeClientEffects {
         telemetry: SkyridersNetwork.VehicleDebugPacket?
     ) {
         val transform = try {
-            vehicle.getRenderTransform()
+            vehicle.getRenderTransform() ?: return
         } catch (_: IllegalStateException) {
             return
         }
@@ -306,7 +306,7 @@ object BikeClientEffects {
         val soundId = if (engineOn) vehicle.vehicleDefinition.sounds.engineStart else vehicle.vehicleDefinition.sounds.engineStop
         soundId ?: return
         val position = try {
-            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: return
         } catch (_: IllegalStateException) {
             return
         }
@@ -358,7 +358,7 @@ object BikeClientEffects {
     ) {
         soundId ?: return
         val position = try {
-            vehicle.getRenderTransform().toWorld.transformPosition(Vector3d())
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: return
         } catch (_: IllegalStateException) {
             return
         }
@@ -456,6 +456,9 @@ object BikeClientEffects {
             val transform = try {
                 vehicle.getRenderTransform()
             } catch (_: IllegalStateException) {
+                volume = 0.0f
+                return
+            } ?: run {
                 volume = 0.0f
                 return
             }
