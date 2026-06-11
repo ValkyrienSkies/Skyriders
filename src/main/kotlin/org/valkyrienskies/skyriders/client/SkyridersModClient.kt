@@ -87,6 +87,7 @@ object SkyridersModClient {
             EntityRenderers.register(SkyridersMod.HONEY_HEISTER_ENTITY.get()) { context ->
                 RacingOpenModelEntityRenderer.honeyHeister(context)
             }
+            EntityRenderers.register(SkyridersMod.EXTENDING_ARM_ENTITY.get(), ::ExtendingArmRenderer)
             ItemProperties.register(SkyridersMod.RACE_COMPASS.get(), ResourceLocation("angle")) { _, _, entity, seed ->
                 RaceCompassClientState.angle(entity, seed)
             }

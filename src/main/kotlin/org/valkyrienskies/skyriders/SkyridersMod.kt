@@ -40,6 +40,7 @@ import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
+import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
 import org.valkyrienskies.skyriders.content.entity.GlassoEntity
 import org.valkyrienskies.skyriders.content.entity.HoneyHeisterEntity
 import org.valkyrienskies.skyriders.content.entity.ItemBoxEntity
@@ -47,6 +48,7 @@ import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
+import org.valkyrienskies.skyriders.content.item.ExtendingArmItem
 import org.valkyrienskies.skyriders.content.item.GlassoItem
 import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
@@ -161,6 +163,12 @@ object SkyridersMod {
     val HONEY_HEISTER: RegistryObject<Item> = ITEMS.register("honey_heister") {
         HoneyHeisterItem(Item.Properties().stacksTo(16))
     }
+    val BOXING_GLOVE: RegistryObject<Item> = ITEMS.register("boxing_glove") {
+        ExtendingArmItem(Item.Properties().stacksTo(16), ExtendingArmEntity.BOXING_GLOVE)
+    }
+    val GRABBY_HAND: RegistryObject<Item> = ITEMS.register("grabby_hand") {
+        ExtendingArmItem(Item.Properties().stacksTo(16), ExtendingArmEntity.GRABBY_HAND)
+    }
     val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
         RaceCompassItem(Item.Properties().stacksTo(1))
     }
@@ -214,6 +222,13 @@ object SkyridersMod {
             .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:honey_heister")
+    }
+    val EXTENDING_ARM_ENTITY: RegistryObject<EntityType<ExtendingArmEntity>> = ENTITIES.register("extending_arm") {
+        EntityType.Builder.of(::ExtendingArmEntity, MobCategory.MISC)
+            .sized(0.75f, 0.75f)
+            .clientTrackingRange(16)
+            .updateInterval(1)
+            .build("$MOD_ID:extending_arm")
     }
     val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
         EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)

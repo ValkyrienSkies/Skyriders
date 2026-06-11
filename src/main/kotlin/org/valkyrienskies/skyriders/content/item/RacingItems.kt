@@ -22,6 +22,7 @@ import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
 
 class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
@@ -235,6 +236,43 @@ class HoneyHeisterItem(properties: Properties) : RacingVehicleItem(properties) {
                 inheritedVelocity.z() / TICKS_PER_SECOND
             ),
             ownerBodyId = vehicle.bodyId
+        )
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
+    }
+}
+
+class ExtendingArmItem(
+    properties: Properties,
+    private val armKind: Int
+) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.EXTENDING_ARM_ENTITY.get().create(level) ?: return false
+        val direction = player.lookAngle.normalize()
+        val bodyPosition = body.kinematics.position
+        val inheritedVelocity = body.kinematics.velocity
+        val origin = net.minecraft.world.phys.Vec3(
+            bodyPosition.x() + direction.x * 1.05,
+            bodyPosition.y() + 0.7 + direction.y * 0.45,
+            bodyPosition.z() + direction.z * 1.05
+        )
+
+        entity.launch(
+            origin = origin,
+            direction = direction,
+            inheritedVelocity = net.minecraft.world.phys.Vec3(
+                inheritedVelocity.x() / TICKS_PER_SECOND,
+                inheritedVelocity.y() / TICKS_PER_SECOND,
+                inheritedVelocity.z() / TICKS_PER_SECOND
+            ),
+            ownerBodyId = vehicle.bodyId,
+            kind = armKind
         )
         level.addFreshEntity(entity)
         playItemUseSound(level, player)

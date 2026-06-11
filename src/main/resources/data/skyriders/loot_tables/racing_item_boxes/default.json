@@ -10,6 +10,8 @@
         { "type": "minecraft:item", "name": "skyriders:homing_sugar_rocket", "weight": 3 },
         { "type": "minecraft:item", "name": "skyriders:glasso", "weight": 3 },
         { "type": "minecraft:item", "name": "skyriders:honey_heister", "weight": 2 },
+        { "type": "minecraft:item", "name": "skyriders:boxing_glove", "weight": 3 },
+        { "type": "minecraft:item", "name": "skyriders:grabby_hand", "weight": 3 },
         { "type": "minecraft:item", "name": "skyriders:thunderbolt", "weight": 2 }
       ]
     }
