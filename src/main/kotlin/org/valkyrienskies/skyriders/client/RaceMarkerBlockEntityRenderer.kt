@@ -20,6 +20,10 @@ import org.valkyrienskies.skyriders.content.racing.RaceMarkerTypes
 class RaceMarkerBlockEntityRenderer(
     private val context: BlockEntityRendererProvider.Context
 ) : BlockEntityRenderer<RaceMarkerBlockEntity> {
+    override fun shouldRenderOffScreen(blockEntity: RaceMarkerBlockEntity): Boolean = true
+
+    override fun getViewDistance(): Int = TEXT_RENDER_DISTANCE.toInt()
+
     override fun render(
         blockEntity: RaceMarkerBlockEntity,
         partialTick: Float,
@@ -71,7 +75,7 @@ class RaceMarkerBlockEntityRenderer(
         val center = blockEntity.blockPos.center
         if (player.distanceToSqr(center) > TEXT_RENDER_DISTANCE * TEXT_RENDER_DISTANCE) return
 
-        val text = Component.literal("Checkpoint ${blockEntity.checkpointIndex}")
+        val text = Component.literal(blockEntity.checkpointIndex.toString())
         val font = context.font
         val width = font.width(text)
 

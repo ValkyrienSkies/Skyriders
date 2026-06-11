@@ -7,6 +7,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.skyriders.content.racing.RaceManager
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 
 object BikeLifecycle {
@@ -50,6 +51,7 @@ object BikeLifecycle {
             val vehicles = VehicleManager.getVehicles(level.dimensionId)
             BoostPadHandler.gameTick(level, vehicles)
             VehicleImpactDamageHandler.tick(level, vehicles)
+            RaceManager.tickLevel(level)
             syncVisualState(level)
         }
     }

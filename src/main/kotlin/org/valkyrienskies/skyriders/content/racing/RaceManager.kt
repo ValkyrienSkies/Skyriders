@@ -39,16 +39,31 @@ object RaceManager {
     private const val START_CAPTURE_RANGE = 128.0
     private const val MIN_LINE_LENGTH = 0.75
     private val racesByKey = HashMap<RaceKey, ActiveRace>()
-    private val markerPositionsByDimension = ConcurrentHashMap<String, MutableSet<Long>>()
+    private val markerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceMarkerSnapshot>>()
 
-    fun registerMarker(level: ServerLevel, pos: BlockPos) {
-        markerPositionsByDimension
-            .getOrPut(level.dimension().location().toString()) { ConcurrentHashMap.newKeySet() }
-            .add(pos.asLong())
+    fun registerMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
+        val snapshots = markerSnapshotsByDimension
+            .getOrPut(level.dimension().location().toString()) { ConcurrentHashMap() }
+        snapshots[marker.blockPos.asLong()] = RaceMarkerSnapshot.from(marker)
     }
 
     fun unregisterMarker(level: ServerLevel, pos: BlockPos) {
-        markerPositionsByDimension[level.dimension().location().toString()]?.remove(pos.asLong())
+        markerSnapshotsByDimension[level.dimension().location().toString()]?.remove(pos.asLong())
+    }
+
+    fun tickLevel(level: ServerLevel) {
+        val dimension = level.dimension().location().toString()
+        racesByKey.values
+            .filter { it.active && it.dimension == dimension }
+            .forEach { race ->
+                if (level.gameTime % 40L == 0L) {
+                    race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
+                }
+                if (level.gameTime % 5L == 0L) {
+                    sendRaceHudPositions(level, race)
+                    sendRaceCompassTargets(level, race)
+                }
+            }
     }
 
     fun startCountdown(marker: RaceMarkerBlockEntity, level: ServerLevel, triggerPlayer: Player? = null) {
@@ -64,20 +79,16 @@ object RaceManager {
     }
 
     fun tickMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
+        registerMarker(level, marker)
         tickCountdown(level, marker)
         val colorId = marker.colorId
         if (colorId < 0 || marker.endpointPos == null) return
         val race = racesByKey[RaceKey(level.dimension().location().toString(), colorId)] ?: return
         if (!race.active) return
-        tickCrossings(level, marker, race)
+        val markerSnapshot = RaceMarkerSnapshot.from(marker)
+        tickCrossings(level, markerSnapshot, race)
         if (level.gameTime % 5L == 0L) {
-            spawnLineParticles(level, marker, race)
-        }
-        if (marker.blockPos == race.startMarkerPos && level.gameTime % 40L == 0L) {
-            race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
-        }
-        if (marker.blockPos == race.startMarkerPos && level.gameTime % 5L == 0L) {
-            sendRaceHudPositions(level, race)
+            spawnLineParticles(level, markerSnapshot, race)
         }
     }
 
@@ -141,7 +152,8 @@ object RaceManager {
 
     private fun startRace(level: ServerLevel, startMarker: RaceMarkerBlockEntity) {
         val color = startMarker.colorId and 0xFFFFFF
-        val line = startMarker.line(level) ?: return
+        val startSnapshot = RaceMarkerSnapshot.from(startMarker)
+        val line = startSnapshot.line(level) ?: return
         val checkpoints = collectMarkers(level, startMarker.colorId)
             .filter { it.markerType == RaceMarkerTypes.CHECKPOINT && it.endpointPos != null }
             .sortedBy { it.checkpointIndex }
@@ -156,8 +168,8 @@ object RaceManager {
         val race = ActiveRace(
             dimension = level.dimension().location().toString(),
             colorId = startMarker.colorId,
-            startMarkerPos = startMarker.blockPos,
-            checkpointMarkerPositions = checkpoints.map { it.blockPos },
+            startMarker = startSnapshot,
+            checkpointMarkers = checkpoints,
             checkpointIndices = checkpoints.mapTo(HashSet()) { it.checkpointIndex },
             racers = participants,
             active = true,
@@ -169,7 +181,7 @@ object RaceManager {
             racer.lapStartedAtGameTime = level.gameTime
             racer.nextCheckpointIndex = race.firstCheckpointIndex()
             racer.nextTarget = nextTarget(level, racer, race)
-            racer.previousDistances[startMarker.blockPos.asLong()] = line.signedDistance(racer.position)
+            racer.previousDistances[startSnapshot.blockPos.asLong()] = line.signedDistance(racer.position)
         }
         racesByKey[RaceKey(race.dimension, race.colorId)] = race
         race.musicTrack?.let { track ->
@@ -191,7 +203,7 @@ object RaceManager {
         )
     }
 
-    private fun tickCrossings(level: ServerLevel, marker: RaceMarkerBlockEntity, race: ActiveRace) {
+    private fun tickCrossings(level: ServerLevel, marker: RaceMarkerSnapshot, race: ActiveRace) {
         val line = marker.line(level) ?: return
         race.racers.values.toList().forEach { racer ->
             val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return@forEach
@@ -209,7 +221,7 @@ object RaceManager {
 
     private fun handleCrossing(
         level: ServerLevel,
-        marker: RaceMarkerBlockEntity,
+        marker: RaceMarkerSnapshot,
         race: ActiveRace,
         racer: RacerState,
         position: Vector3d
@@ -302,6 +314,14 @@ object RaceManager {
         }
     }
 
+    private fun sendRaceCompassTargets(level: ServerLevel, race: ActiveRace) {
+        race.racers.values.forEach { racer ->
+            driverForBody(level, racer.bodyId)?.let { driver ->
+                SkyridersNetwork.sendRaceCompassTarget(driver, racer.nextTarget?.let { Vec3(it.x, it.y, it.z) })
+            }
+        }
+    }
+
     private fun activeStandings(level: ServerLevel, race: ActiveRace): List<RacerState> {
         race.racers.values.forEach { racer ->
             refreshRacerPosition(level, racer, race)
@@ -339,19 +359,18 @@ object RaceManager {
     }
 
     private fun nextTarget(level: ServerLevel, racer: RacerState, race: ActiveRace): Vector3d? {
-        val nextCheckpoint = race.checkpointMarkerPositions
-            .mapNotNull { level.getBlockEntity(it) as? RaceMarkerBlockEntity }
+        val nextCheckpoint = race.checkpointMarkers
             .filter { it.checkpointIndex == racer.nextCheckpointIndex }
             .minByOrNull { it.blockPos.distSqr(BlockPos.containing(racer.position.x, racer.position.y, racer.position.z)) }
-        return nextCheckpoint?.line(level)?.center ?: (level.getBlockEntity(race.startMarkerPos) as? RaceMarkerBlockEntity)?.line(level)?.center
+        return nextCheckpoint?.line(level)?.center ?: race.startMarker.line(level)?.center
     }
 
-    private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerBlockEntity) {
+    private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerSnapshot) {
         val endpointPos = marker.endpointPos ?: return
         (level.getBlockEntity(endpointPos) as? RaceEndpointBlockEntity)?.pulse()
     }
 
-    private fun spawnLineParticles(level: ServerLevel, marker: RaceMarkerBlockEntity, race: ActiveRace) {
+    private fun spawnLineParticles(level: ServerLevel, marker: RaceMarkerSnapshot, race: ActiveRace) {
         val line = marker.line(level) ?: return
         val length = line.length()
         if (length < MIN_LINE_LENGTH) return
@@ -359,7 +378,6 @@ object RaceManager {
         level.players().forEach { player ->
             val seat = player.vehicle as? BikeSeatEntity ?: return@forEach
             val racer = race.racers[seat.bodyId] ?: return@forEach
-            SkyridersNetwork.sendRaceCompassTarget(player, racer.nextTarget?.let { Vec3(it.x, it.y, it.z) })
             val particle = lineParticle(markerStateForRacer(marker, racer, race))
             for (i in 0..count) {
                 val t = i.toDouble() / count.toDouble()
@@ -369,7 +387,7 @@ object RaceManager {
         }
     }
 
-    private fun markerStateForRacer(marker: RaceMarkerBlockEntity, racer: RacerState, race: ActiveRace): LineParticleState {
+    private fun markerStateForRacer(marker: RaceMarkerSnapshot, racer: RacerState, race: ActiveRace): LineParticleState {
         if (marker.markerType == RaceMarkerTypes.CHECKPOINT) {
             if (marker.checkpointIndex in racer.crossedCheckpoints) return LineParticleState.CROSSED
             return if (marker.checkpointIndex == racer.nextCheckpointIndex) LineParticleState.NEXT else LineParticleState.BLOCKED
@@ -455,12 +473,9 @@ object RaceManager {
         connection.send(ClientboundSetTitleTextPacket(Component.literal(title)))
     }
 
-    private fun collectMarkers(level: ServerLevel, colorId: Int): List<RaceMarkerBlockEntity> {
-        val positions = markerPositionsByDimension[level.dimension().location().toString()] ?: return emptyList()
-        return positions.mapNotNull { packed ->
-            val be = level.getBlockEntity(BlockPos.of(packed)) as? RaceMarkerBlockEntity ?: return@mapNotNull null
-            be.takeIf { it.colorId == colorId && !it.isRemoved }
-        }
+    private fun collectMarkers(level: ServerLevel, colorId: Int): List<RaceMarkerSnapshot> {
+        val snapshots = markerSnapshotsByDimension[level.dimension().location().toString()] ?: return emptyList()
+        return snapshots.values.filter { it.colorId == colorId }
     }
 
     private fun driverForVehicle(level: ServerLevel, bodyId: Long): ServerPlayer? {
@@ -504,8 +519,8 @@ object RaceManager {
     private data class ActiveRace(
         val dimension: String,
         val colorId: Int,
-        val startMarkerPos: BlockPos,
-        val checkpointMarkerPositions: List<BlockPos>,
+        val startMarker: RaceMarkerSnapshot,
+        val checkpointMarkers: List<RaceMarkerSnapshot>,
         val checkpointIndices: Set<Int>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
@@ -574,7 +589,33 @@ data class RaceLine(val start: Vector3d, val end: Vector3d) {
     fun point(t: Double): Vector3d = Vector3d(start).lerp(end, t)
 }
 
+data class RaceMarkerSnapshot(
+    val blockPos: BlockPos,
+    val endpointPos: BlockPos?,
+    val colorId: Int,
+    val markerType: String,
+    val checkpointIndex: Int,
+    val lapCount: Int
+) {
+    companion object {
+        fun from(marker: RaceMarkerBlockEntity): RaceMarkerSnapshot {
+            return RaceMarkerSnapshot(
+                blockPos = marker.blockPos,
+                endpointPos = marker.endpointPos,
+                colorId = marker.colorId,
+                markerType = marker.markerType,
+                checkpointIndex = marker.checkpointIndex,
+                lapCount = marker.lapCount
+            )
+        }
+    }
+}
+
 fun RaceMarkerBlockEntity.line(level: ServerLevel): RaceLine? {
+    return RaceMarkerSnapshot.from(this).line(level)
+}
+
+fun RaceMarkerSnapshot.line(level: ServerLevel): RaceLine? {
     val endpoint = endpointPos ?: return null
     val a = level.toWorldCoordinates(Vec3.atCenterOf(blockPos)).let { Vector3d(it.x, it.y, it.z) }
     val b = level.toWorldCoordinates(Vec3.atCenterOf(endpoint)).let { Vector3d(it.x, it.y, it.z) }

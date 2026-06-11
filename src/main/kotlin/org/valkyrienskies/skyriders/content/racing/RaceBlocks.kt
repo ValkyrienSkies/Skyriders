@@ -114,6 +114,7 @@ class RaceMarkerBlock(properties: Properties) : BaseEntityBlock(properties) {
             (level.getBlockEntity(pos) as? RaceMarkerBlockEntity)?.endpointPos?.let { endpointPos ->
                 (level.getBlockEntity(endpointPos) as? RaceEndpointBlockEntity)?.setMarker(null)
             }
+            (level as? ServerLevel)?.let { RaceManager.unregisterMarker(it, pos) }
         }
         super.onRemove(state, level, pos, newState, movedByPiston)
     }

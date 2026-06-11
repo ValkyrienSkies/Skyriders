@@ -71,11 +71,11 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
 
     override fun onLoad() {
         super.onLoad()
-        (level as? ServerLevel)?.let { RaceManager.registerMarker(it, blockPos) }
+        (level as? ServerLevel)?.let { RaceManager.registerMarker(it, this) }
     }
 
     override fun setRemoved() {
-        (level as? ServerLevel)?.let { RaceManager.unregisterMarker(it, blockPos) }
+        // Chunk unloads also call setRemoved; actual block deletion unregisters from RaceMarkerBlock.onRemove.
         super.setRemoved()
     }
 
@@ -132,7 +132,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
 
         fun serverTick(level: Level, pos: BlockPos, state: BlockState, blockEntity: RaceMarkerBlockEntity) {
             val serverLevel = level as? ServerLevel ?: return
-            RaceManager.registerMarker(serverLevel, pos)
+            RaceManager.registerMarker(serverLevel, blockEntity)
             RaceManager.tickMarker(serverLevel, blockEntity)
         }
     }
