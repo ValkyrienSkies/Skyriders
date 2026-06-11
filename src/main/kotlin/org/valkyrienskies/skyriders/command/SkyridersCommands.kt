@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.LongArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands.argument
 import net.minecraft.commands.Commands.literal
@@ -21,6 +22,7 @@ import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.racing.RaceManager
 import org.joml.Vector3d
 
 object SkyridersCommands {
@@ -29,9 +31,13 @@ object SkyridersCommands {
     }
 
     fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
-        dispatcher.register(
-            literal("skyrider")
-                .requires { source -> source.hasPermission(2) }
+        dispatcher.register(commandRoot("skyrider"))
+        dispatcher.register(commandRoot("skyriders"))
+    }
+
+    private fun commandRoot(name: String): LiteralArgumentBuilder<CommandSourceStack> {
+        return literal(name)
+            .requires { source -> source.hasPermission(2) }
                 .then(
                     literal("summon")
                         .then(
@@ -94,7 +100,27 @@ object SkyridersCommands {
                                 }
                         )
                 )
-        )
+                .then(
+                    literal("race")
+                        .then(
+                            literal("end")
+                                .then(
+                                    argument("color", StringArgumentType.word())
+                                        .suggests { ctx, builder ->
+                                            SharedSuggestionProvider.suggest(
+                                                RaceManager.activeRaceColorSuggestions(ctx.source.level),
+                                                builder
+                                            )
+                                        }
+                                        .executes { ctx ->
+                                            endRace(
+                                                ctx.source,
+                                                StringArgumentType.getString(ctx, "color")
+                                            )
+                                        }
+                                )
+                        )
+                )
     }
 
     private fun bikeIdSuggestions(): Iterable<String> {
@@ -113,6 +139,12 @@ object SkyridersCommands {
         } else {
             null
         }
+    }
+
+    private fun parseRaceColor(input: String): Int? {
+        val normalized = input.removePrefix("#")
+        if (!Regex("[0-9a-fA-F]{6}").matches(normalized)) return null
+        return normalized.toIntOrNull(16)?.and(0xFFFFFF)
     }
 
     private fun inputSetter(
@@ -258,6 +290,26 @@ object SkyridersCommands {
             return 0
         }
         source.sendSuccess({ Component.literal("Mounted ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body $bodyId") }, false)
+        return 1
+    }
+
+    private fun endRace(source: CommandSourceStack, colorInput: String): Int {
+        val level = source.level as? ServerLevel
+            ?: run {
+                source.sendFailure(Component.literal("Races can only be ended on the server."))
+                return 0
+            }
+        val color = parseRaceColor(colorInput)
+            ?: run {
+                source.sendFailure(Component.literal("Invalid race color: $colorInput. Expected six hex digits like FAFAFA."))
+                return 0
+            }
+
+        if (!RaceManager.endRace(level, color)) {
+            source.sendFailure(Component.literal("No active race with color %06X in this dimension.".format(color)))
+            return 0
+        }
+        source.sendSuccess({ Component.literal("Ended race %06X.".format(color)) }, true)
         return 1
     }
 }

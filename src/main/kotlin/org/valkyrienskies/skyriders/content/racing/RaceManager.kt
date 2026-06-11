@@ -103,6 +103,25 @@ object RaceManager {
         )
     }
 
+    fun activeRaceColorSuggestions(level: ServerLevel): List<String> {
+        val dimension = level.dimension().location().toString()
+        return racesByKey.values
+            .asSequence()
+            .filter { it.active && it.dimension == dimension }
+            .map { "%06X".format(it.colorId and 0xFFFFFF) }
+            .distinct()
+            .sorted()
+            .toList()
+    }
+
+    fun endRace(level: ServerLevel, colorId: Int): Boolean {
+        val dimension = level.dimension().location().toString()
+        val key = RaceKey(dimension, colorId and 0xFFFFFF)
+        val race = racesByKey[key]?.takeIf { it.active } ?: return false
+        stopRace(level, race)
+        return true
+    }
+
     private fun tickCountdown(level: ServerLevel, marker: RaceMarkerBlockEntity) {
         if (marker.countdownTicks <= 0) return
         marker.countdownTicks--
@@ -240,18 +259,15 @@ object RaceManager {
             }
             race.racers.remove(racer.bodyId)
             if (race.racers.isEmpty()) {
-                endRace(level, race)
+                stopRace(level, race)
             }
         }
     }
 
-    private fun endRace(level: ServerLevel, race: ActiveRace) {
+    private fun stopRace(level: ServerLevel, race: ActiveRace) {
         race.active = false
         racesByKey.remove(RaceKey(race.dimension, race.colorId))
-        val dimension = level.dimension().location().toString()
-        if (racesByKey.values.none { it.active && it.dimension == dimension }) {
-            sendRaceMusicStopToRacers(level, race)
-        }
+        sendRaceMusicStopToRacers(level, race)
     }
 
     private fun sendRaceMusicStartToRacers(level: ServerLevel, race: ActiveRace, track: ResourceLocation) {
