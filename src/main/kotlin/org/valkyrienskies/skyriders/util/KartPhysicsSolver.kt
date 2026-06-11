@@ -27,6 +27,7 @@ object KartPhysicsSolver {
     private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
     private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
     private const val MIN_STEP_ASSIST_RISE = 0.35
+    private const val STEP_SIDE_PROBE_BIAS = 0.025
 
     fun updateKartPhysics(
         body: PhysVsBody,
@@ -520,22 +521,32 @@ object KartPhysicsSolver {
         if (effectiveStepSpeed < 0.35) return 0.0
 
         val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveStepSpeed)
-        val probeLength = (config.wheelRadius + 0.45 + effectiveStepSpeed * 0.09)
-            .coerceIn(config.wheelRadius + 0.35, config.wheelRadius + 1.75)
+        val probeLength = (config.wheelRadius + 0.55 + effectiveStepSpeed * 0.11)
+            .coerceIn(config.wheelRadius + 0.45, config.wheelRadius + 2.15)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(config.wheelRadius * 0.45, terrainUp)
-            .fma(0.06 + speedLookahead * 0.24, terrainForward)
-        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return 0.0
-        if (obstacle.hitBody.id == body.id) return 0.0
+            .fma(0.16 + speedLookahead * 0.36, terrainForward)
+        val sideProbeDistance = config.wheelSampleWidth * 0.7 + 0.08
+        val obstacle = findStepObstacle(
+            physLevel = physLevel,
+            body = body,
+            lowProbeStart = lowProbeStart,
+            terrainForward = terrainForward,
+            wheelRight = contact.wheelRightWorld,
+            sideProbeDistance = sideProbeDistance,
+            probeLength = probeLength
+        ) ?: return 0.0
 
         val step = findStepLandingSurface(
             physLevel = physLevel,
             body = body,
             contact = contact,
-            lowProbeStart = lowProbeStart,
+            lowProbeStart = obstacle.probeStart,
             obstacleDistance = obstacle.distance,
             terrainForward = terrainForward,
             terrainUp = terrainUp,
+            wheelRight = contact.wheelRightWorld,
+            sideProbeDistance = sideProbeDistance,
             config = config,
             speedLookahead = speedLookahead
         ) ?: return 0.0
@@ -575,6 +586,25 @@ object KartPhysicsSolver {
         val assistForce = liftForce.add(forwardForce)
         VehicleWheelPhysics.applyContactForce(body, contact, assistForce)
         return assistForce.length() / max(config.mass, 1.0)
+    }
+
+    private fun findStepObstacle(
+        physLevel: PhysLevel,
+        body: PhysVsBody,
+        lowProbeStart: Vector3d,
+        terrainForward: Vector3d,
+        wheelRight: Vector3d,
+        sideProbeDistance: Double,
+        probeLength: Double
+    ): StepObstacle? {
+        return lateralStepOffsets(sideProbeDistance).asSequence()
+            .mapNotNull { sideOffset ->
+                val probeStart = Vector3d(lowProbeStart).fma(sideOffset, wheelRight)
+                val hit = physLevel.rayCast(probeStart, terrainForward, probeLength, body.id) ?: return@mapNotNull null
+                if (hit.hitBody.id == body.id || !hit.distance.isFinite()) return@mapNotNull null
+                StepObstacle(probeStart, hit.distance, abs(sideOffset))
+            }
+            .minByOrNull { it.distance + it.sideOffset * STEP_SIDE_PROBE_BIAS }
     }
 
     private fun computeStepApproachDirection(
@@ -621,6 +651,8 @@ object KartPhysicsSolver {
         obstacleDistance: Double,
         terrainForward: Vector3d,
         terrainUp: Vector3d,
+        wheelRight: Vector3d,
+        sideProbeDistance: Double,
         config: KartPhysicsConfig,
         speedLookahead: Double
     ): StepOpportunity? {
@@ -638,9 +670,13 @@ object KartPhysicsSolver {
         return forwardDistances
             .asSequence()
             .filter { it.isFinite() && it > 0.0 }
-            .mapNotNull { forwardDistance ->
+            .flatMap { forwardDistance ->
+                lateralStepOffsets(sideProbeDistance).asSequence().map { sideOffset -> forwardDistance to sideOffset }
+            }
+            .mapNotNull { (forwardDistance, sideOffset) ->
                 val topProbeStart = Vector3d(lowProbeStart)
                     .fma(forwardDistance, terrainForward)
+                    .fma(sideOffset, wheelRight)
                     .fma(stepProbeHeight, terrainUp)
                 val topHit = physLevel.rayCast(topProbeStart, down, downProbeLength, body.id) ?: return@mapNotNull null
                 if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
@@ -651,9 +687,14 @@ object KartPhysicsSolver {
                 if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + config.wheelRadius * 0.25) return@mapNotNull null
                 if (normalDot < 0.48) return@mapNotNull null
 
-                StepOpportunity(rise = rise, approachDistance = forwardDistance)
+                StepOpportunity(rise = rise, approachDistance = forwardDistance, sideOffset = abs(sideOffset))
             }
-            .minByOrNull { it.rise }
+            .minByOrNull { it.rise + it.sideOffset * STEP_SIDE_PROBE_BIAS }
+    }
+
+    private fun lateralStepOffsets(sideProbeDistance: Double): List<Double> {
+        val side = sideProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
+        return listOf(0.0, -side, side)
     }
 
     private fun smoothGroundNormal(
@@ -1147,7 +1188,14 @@ object KartPhysicsSolver {
 
     private data class StepOpportunity(
         val rise: Double,
-        val approachDistance: Double
+        val approachDistance: Double,
+        val sideOffset: Double
+    )
+
+    private data class StepObstacle(
+        val probeStart: Vector3d,
+        val distance: Double,
+        val sideOffset: Double
     )
 
     private data class WheelSample(

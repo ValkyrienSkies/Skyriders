@@ -26,6 +26,7 @@ object WheeledVehiclePhysicsSolver {
     private const val LATERAL_SAMPLE_TIE_BREAK_BIAS = 0.02
     private const val SWEEP_SAMPLE_TIE_BREAK_BIAS = 0.005
     private const val MIN_STEP_ASSIST_RISE = 0.12
+    private const val STEP_SIDE_PROBE_BIAS = 0.025
 
     fun updatePhysics(
         body: PhysVsBody,
@@ -780,14 +781,35 @@ object WheeledVehiclePhysicsSolver {
         if (effectiveSpeed < 0.35) return 0.0
 
         val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveSpeed)
-        val probeLength = (axle.wheelRadius + 0.45 + effectiveSpeed * 0.09)
-            .coerceIn(axle.wheelRadius + 0.35, axle.wheelRadius + 1.75)
+        val probeLength = (axle.wheelRadius + 0.55 + effectiveSpeed * 0.11)
+            .coerceIn(axle.wheelRadius + 0.45, axle.wheelRadius + 2.15)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(axle.wheelRadius * 0.45, terrainUp)
-            .fma(0.06 + speedLookahead * 0.24, terrainForward)
-        val obstacle = physLevel.rayCast(lowProbeStart, terrainForward, probeLength, body.id) ?: return 0.0
-        if (obstacle.hitBody.id == body.id) return 0.0
-        val step = findStepLandingSurface(physLevel, body, contact, lowProbeStart, obstacle.distance, terrainForward, terrainUp, axle, config, speedLookahead) ?: return 0.0
+            .fma(0.16 + speedLookahead * 0.36, terrainForward)
+        val sideProbeDistance = axle.wheelWidth * 0.7 + 0.08
+        val obstacle = findStepObstacle(
+            physLevel = physLevel,
+            body = body,
+            lowProbeStart = lowProbeStart,
+            terrainForward = terrainForward,
+            wheelRight = contact.wheelRightWorld,
+            sideProbeDistance = sideProbeDistance,
+            probeLength = probeLength
+        ) ?: return 0.0
+        val step = findStepLandingSurface(
+            physLevel = physLevel,
+            body = body,
+            contact = contact,
+            lowProbeStart = obstacle.probeStart,
+            obstacleDistance = obstacle.distance,
+            terrainForward = terrainForward,
+            terrainUp = terrainUp,
+            wheelRight = contact.wheelRightWorld,
+            sideProbeDistance = sideProbeDistance,
+            axle = axle,
+            config = config,
+            speedLookahead = speedLookahead
+        ) ?: return 0.0
 
         val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
         val approachDistance = max(0.25, step.approachDistance)
@@ -825,6 +847,25 @@ object WheeledVehiclePhysicsSolver {
         return assistForce.length() / max(config.mass, 1.0)
     }
 
+    private fun findStepObstacle(
+        physLevel: PhysLevel,
+        body: PhysVsBody,
+        lowProbeStart: Vector3d,
+        terrainForward: Vector3d,
+        wheelRight: Vector3d,
+        sideProbeDistance: Double,
+        probeLength: Double
+    ): StepObstacle? {
+        return lateralStepOffsets(sideProbeDistance).asSequence()
+            .mapNotNull { sideOffset ->
+                val probeStart = Vector3d(lowProbeStart).fma(sideOffset, wheelRight)
+                val hit = physLevel.rayCast(probeStart, terrainForward, probeLength, body.id) ?: return@mapNotNull null
+                if (hit.hitBody.id == body.id || !hit.distance.isFinite()) return@mapNotNull null
+                StepObstacle(probeStart, hit.distance, abs(sideOffset))
+            }
+            .minByOrNull { it.distance + it.sideOffset * STEP_SIDE_PROBE_BIAS }
+    }
+
     private fun findStepLandingSurface(
         physLevel: PhysLevel,
         body: PhysVsBody,
@@ -833,6 +874,8 @@ object WheeledVehiclePhysicsSolver {
         obstacleDistance: Double,
         terrainForward: Vector3d,
         terrainUp: Vector3d,
+        wheelRight: Vector3d,
+        sideProbeDistance: Double,
         axle: WheelAxleConfig,
         config: WheeledVehiclePhysicsConfig,
         speedLookahead: Double
@@ -848,17 +891,28 @@ object WheeledVehiclePhysicsSolver {
         )
         return forwardDistances.asSequence()
             .filter { it.isFinite() && it > 0.0 }
-            .mapNotNull { distance ->
-                val topProbeStart = Vector3d(lowProbeStart).fma(distance, terrainForward).fma(stepProbeHeight, terrainUp)
+            .flatMap { distance ->
+                lateralStepOffsets(sideProbeDistance).asSequence().map { sideOffset -> distance to sideOffset }
+            }
+            .mapNotNull { (distance, sideOffset) ->
+                val topProbeStart = Vector3d(lowProbeStart)
+                    .fma(distance, terrainForward)
+                    .fma(sideOffset, wheelRight)
+                    .fma(stepProbeHeight, terrainUp)
                 val topHit = physLevel.rayCast(topProbeStart, down, downProbeLength, body.id) ?: return@mapNotNull null
                 if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
                 val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
                 val rise = VehiclePhysicsMath.safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
                 if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + axle.wheelRadius * 0.25) return@mapNotNull null
                 if (VehiclePhysicsMath.safeDot(topHit.hitNormal, terrainUp) < 0.48) return@mapNotNull null
-                StepOpportunity(rise, distance)
+                StepOpportunity(rise, distance, abs(sideOffset))
             }
-            .minByOrNull(StepOpportunity::rise)
+            .minByOrNull { it.rise + it.sideOffset * STEP_SIDE_PROBE_BIAS }
+    }
+
+    private fun lateralStepOffsets(sideProbeDistance: Double): List<Double> {
+        val side = sideProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
+        return listOf(0.0, -side, side)
     }
 
     private fun computeStepApproachDirection(body: PhysVsBody, forward: Vector3d, terrainUp: Vector3d, throttle: Double): Vector3d {
@@ -1257,6 +1311,13 @@ object WheeledVehiclePhysicsSolver {
 
     private data class StepOpportunity(
         val rise: Double,
-        val approachDistance: Double
+        val approachDistance: Double,
+        val sideOffset: Double
+    )
+
+    private data class StepObstacle(
+        val probeStart: Vector3d,
+        val distance: Double,
+        val sideOffset: Double
     )
 }
