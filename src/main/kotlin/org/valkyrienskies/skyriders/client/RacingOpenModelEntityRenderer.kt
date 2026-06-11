@@ -12,9 +12,12 @@ import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.model.data.ModelData
+import org.joml.Vector3d
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
+import org.valkyrienskies.skyriders.content.entity.HoneyHeisterEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
+import org.valkyrienskies.mod.api.shipWorld
 import kotlin.math.atan2
 
 class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
@@ -38,6 +41,9 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
         val light = LevelRenderer.getLightColor(entity.level(), BlockPos.containing(entity.x, entity.y, entity.z))
         val selectedModel = modelSelector(entity)
         val selectedTexture = textureSelector(entity)
+        if (entity is HoneyHeisterEntity) {
+            renderHoneyTether(entity, partialTick, poseStack, bufferSource)
+        }
 
         poseStack.pushPose()
         poseStack.translate(0.0, yOffset, 0.0)
@@ -84,16 +90,61 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
                 return
             }
         }
+        if (entity is HoneyHeisterEntity) {
+            if (!entity.ignited || entity.attached) {
+                poseStack.mulPose(Axis.YP.rotationDegrees(-entity.yRot))
+                poseStack.mulPose(Axis.XP.rotationDegrees(entity.xRot))
+                return
+            }
+            val velocity = entity.deltaMovement
+            if (velocity.lengthSqr() > 1.0e-8) {
+                val horizontal = kotlin.math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
+                poseStack.mulPose(Axis.YP.rotationDegrees(Math.toDegrees(atan2(-velocity.x, -velocity.z)).toFloat()))
+                poseStack.mulPose(Axis.XP.rotationDegrees(Math.toDegrees(atan2(velocity.y, horizontal)).toFloat()))
+                val rollSpeed = if (entity.hasFuel) 32.0f else 7.0f
+                poseStack.mulPose(Axis.ZP.rotationDegrees((entity.tickCount * rollSpeed) % 360.0f))
+                return
+            }
+        }
         poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw))
+    }
+
+    private fun renderHoneyTether(
+        entity: HoneyHeisterEntity,
+        partialTick: Float,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource
+    ) {
+        if (!entity.lineConnected) return
+        val body = entity.level().shipWorld?.allBodies?.getById(entity.ownerBodyId) ?: return
+        val source = Vector3d(body.kinematics.position)
+        val entityX = entity.xOld + (entity.x - entity.xOld) * partialTick
+        val entityY = entity.yOld + (entity.y - entity.yOld) * partialTick
+        val entityZ = entity.zOld + (entity.z - entity.zOld) * partialTick
+        val dx = (source.x - entityX).toFloat()
+        val dy = (source.y - entityY + 0.45).toFloat()
+        val dz = (source.z - entityZ).toFloat()
+        val buffer = bufferSource.getBuffer(RenderType.lines())
+        val pose = poseStack.last()
+        buffer.vertex(pose.pose(), 0.0f, 0.0f, 0.0f)
+            .color(1.0f, 0.62f, 0.08f, 0.95f)
+            .normal(pose.normal(), 0.0f, 1.0f, 0.0f)
+            .endVertex()
+        buffer.vertex(pose.pose(), dx, dy, dz)
+            .color(1.0f, 0.38f, 0.02f, 0.95f)
+            .normal(pose.normal(), 0.0f, 1.0f, 0.0f)
+            .endVertex()
     }
 
     companion object {
         val CAVENDISH_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/cavendish")
         val SUGAR_ROCKET_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/sugar_rocket")
         val HOMING_SUGAR_ROCKET_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/homing_sugar_rocket")
+        val HONEY_HEISTER_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/honey_heister")
         private val CAVENDISH_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/cavendish.png")
         private val SUGAR_ROCKET_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/sugar_rocket.png")
         private val HOMING_SUGAR_ROCKET_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/sugar_rocket_homing.png")
+        private val HONEY_HEISTER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/honey_heister.png")
 
         fun cavendish(context: EntityRendererProvider.Context): RacingOpenModelEntityRenderer<CavendishEntity> {
             return RacingOpenModelEntityRenderer(
@@ -113,6 +164,15 @@ class RacingOpenModelEntityRenderer<T : net.minecraft.world.entity.Entity>(
                 scale = 1.0f,
                 modelSelector = { entity -> if (entity.homing) HOMING_SUGAR_ROCKET_MODEL else SUGAR_ROCKET_MODEL },
                 textureSelector = { entity -> if (entity.homing) HOMING_SUGAR_ROCKET_TEXTURE else SUGAR_ROCKET_TEXTURE }
+            )
+        }
+
+        fun honeyHeister(context: EntityRendererProvider.Context): RacingOpenModelEntityRenderer<HoneyHeisterEntity> {
+            return RacingOpenModelEntityRenderer(
+                context = context,
+                modelLocation = HONEY_HEISTER_MODEL,
+                textureLocation = HONEY_HEISTER_TEXTURE,
+                scale = 1.0f
             )
         }
     }

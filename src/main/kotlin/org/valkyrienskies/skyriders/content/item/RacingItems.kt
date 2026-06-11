@@ -212,6 +212,40 @@ class SugarRocketItem(
     }
 }
 
+class HoneyHeisterItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.HONEY_HEISTER_ENTITY.get().create(level) ?: return false
+        val direction = player.lookAngle.normalize()
+        val forwardOffset = Vector3d(direction.x, direction.y, direction.z).mul(1.05)
+        val bodyPosition = body.kinematics.position
+        val inheritedVelocity = body.kinematics.velocity
+        val origin = net.minecraft.world.phys.Vec3(
+            bodyPosition.x() + forwardOffset.x,
+            bodyPosition.y() + 0.6 + forwardOffset.y,
+            bodyPosition.z() + forwardOffset.z
+        )
+
+        entity.launch(
+            origin = origin,
+            direction = direction,
+            inheritedVelocity = net.minecraft.world.phys.Vec3(
+                inheritedVelocity.x() / TICKS_PER_SECOND,
+                inheritedVelocity.y() / TICKS_PER_SECOND,
+                inheritedVelocity.z() / TICKS_PER_SECOND
+            ),
+            ownerBodyId = vehicle.bodyId
+        )
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
+    }
+}
+
 class GlassoItem(properties: Properties) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false

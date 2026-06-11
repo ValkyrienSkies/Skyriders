@@ -47,6 +47,25 @@ object VehicleFuel {
         return (capacity - before).coerceAtLeast(0.0)
     }
 
+    fun transfer(from: IVehicle, to: IVehicle, maxAmount: Double): Double {
+        val amount = maxAmount.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+        val toCapacity = capacity(to.vehicleDefinition)
+        if (toCapacity <= 0.0) return 0.0
+
+        val available = amount(from)
+        val room = (toCapacity - amount(to)).coerceAtLeast(0.0)
+        val transferred = minOf(amount, available, room)
+        if (transferred <= EPSILON) return 0.0
+
+        val fromNext = available - transferred
+        setAmount(from, fromNext)
+        setAmount(to, amount(to) + transferred)
+        if (fromNext <= EPSILON) {
+            stallOutOfFuel(from)
+        }
+        return transferred
+    }
+
     fun consume(vehicle: IVehicle, body: PhysVsBody, input: VehicleInput, dt: Double) {
         if (!isEngineOn(vehicle)) return
         val definition = vehicle.vehicleDefinition

@@ -84,6 +84,9 @@ object SkyridersModClient {
                 RacingOpenModelEntityRenderer.sugarRocket(context)
             }
             EntityRenderers.register(SkyridersMod.GLASSO_ENTITY.get(), ::GlassoRenderer)
+            EntityRenderers.register(SkyridersMod.HONEY_HEISTER_ENTITY.get()) { context ->
+                RacingOpenModelEntityRenderer.honeyHeister(context)
+            }
             ItemProperties.register(SkyridersMod.RACE_COMPASS.get(), ResourceLocation("angle")) { _, _, entity, seed ->
                 RaceCompassClientState.angle(entity, seed)
             }
@@ -128,6 +131,7 @@ object SkyridersModClient {
         event.register(RacingOpenModelEntityRenderer.CAVENDISH_MODEL)
         event.register(RacingOpenModelEntityRenderer.SUGAR_ROCKET_MODEL)
         event.register(RacingOpenModelEntityRenderer.HOMING_SUGAR_ROCKET_MODEL)
+        event.register(RacingOpenModelEntityRenderer.HONEY_HEISTER_MODEL)
     }
 
     @JvmStatic

@@ -41,12 +41,14 @@ import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.GlassoEntity
+import org.valkyrienskies.skyriders.content.entity.HoneyHeisterEntity
 import org.valkyrienskies.skyriders.content.entity.ItemBoxEntity
 import org.valkyrienskies.skyriders.content.entity.SugarRocketEntity
 import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.GlassoItem
+import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
@@ -156,6 +158,9 @@ object SkyridersMod {
     val HOMING_SUGAR_ROCKET: RegistryObject<Item> = ITEMS.register("homing_sugar_rocket") {
         SugarRocketItem(Item.Properties().stacksTo(16), homing = true)
     }
+    val HONEY_HEISTER: RegistryObject<Item> = ITEMS.register("honey_heister") {
+        HoneyHeisterItem(Item.Properties().stacksTo(16))
+    }
     val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
         RaceCompassItem(Item.Properties().stacksTo(1))
     }
@@ -202,6 +207,13 @@ object SkyridersMod {
             .clientTrackingRange(16)
             .updateInterval(1)
             .build("$MOD_ID:glasso")
+    }
+    val HONEY_HEISTER_ENTITY: RegistryObject<EntityType<HoneyHeisterEntity>> = ENTITIES.register("honey_heister") {
+        EntityType.Builder.of(::HoneyHeisterEntity, MobCategory.MISC)
+            .sized(0.65f, 0.65f)
+            .clientTrackingRange(16)
+            .updateInterval(1)
+            .build("$MOD_ID:honey_heister")
     }
     val BAD_EXPLOSION_ENTITY: RegistryObject<EntityType<BadExplosionEntity>> = ENTITIES.register("bad_explosion") {
         EntityType.Builder.of(::BadExplosionEntity, MobCategory.MISC)
