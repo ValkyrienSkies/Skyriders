@@ -773,6 +773,7 @@ object WheeledVehiclePhysicsSolver {
         val driveDirection = driveCommand.throttle.coerceIn(-1.0, 1.0)
         val terrainForward = computeStepApproachDirection(body, forward, terrainUp, driveDirection)
         if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
+        val probeForward = computeStepProbeDirection(terrainForward)
         val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
         val throttleIntoStep = max(0.0, driveDirection * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
@@ -785,13 +786,13 @@ object WheeledVehiclePhysicsSolver {
             .coerceIn(axle.wheelRadius + 0.45, axle.wheelRadius + 2.15)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(axle.wheelRadius * 0.45, terrainUp)
-            .fma(0.16 + speedLookahead * 0.36, terrainForward)
+            .fma(0.16 + speedLookahead * 0.36, probeForward)
         val sideProbeDistance = axle.wheelWidth * 0.7 + 0.08
         val obstacle = findStepObstacle(
             physLevel = physLevel,
             body = body,
             lowProbeStart = lowProbeStart,
-            terrainForward = terrainForward,
+            terrainForward = probeForward,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
             probeLength = probeLength
@@ -802,7 +803,7 @@ object WheeledVehiclePhysicsSolver {
             contact = contact,
             lowProbeStart = obstacle.probeStart,
             obstacleDistance = obstacle.distance,
-            terrainForward = terrainForward,
+            terrainForward = probeForward,
             terrainUp = terrainUp,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
@@ -935,6 +936,15 @@ object WheeledVehiclePhysicsSolver {
             throttle < -0.05 -> Vector3d(projectedForward).negate()
             else -> Vector3d()
         }
+    }
+
+    private fun computeStepProbeDirection(approachDirection: Vector3d): Vector3d {
+        val worldUp = Vector3d(0.0, 1.0, 0.0)
+        val horizontal = Vector3d(approachDirection)
+            .fma(-VehiclePhysicsMath.safeDot(approachDirection, worldUp), worldUp)
+        if (horizontal.lengthSquared() < 1.0e-6) return Vector3d(approachDirection)
+        val normalized = VehiclePhysicsMath.safeNormalize(horizontal, approachDirection)
+        return if (VehiclePhysicsMath.safeDot(normalized, approachDirection) > 0.35) normalized else Vector3d(approachDirection)
     }
 
     private fun smoothGroundNormal(

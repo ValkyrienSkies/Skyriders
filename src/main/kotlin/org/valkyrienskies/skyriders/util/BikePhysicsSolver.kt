@@ -839,6 +839,7 @@ object BikePhysicsSolver {
 
         val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
         if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
+        val probeForward = computeStepProbeDirection(terrainForward)
 
         val speedIntoStep = max(0.0, safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = projectOntoPlane(forward, terrainUp, forward)
@@ -852,13 +853,13 @@ object BikePhysicsSolver {
             .coerceIn(config.wheelRadius + 0.45, config.wheelRadius + 2.15)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(config.wheelRadius * 0.45, terrainUp)
-            .fma(0.16 + speedLookahead * 0.36, terrainForward)
+            .fma(0.16 + speedLookahead * 0.36, probeForward)
         val sideProbeDistance = config.wheelWidth * 0.7 + 0.08
         val obstacle = findStepObstacle(
             physLevel = physLevel,
             body = body,
             lowProbeStart = lowProbeStart,
-            terrainForward = terrainForward,
+            terrainForward = probeForward,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
             probeLength = probeLength
@@ -870,7 +871,7 @@ object BikePhysicsSolver {
             contact = contact,
             lowProbeStart = obstacle.probeStart,
             obstacleDistance = obstacle.distance,
-            terrainForward = terrainForward,
+            terrainForward = probeForward,
             terrainUp = terrainUp,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
@@ -959,6 +960,14 @@ object BikePhysicsSolver {
             throttle < -0.05 -> Vector3d(projectedForward).negate()
             else -> Vector3d()
         }
+    }
+
+    private fun computeStepProbeDirection(approachDirection: Vector3d): Vector3d {
+        val worldUp = Vector3d(0.0, 1.0, 0.0)
+        val horizontal = Vector3d(approachDirection).fma(-safeDot(approachDirection, worldUp), worldUp)
+        if (horizontal.lengthSquared() < 1.0e-6) return Vector3d(approachDirection)
+        val normalized = safeNormalize(horizontal, approachDirection)
+        return if (safeDot(normalized, approachDirection) > 0.35) normalized else Vector3d(approachDirection)
     }
 
     private fun findStepLandingSurface(
