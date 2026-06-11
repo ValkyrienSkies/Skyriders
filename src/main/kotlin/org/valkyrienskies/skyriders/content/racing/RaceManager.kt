@@ -387,8 +387,9 @@ object RaceManager {
 
     private fun sendRaceMusicStopToRacers(level: ServerLevel, race: ActiveRace) {
         race.racers.values
-            .mapNotNull { racer -> driverForBody(level, racer.bodyId) }
+            .mapNotNull { racer -> playerForRacer(level, racer) }
             .forEach { driver ->
+                SkyridersNetwork.sendRaceCompassTarget(driver, null)
                 SkyridersNetwork.sendRaceHudClear(driver)
                 SkyridersNetwork.sendRaceMusicStop(driver)
             }
@@ -680,6 +681,11 @@ object RaceManager {
     }
 
     private fun driverForBody(level: ServerLevel, bodyId: Long): ServerPlayer? = driverForVehicle(level, bodyId)
+
+    private fun playerForRacer(level: ServerLevel, racer: RacerState): ServerPlayer? {
+        return racer.driverId?.let { level.server.playerList.getPlayer(it) }
+            ?: driverForBody(level, racer.bodyId)
+    }
 
     private fun selectRaceMusicTrack(level: ServerLevel): ResourceLocation? {
         val tracks = SkyridersSounds.RACE_MUSIC_TRACKS
