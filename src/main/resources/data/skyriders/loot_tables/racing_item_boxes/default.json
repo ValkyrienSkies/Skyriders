@@ -5,6 +5,7 @@
       "rolls": 1,
       "entries": [
         { "type": "minecraft:item", "name": "skyriders:honey_canister", "weight": 8 },
+        { "type": "minecraft:item", "name": "skyriders:royal_jelly_canister", "weight": 3 },
         { "type": "minecraft:item", "name": "skyriders:honey_tank", "weight": 6 },
         { "type": "minecraft:item", "name": "skyriders:cavendish", "weight": 7 },
         { "type": "minecraft:item", "name": "skyriders:fake_item_box", "weight": 5 },

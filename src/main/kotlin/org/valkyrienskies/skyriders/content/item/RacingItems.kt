@@ -29,7 +29,13 @@ import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
 import org.valkyrienskies.skyriders.content.entity.FakeItemBoxEntity
 
-class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) {
+open class HoneyCanisterItem(
+    properties: Properties,
+    private val boostDuration: Double = 1.15,
+    private val boostAcceleration: Double = 44.0,
+    private val boostTargetSpeed: Double = 38.0,
+    private val boostFadeRange: Double = 9.0
+) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
         playItemUseSound(level, player)
         level.playSound(
@@ -42,8 +48,30 @@ class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) 
             0.9f,
             1.0f
         )
-        VehicleStatusEffects.applyBoost(vehicle, duration = 0.95, acceleration = 36.0, targetSpeed = 34.0, fadeRange = 8.0)
+        VehicleStatusEffects.applyBoost(
+            vehicle,
+            duration = boostDuration,
+            acceleration = boostAcceleration,
+            targetSpeed = boostTargetSpeed,
+            fadeRange = boostFadeRange
+        )
         return true
+    }
+}
+
+class RoyalJellyCanisterItem(properties: Properties) : HoneyCanisterItem(
+    properties,
+    boostDuration = 1.45,
+    boostAcceleration = 58.0,
+    boostTargetSpeed = 46.0,
+    boostFadeRange = 11.0
+) {
+    override fun isFoil(stack: ItemStack): Boolean = true
+
+    override fun consumeAfterUse(player: Player, hand: InteractionHand, stack: ItemStack) {
+        stack.hurtAndBreak(1, player) { brokenPlayer ->
+            brokenPlayer.broadcastBreakEvent(hand)
+        }
     }
 }
 
@@ -445,13 +473,15 @@ abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
             return InteractionResultHolder.fail(stack)
         }
 
-        if (!player.abilities.instabuild) {
-            stack.shrink(1)
-        }
+        if (!player.abilities.instabuild) consumeAfterUse(player, hand, stack)
         return InteractionResultHolder.success(stack)
     }
 
     protected abstract fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean
+
+    protected open fun consumeAfterUse(player: Player, hand: InteractionHand, stack: ItemStack) {
+        stack.shrink(1)
+    }
 
     protected fun playItemUseSound(level: ServerLevel, player: Player) {
         level.playSound(

@@ -90,6 +90,7 @@ class RacingRouletteItem(properties: Properties) : Item(properties) {
             val ticks = minecraft.level?.gameTime ?: (System.currentTimeMillis() / 50L)
             val options = listOf(
                 SkyridersMod.HONEY_CANISTER.get(),
+                SkyridersMod.ROYAL_JELLY_CANISTER.get(),
                 SkyridersMod.HONEY_TANK.get(),
                 SkyridersMod.CAVENDISH.get(),
                 SkyridersMod.FAKE_ITEM_BOX.get(),

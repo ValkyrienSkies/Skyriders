@@ -62,6 +62,7 @@ import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.RacingDispenserBehaviors
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
+import org.valkyrienskies.skyriders.content.item.RoyalJellyCanisterItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
@@ -169,6 +170,9 @@ object SkyridersMod {
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))
     }
+    val ROYAL_JELLY_CANISTER: RegistryObject<Item> = ITEMS.register("royal_jelly_canister") {
+        RoyalJellyCanisterItem(Item.Properties().durability(4).rarity(Rarity.RARE))
+    }
     val HONEY_TANK: RegistryObject<Item> = ITEMS.register("honey_tank") {
         HoneyTankItem(Item.Properties().stacksTo(16))
     }
@@ -227,6 +231,7 @@ object SkyridersMod {
                 output.accept(RACING_ROULETTE.get())
                 output.accept(RACE_COMPASS.get())
                 output.accept(HONEY_CANISTER.get())
+                output.accept(ROYAL_JELLY_CANISTER.get())
                 output.accept(HONEY_TANK.get())
                 output.accept(FAKE_ITEM_BOX.get())
                 output.accept(CAVENDISH.get())

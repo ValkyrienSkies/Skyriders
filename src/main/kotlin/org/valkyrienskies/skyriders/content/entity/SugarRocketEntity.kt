@@ -444,11 +444,11 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 4.75
-        private const val EXPLOSION_SHOVE_DISTANCE = 9.0
-        private const val EXPLOSION_SHOVE_UP = 1.4
-        private const val EXPLOSION_SHOVE_DURATION = 0.34
-        private const val EXPLOSION_SHOVE_ACCELERATION = 86.0
-        private const val EXPLOSION_SHOVE_MAX_SPEED = 31.0
+        private const val EXPLOSION_SHOVE_DISTANCE = 12.0
+        private const val EXPLOSION_SHOVE_UP = 1.8
+        private const val EXPLOSION_SHOVE_DURATION = 0.42
+        private const val EXPLOSION_SHOVE_ACCELERATION = 118.0
+        private const val EXPLOSION_SHOVE_MAX_SPEED = 40.0
         private const val EXPLOSION_SOUND_RADIUS = 128.0
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0

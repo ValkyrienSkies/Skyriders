@@ -209,6 +209,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
     private fun fallbackItems(level: ServerLevel, lowFuel: Boolean): List<ItemStack> {
         val options = listOf(
             SkyridersMod.HONEY_CANISTER.get(),
+            SkyridersMod.ROYAL_JELLY_CANISTER.get(),
             SkyridersMod.HONEY_TANK.get(),
             SkyridersMod.CAVENDISH.get(),
             SkyridersMod.FAKE_ITEM_BOX.get(),
