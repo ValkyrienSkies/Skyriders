@@ -168,6 +168,7 @@ data class BikePhysicsConfig(
             lateralGrip = 1.15,
             longitudinalGrip = 1.12,
             wheelTopSpeed = 28.0,
+            brakeStrength = 5.0,
             frictionCoefficient = 1.25,
             slipSharpness = 3.25,
             driftRearGripScale = 0.22,
