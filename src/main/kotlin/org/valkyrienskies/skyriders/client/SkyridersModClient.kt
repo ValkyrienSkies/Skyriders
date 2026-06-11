@@ -80,6 +80,7 @@ object SkyridersModClient {
                 RacingOpenModelEntityRenderer.cavendish(context)
             }
             EntityRenderers.register(SkyridersMod.ITEM_BOX_ENTITY.get(), ::ItemBoxRenderer)
+            EntityRenderers.register(SkyridersMod.FAKE_ITEM_BOX_ENTITY.get(), ::FakeItemBoxRenderer)
             EntityRenderers.register(SkyridersMod.SUGAR_ROCKET_ENTITY.get()) { context ->
                 RacingOpenModelEntityRenderer.sugarRocket(context)
             }

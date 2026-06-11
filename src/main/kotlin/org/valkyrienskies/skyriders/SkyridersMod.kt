@@ -41,6 +41,7 @@ import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
+import org.valkyrienskies.skyriders.content.entity.FakeItemBoxEntity
 import org.valkyrienskies.skyriders.content.entity.GlassoEntity
 import org.valkyrienskies.skyriders.content.entity.HoneyHeisterEntity
 import org.valkyrienskies.skyriders.content.entity.ItemBoxEntity
@@ -49,9 +50,11 @@ import org.valkyrienskies.skyriders.content.item.CavendishItem
 import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.ExtendingArmItem
+import org.valkyrienskies.skyriders.content.item.FakeItemBoxItem
 import org.valkyrienskies.skyriders.content.item.GlassoItem
 import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
+import org.valkyrienskies.skyriders.content.item.HoneyTankItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
@@ -145,6 +148,12 @@ object SkyridersMod {
     val HONEY_CANISTER: RegistryObject<Item> = ITEMS.register("honey_canister") {
         HoneyCanisterItem(Item.Properties().stacksTo(16))
     }
+    val HONEY_TANK: RegistryObject<Item> = ITEMS.register("honey_tank") {
+        HoneyTankItem(Item.Properties().stacksTo(16))
+    }
+    val FAKE_ITEM_BOX: RegistryObject<Item> = ITEMS.register("fake_item_box") {
+        FakeItemBoxItem(Item.Properties().stacksTo(16))
+    }
     val THUNDERBOLT: RegistryObject<Item> = ITEMS.register("thunderbolt") {
         ThunderboltItem(Item.Properties().stacksTo(16))
     }
@@ -201,6 +210,13 @@ object SkyridersMod {
             .clientTrackingRange(12)
             .updateInterval(1)
             .build("$MOD_ID:item_box")
+    }
+    val FAKE_ITEM_BOX_ENTITY: RegistryObject<EntityType<FakeItemBoxEntity>> = ENTITIES.register("fake_item_box") {
+        EntityType.Builder.of(::FakeItemBoxEntity, MobCategory.MISC)
+            .sized(0.9f, 0.9f)
+            .clientTrackingRange(16)
+            .updateInterval(1)
+            .build("$MOD_ID:fake_item_box")
     }
     val SUGAR_ROCKET_ENTITY: RegistryObject<EntityType<SugarRocketEntity>> = ENTITIES.register("sugar_rocket") {
         EntityType.Builder.of(::SugarRocketEntity, MobCategory.MISC)

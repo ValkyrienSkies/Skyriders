@@ -1,5 +1,7 @@
 package org.valkyrienskies.skyriders.content.entity
 
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.game.ClientGamePacketListener
@@ -29,8 +31,11 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
-import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
+import org.valkyrienskies.skyriders.content.racing.RaceManager
+import net.minecraftforge.registries.ForgeRegistries
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import kotlin.math.sqrt
 
 class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type, level) {
@@ -71,7 +76,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: continue
             val radius = PICKUP_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(center) > radius * radius) continue
-            if (grantPickup(serverLevel, driver)) {
+            if (grantPickup(serverLevel, driver, vehicle.bodyId)) {
                 freezeRotation()
                 rechargeTicks = RECHARGE_TICKS_DEFAULT
                 playPickupSound(serverLevel)
@@ -106,23 +111,85 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         entityData.set(FROZEN_ROTATION_TICK, tickCount)
     }
 
-    private fun grantPickup(level: ServerLevel, driver: ServerPlayer): Boolean {
-        val table: LootTable? = level.server.getLootData()
-            .getElement(LootDataId(LootDataType.TABLE, DEFAULT_LOOT_TABLE))
-        val params = LootParams.Builder(level).create(LootContextParamSets.EMPTY)
-        val generated = table?.getRandomItems(params).orEmpty()
-        val stacks = if (generated.isEmpty()) fallbackItems(level) else generated
+    private fun grantPickup(level: ServerLevel, driver: ServerPlayer, bodyId: Long): Boolean {
+        val placeWeighted = placeWeightedItems(level, bodyId)
+        val stacks = placeWeighted ?: vanillaLootItems(level)
         if (stacks.isEmpty()) return false
         stacks.forEach { stack -> giveOrDrop(driver, RacingRouletteItem.create(stack.copy())) }
         return true
     }
 
+    private fun vanillaLootItems(level: ServerLevel): List<ItemStack> {
+        val table: LootTable? = level.server.getLootData()
+            .getElement(LootDataId(LootDataType.TABLE, DEFAULT_LOOT_TABLE))
+        val params = LootParams.Builder(level).create(LootContextParamSets.EMPTY)
+        val generated = table?.getRandomItems(params).orEmpty()
+        return if (generated.isEmpty()) fallbackItems(level) else generated
+    }
+
+    private fun placeWeightedItems(level: ServerLevel, bodyId: Long): List<ItemStack>? {
+        val entries = loadPlaceWeightedEntries(level)
+        if (entries.isEmpty()) return null
+        val placeFactor = placeFactor(level, bodyId)
+        val totalWeight = entries.sumOf { it.effectiveWeight(placeFactor) }
+        if (totalWeight <= 0.0) return null
+
+        var pick = level.random.nextDouble() * totalWeight
+        entries.forEach { entry ->
+            pick -= entry.effectiveWeight(placeFactor)
+            if (pick <= 0.0) {
+                return listOf(entry.stack())
+            }
+        }
+        return listOf(entries.last().stack())
+    }
+
+    private fun placeFactor(level: ServerLevel, bodyId: Long): Double {
+        val placement = RaceManager.placementFor(level, bodyId) ?: return 0.5
+        if (placement.total <= 1) return 0.5
+        return ((placement.place - 1).toDouble() / (placement.total - 1).toDouble()).coerceIn(0.0, 1.0)
+    }
+
+    private fun loadPlaceWeightedEntries(level: ServerLevel): List<PlaceWeightedReward> {
+        val resource = level.server.resourceManager.getResource(PLACE_WEIGHT_TABLE)
+        if (resource.isEmpty) return emptyList()
+        return try {
+            resource.get().open().use { stream ->
+                val json = JsonParser.parseReader(InputStreamReader(stream, StandardCharsets.UTF_8)).asJsonObject
+                val entries = json.getAsJsonArray("entries") ?: return emptyList()
+                entries.mapNotNull { element ->
+                    val entry = element.asJsonObject ?: return@mapNotNull null
+                    val itemId = ResourceLocation.tryParse(entry.get("item")?.asString ?: return@mapNotNull null)
+                        ?: return@mapNotNull null
+                    val item = ForgeRegistries.ITEMS.getValue(itemId) ?: return@mapNotNull null
+                    val weight = entry.doubleOr("weight", 1.0)
+                    if (weight <= 0.0) return@mapNotNull null
+                    PlaceWeightedReward(
+                        item = item,
+                        weight = weight,
+                        frontMultiplier = entry.doubleOr("frontMultiplier", 1.0),
+                        backMultiplier = entry.doubleOr("backMultiplier", 1.0),
+                        count = entry.intOr("count", 1).coerceAtLeast(1)
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     private fun fallbackItems(level: ServerLevel): List<ItemStack> {
         val options = listOf(
             SkyridersMod.HONEY_CANISTER.get(),
+            SkyridersMod.HONEY_TANK.get(),
             SkyridersMod.CAVENDISH.get(),
+            SkyridersMod.FAKE_ITEM_BOX.get(),
             SkyridersMod.SUGAR_ROCKET.get(),
             SkyridersMod.HOMING_SUGAR_ROCKET.get(),
+            SkyridersMod.GLASSO.get(),
+            SkyridersMod.HONEY_HEISTER.get(),
+            SkyridersMod.BOXING_GLOVE.get(),
+            SkyridersMod.GRABBY_HAND.get(),
             SkyridersMod.THUNDERBOLT.get()
         )
         return listOf(ItemStack(options[level.random.nextInt(options.size)]))
@@ -226,6 +293,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
     companion object {
         val DEFAULT_LOOT_TABLE = ResourceLocation(SkyridersMod.MOD_ID, "racing_item_boxes/default")
+        val PLACE_WEIGHT_TABLE = ResourceLocation(SkyridersMod.MOD_ID, "racing_item_box_weights/default.json")
         private const val RECHARGE_TICKS_KEY = "RechargeTicks"
         private const val RECHARGE_TICKS_DEFAULT = 20 * 5
         private const val PICKUP_RADIUS = 0.85
@@ -234,5 +302,36 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             SynchedEntityData.defineId(ItemBoxEntity::class.java, EntityDataSerializers.INT)
         private val FROZEN_ROTATION_TICK: EntityDataAccessor<Int> =
             SynchedEntityData.defineId(ItemBoxEntity::class.java, EntityDataSerializers.INT)
+    }
+
+    private data class PlaceWeightedReward(
+        val item: net.minecraft.world.item.Item,
+        val weight: Double,
+        val frontMultiplier: Double,
+        val backMultiplier: Double,
+        val count: Int
+    ) {
+        fun effectiveWeight(placeFactor: Double): Double {
+            val multiplier = frontMultiplier + (backMultiplier - frontMultiplier) * placeFactor
+            return (weight * multiplier).takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+        }
+
+        fun stack(): ItemStack = ItemStack(item, count.coerceAtMost(item.defaultInstance.maxStackSize))
+    }
+}
+
+private fun JsonObject.doubleOr(key: String, defaultValue: Double): Double {
+    return try {
+        get(key)?.asDouble?.takeIf { it.isFinite() } ?: defaultValue
+    } catch (_: Exception) {
+        defaultValue
+    }
+}
+
+private fun JsonObject.intOr(key: String, defaultValue: Int): Int {
+    return try {
+        get(key)?.asInt ?: defaultValue
+    } catch (_: Exception) {
+        defaultValue
     }
 }

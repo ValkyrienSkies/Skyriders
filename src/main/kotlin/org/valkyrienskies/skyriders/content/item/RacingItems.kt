@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
+import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.VsBody
@@ -19,6 +20,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
+import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
@@ -39,6 +41,28 @@ class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) 
         )
         VehicleStatusEffects.applyBoost(vehicle, duration = 0.95, acceleration = 36.0, targetSpeed = 34.0, fadeRange = 8.0)
         return true
+    }
+}
+
+class HoneyTankItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val added = VehicleFuel.refillFraction(vehicle, FUEL_FRACTION)
+        if (added <= 0.0) return false
+        level.playSound(
+            null,
+            player.x,
+            player.y,
+            player.z,
+            SoundEvents.HONEY_DRINK,
+            SoundSource.PLAYERS,
+            0.95f,
+            0.78f
+        )
+        return true
+    }
+
+    private companion object {
+        const val FUEL_FRACTION = 0.25
     }
 }
 
@@ -168,6 +192,37 @@ class CavendishItem(properties: Properties) : RacingVehicleItem(properties) {
         return Vector3d(forward).mul(-0.48)
             .add(0.0, 0.34, 0.0)
             .add(inheritedVelocity.x() / TICKS_PER_SECOND, inheritedVelocity.y() / TICKS_PER_SECOND, inheritedVelocity.z() / TICKS_PER_SECOND)
+    }
+
+    private companion object {
+        const val TICKS_PER_SECOND = 20.0
+    }
+}
+
+class FakeItemBoxItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
+        val entity = SkyridersMod.FAKE_ITEM_BOX_ENTITY.get().create(level) ?: return false
+        val forward = body.kinematics.transform.rotation.transform(Vector3d(0.0, 0.0, 1.0)).normalize()
+        val origin = body.kinematics.transform.toWorld.transformPosition(Vector3d())
+            .sub(Vector3d(forward).mul(1.05))
+            .add(0.0, 0.78, 0.0)
+        val inheritedVelocity = body.kinematics.velocity
+        val velocity = Vec3(
+            -forward.x * 0.42 + inheritedVelocity.x() / TICKS_PER_SECOND,
+            0.28 + inheritedVelocity.y() / TICKS_PER_SECOND,
+            -forward.z * 0.42 + inheritedVelocity.z() / TICKS_PER_SECOND
+        )
+
+        entity.launch(
+            origin = Vec3(origin.x, origin.y, origin.z),
+            velocity = velocity,
+            ownerBodyId = vehicle.bodyId,
+            yaw = level.random.nextFloat() * 360.0f
+        )
+        level.addFreshEntity(entity)
+        playItemUseSound(level, player)
+        return true
     }
 
     private companion object {

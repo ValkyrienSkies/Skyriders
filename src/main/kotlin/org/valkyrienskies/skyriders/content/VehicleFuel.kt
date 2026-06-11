@@ -40,11 +40,22 @@ object VehicleFuel {
         val capacity = capacity(vehicle.vehicleDefinition)
         val before = amount(vehicle)
         setAmount(vehicle, capacity)
-        if (vehicle is WheeledVehicle && capacity > 0.0) {
-            vehicle.wheeledState.engineStalled = false
-            vehicle.wheeledState.debugEngineStalled = false
-        }
+        clearFuelStall(vehicle)
         return (capacity - before).coerceAtLeast(0.0)
+    }
+
+    fun refillFraction(vehicle: IVehicle, fraction: Double): Double {
+        val capacity = capacity(vehicle.vehicleDefinition)
+        val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+        if (capacity <= 0.0) return 0.0
+        val before = amount(vehicle)
+        val addedTarget = capacity * safeFraction
+        setAmount(vehicle, before + addedTarget)
+        val added = (amount(vehicle) - before).coerceAtLeast(0.0)
+        if (added > EPSILON) {
+            clearFuelStall(vehicle)
+        }
+        return added
     }
 
     fun transfer(from: IVehicle, to: IVehicle, maxAmount: Double): Double {
@@ -63,6 +74,7 @@ object VehicleFuel {
         if (fromNext <= EPSILON) {
             stallOutOfFuel(from)
         }
+        clearFuelStall(to)
         return transferred
     }
 
@@ -165,6 +177,13 @@ object VehicleFuel {
                 vehicle.wheeledState.driftBoostForce = 0.0
                 vehicle.wheeledState.driftBoostTimeRemaining = 0.0
             }
+        }
+    }
+
+    private fun clearFuelStall(vehicle: IVehicle) {
+        if (vehicle is WheeledVehicle) {
+            vehicle.wheeledState.engineStalled = false
+            vehicle.wheeledState.debugEngineStalled = false
         }
     }
 }

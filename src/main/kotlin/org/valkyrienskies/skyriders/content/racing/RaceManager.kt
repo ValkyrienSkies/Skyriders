@@ -36,7 +36,7 @@ object RaceManager {
     private const val COUNTDOWN_TICKS = 80
     private const val COUNTDOWN_MESSAGE_INTERVAL = 20
     private const val LINE_PARTICLE_SPACING = 0.55
-    private const val START_CAPTURE_RANGE = 8.0
+    private const val START_CAPTURE_RANGE = 128.0
     private const val MIN_LINE_LENGTH = 0.75
     private val racesByKey = HashMap<RaceKey, ActiveRace>()
     private val markerPositionsByDimension = ConcurrentHashMap<String, MutableSet<Long>>()
@@ -53,7 +53,7 @@ object RaceManager {
 
     fun startCountdown(marker: RaceMarkerBlockEntity, level: ServerLevel, triggerPlayer: Player? = null) {
         if (marker.markerType != RaceMarkerTypes.START_FINISH || marker.colorId < 0 || marker.endpointPos == null) {
-            triggerPlayer?.sendSystemMessage(Component.literal("Race marker needs start/finish type, endpoint, and flag color."))
+            triggerPlayer?.displayClientMessage(Component.literal("Race marker needs start/finish type, endpoint, and flag color."), true)
             return
         }
         val key = RaceKey(level.dimension().location().toString(), marker.colorId)
@@ -88,6 +88,19 @@ object RaceManager {
             race.active && race.dimension == level.dimension().location().toString() && race.racers[seat.bodyId]?.driverId == player.uuid
         }?.racers?.get(seat.bodyId) ?: return null
         return state.nextTarget
+    }
+
+    fun placementFor(level: ServerLevel, bodyId: Long): RacePlacement? {
+        val race = racesByKey.values.firstOrNull { race ->
+            race.active && race.dimension == level.dimension().location().toString() && race.racers.containsKey(bodyId)
+        } ?: return null
+        val standings = activeStandings(level, race)
+        val standingIndex = standings.indexOfFirst { it.bodyId == bodyId }
+        if (standingIndex < 0) return null
+        return RacePlacement(
+            place = race.finishOrder.size + standingIndex + 1,
+            total = race.totalParticipants
+        )
     }
 
     private fun tickCountdown(level: ServerLevel, marker: RaceMarkerBlockEntity) {
@@ -506,6 +519,8 @@ object RaceManager {
     )
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
+
+    data class RacePlacement(val place: Int, val total: Int)
 }
 
 data class RaceLine(val start: Vector3d, val end: Vector3d) {

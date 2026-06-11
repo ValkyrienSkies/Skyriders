@@ -182,7 +182,7 @@ object BikeWorldRenderer {
             ?: fallbackFlagAttachment(vehicle)
         poseStack.pushPose()
         poseStack.translate(attachment.localPos.x, attachment.localPos.y, attachment.localPos.z)
-        poseStack.mulPose(Axis.YP.rotationDegrees(attachment.yawDegrees))
+        poseStack.mulPose(Axis.YP.rotationDegrees(attachment.yawDegrees + FLAG_MODEL_YAW_CORRECTION_DEGREES))
         poseStack.scale(attachment.scale, attachment.scale, attachment.scale)
         Minecraft.getInstance().itemRenderer.renderStatic(
             flagStack(color),
@@ -389,6 +389,8 @@ object BikeWorldRenderer {
         val yawDegrees: Float = 180.0f,
         val scale: Float = 0.9f
     )
+
+    private const val FLAG_MODEL_YAW_CORRECTION_DEGREES = 180.0f
 
     private data class RenderVisualState(
         var lastRenderNanos: Long,
