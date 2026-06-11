@@ -27,7 +27,7 @@ object RaceCompassClientState {
         if (dx * dx + dz * dz < 1.0E-4) return 0.0f
         val targetAngle = atan2(dz, dx) / (Math.PI * 2.0)
         val entityYaw = Mth.positiveModulo(entity.yRot.toDouble() / 360.0, 1.0)
-        return Mth.positiveModulo((0.5 - (targetAngle - entityYaw)).toFloat(), 1.0f)
+        return Mth.positiveModulo((0.5 - (entityYaw - targetAngle)).toFloat(), 1.0f)
     }
 
     fun tick() {

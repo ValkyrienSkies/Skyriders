@@ -512,7 +512,6 @@ object KartPhysicsSolver {
 
         val terrainForward = computeStepApproachDirection(body, forward, terrainUp, input.throttle)
         if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
-        val probeForward = computeStepProbeDirection(terrainForward)
 
         val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
         val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
@@ -526,15 +525,17 @@ object KartPhysicsSolver {
             .coerceIn(config.wheelRadius + 0.45, config.wheelRadius + 2.15)
         val lowProbeStart = Vector3d(contact.contactPointWorld)
             .fma(config.wheelRadius * 0.45, terrainUp)
-            .fma(0.16 + speedLookahead * 0.36, probeForward)
+            .fma(0.16 + speedLookahead * 0.36, terrainForward)
         val sideProbeDistance = config.wheelSampleWidth * 0.7 + 0.08
         val obstacle = findStepObstacle(
             physLevel = physLevel,
             body = body,
             lowProbeStart = lowProbeStart,
-            terrainForward = probeForward,
+            terrainForward = terrainForward,
+            terrainUp = terrainUp,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
+            verticalProbeDistance = min(config.maxStepHeight * 0.45, config.wheelRadius * 1.15),
             probeLength = probeLength
         ) ?: return 0.0
 
@@ -544,7 +545,7 @@ object KartPhysicsSolver {
             contact = contact,
             lowProbeStart = obstacle.probeStart,
             obstacleDistance = obstacle.distance,
-            terrainForward = probeForward,
+            terrainForward = terrainForward,
             terrainUp = terrainUp,
             wheelRight = contact.wheelRightWorld,
             sideProbeDistance = sideProbeDistance,
@@ -594,13 +595,20 @@ object KartPhysicsSolver {
         body: PhysVsBody,
         lowProbeStart: Vector3d,
         terrainForward: Vector3d,
+        terrainUp: Vector3d,
         wheelRight: Vector3d,
         sideProbeDistance: Double,
+        verticalProbeDistance: Double,
         probeLength: Double
     ): StepObstacle? {
         return lateralStepOffsets(sideProbeDistance).asSequence()
-            .mapNotNull { sideOffset ->
-                val probeStart = Vector3d(lowProbeStart).fma(sideOffset, wheelRight)
+            .flatMap { sideOffset ->
+                verticalStepOffsets(verticalProbeDistance).asSequence().map { verticalOffset -> sideOffset to verticalOffset }
+            }
+            .mapNotNull { (sideOffset, verticalOffset) ->
+                val probeStart = Vector3d(lowProbeStart)
+                    .fma(sideOffset, wheelRight)
+                    .fma(verticalOffset, terrainUp)
                 val hit = physLevel.rayCast(probeStart, terrainForward, probeLength, body.id) ?: return@mapNotNull null
                 if (hit.hitBody.id == body.id || !hit.distance.isFinite()) return@mapNotNull null
                 StepObstacle(probeStart, hit.distance, abs(sideOffset))
@@ -642,15 +650,6 @@ object KartPhysicsSolver {
             throttle < -0.05 -> Vector3d(projectedForward).negate()
             else -> Vector3d()
         }
-    }
-
-    private fun computeStepProbeDirection(approachDirection: Vector3d): Vector3d {
-        val worldUp = Vector3d(0.0, 1.0, 0.0)
-        val horizontal = Vector3d(approachDirection)
-            .fma(-VehiclePhysicsMath.safeDot(approachDirection, worldUp), worldUp)
-        if (horizontal.lengthSquared() < 1.0e-6) return Vector3d(approachDirection)
-        val normalized = VehiclePhysicsMath.safeNormalize(horizontal, approachDirection)
-        return if (VehiclePhysicsMath.safeDot(normalized, approachDirection) > 0.35) normalized else Vector3d(approachDirection)
     }
 
     private fun findStepLandingSurface(
@@ -705,6 +704,11 @@ object KartPhysicsSolver {
     private fun lateralStepOffsets(sideProbeDistance: Double): List<Double> {
         val side = sideProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
         return listOf(0.0, -side, side)
+    }
+
+    private fun verticalStepOffsets(verticalProbeDistance: Double): List<Double> {
+        val vertical = verticalProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
+        return listOf(0.0, vertical, vertical * 0.5)
     }
 
     private fun smoothGroundNormal(
