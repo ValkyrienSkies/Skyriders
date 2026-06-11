@@ -47,11 +47,29 @@ object RaceManager {
     fun registerMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
         val snapshots = markerSnapshotsByDimension
             .getOrPut(level.dimension().location().toString()) { ConcurrentHashMap() }
-        snapshots[marker.blockPos.asLong()] = RaceMarkerSnapshot.from(marker)
+        val snapshot = RaceMarkerSnapshot.from(marker)
+        snapshots[marker.blockPos.asLong()] = snapshot
+        RaceSavedData.get(level).setMarker(snapshot)
     }
 
     fun unregisterMarker(level: ServerLevel, pos: BlockPos) {
         markerSnapshotsByDimension[level.dimension().location().toString()]?.remove(pos.asLong())
+        RaceSavedData.get(level).removeMarker(pos)
+    }
+
+    fun loadLevel(level: ServerLevel) {
+        val dimension = level.dimension().location().toString()
+        val snapshots = markerSnapshotsByDimension
+            .getOrPut(dimension) { ConcurrentHashMap() }
+        snapshots.clear()
+        RaceSavedData.get(level).markers.forEach { (key, snapshot) ->
+            snapshots[key] = snapshot
+        }
+    }
+
+    fun saveLevel(level: ServerLevel) {
+        val dimension = level.dimension().location().toString()
+        RaceSavedData.get(level).replaceMarkers(markerSnapshotsByDimension[dimension]?.values.orEmpty())
     }
 
     fun tickLevel(level: ServerLevel) {
@@ -231,6 +249,7 @@ object RaceManager {
         )
         ensureRaceMarkerChunksLoaded(level, race)
         participants.values.forEach { racer ->
+            racer.raceStartedAtGameTime = level.gameTime
             racer.lapStartedAtGameTime = level.gameTime
             racer.nextCheckpointIndex = race.firstCheckpointIndex()
             racer.nextTarget = nextTarget(level, racer, race)
@@ -256,6 +275,7 @@ object RaceManager {
             bodyId = vehicle.bodyId,
             driverId = driver?.uuid,
             driverName = driver?.gameProfile?.name ?: vehicle.vehicleDefinition.displayName,
+            vehicleType = vehicle.vehicleDefinition.id.toString(),
             position = position
         )
     }
@@ -321,6 +341,7 @@ object RaceManager {
             val place = race.finishOrder.size
             val total = race.totalParticipants
             driverForBody(level, racer.bodyId)?.let { driver ->
+                saveLeaderboardEntry(level, race, racer, marker, driver)
                 driver.sendTitle("Finished $place/$total", fadeIn = 4, stay = 42, fadeOut = 12)
                 SkyridersNetwork.sendRaceCompassTarget(driver, null)
                 SkyridersNetwork.sendRaceHudClear(driver)
@@ -489,6 +510,29 @@ object RaceManager {
             )
         }
         race.forceLoadedMarkerChunks.clear()
+    }
+
+    private fun saveLeaderboardEntry(
+        level: ServerLevel,
+        race: ActiveRace,
+        racer: RacerState,
+        finishMarker: RaceMarkerSnapshot,
+        driver: ServerPlayer
+    ) {
+        RaceSavedData.get(level).addLeaderboardEntry(
+            RaceLeaderboardEntry(
+                playerUuid = driver.uuid,
+                playerName = driver.gameProfile.name,
+                vehicleType = racer.vehicleType,
+                dimension = race.dimension,
+                colorId = race.colorId,
+                totalLaps = race.totalLaps,
+                startMarkerPos = race.startMarker.blockPos,
+                finishMarkerPos = finishMarker.blockPos,
+                elapsedTicks = (level.gameTime - racer.raceStartedAtGameTime).coerceAtLeast(0L),
+                finishedAtGameTime = level.gameTime
+            )
+        )
     }
 
     private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerSnapshot) {
@@ -681,7 +725,9 @@ object RaceManager {
         val bodyId: Long,
         val driverId: java.util.UUID?,
         val driverName: String,
+        val vehicleType: String,
         var position: Vector3d,
+        var raceStartedAtGameTime: Long = 0L,
         var currentLap: Int = 1,
         var lapStartedAtGameTime: Long = 0L,
         var nextCheckpointIndex: Int = 0,
@@ -755,7 +801,25 @@ data class RaceMarkerSnapshot(
     val checkpointIndex: Int,
     val lapCount: Int
 ) {
+    fun save(): net.minecraft.nbt.CompoundTag {
+        val tag = net.minecraft.nbt.CompoundTag()
+        tag.putLong(BLOCK_POS_KEY, blockPos.asLong())
+        endpointPos?.let { tag.putLong(ENDPOINT_POS_KEY, it.asLong()) }
+        tag.putInt(COLOR_KEY, colorId and 0xFFFFFF)
+        tag.putString(TYPE_KEY, markerType)
+        tag.putInt(CHECKPOINT_KEY, checkpointIndex)
+        tag.putInt(LAP_COUNT_KEY, lapCount)
+        return tag
+    }
+
     companion object {
+        private const val BLOCK_POS_KEY = "BlockPos"
+        private const val ENDPOINT_POS_KEY = "EndpointPos"
+        private const val COLOR_KEY = "ColorId"
+        private const val TYPE_KEY = "MarkerType"
+        private const val CHECKPOINT_KEY = "CheckpointIndex"
+        private const val LAP_COUNT_KEY = "LapCount"
+
         fun from(marker: RaceMarkerBlockEntity): RaceMarkerSnapshot {
             return RaceMarkerSnapshot(
                 blockPos = marker.blockPos,
@@ -764,6 +828,21 @@ data class RaceMarkerSnapshot(
                 markerType = marker.markerType,
                 checkpointIndex = marker.checkpointIndex,
                 lapCount = marker.lapCount
+            )
+        }
+
+        fun load(tag: net.minecraft.nbt.CompoundTag): RaceMarkerSnapshot? {
+            if (!tag.contains(BLOCK_POS_KEY)) return null
+            val type = tag.getString(TYPE_KEY)
+                .takeIf { it == RaceMarkerTypes.START_FINISH || it == RaceMarkerTypes.CHECKPOINT }
+                ?: RaceMarkerTypes.START_FINISH
+            return RaceMarkerSnapshot(
+                blockPos = BlockPos.of(tag.getLong(BLOCK_POS_KEY)),
+                endpointPos = if (tag.contains(ENDPOINT_POS_KEY)) BlockPos.of(tag.getLong(ENDPOINT_POS_KEY)) else null,
+                colorId = org.valkyrienskies.skyriders.content.item.RaceFlagItem.normalizeSavedRaceColor(tag.getInt(COLOR_KEY)),
+                markerType = type,
+                checkpointIndex = tag.getInt(CHECKPOINT_KEY).coerceIn(0, 99),
+                lapCount = if (tag.contains(LAP_COUNT_KEY)) tag.getInt(LAP_COUNT_KEY).coerceAtLeast(1) else 3
             )
         }
     }

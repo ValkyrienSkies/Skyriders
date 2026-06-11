@@ -23,6 +23,7 @@ object BikeLifecycle {
     fun onLevelSave(event: LevelEvent.Save) {
         val level = event.level as? ServerLevel ?: return
         BikeSavedData.get(level).replaceFromManager(level)
+        RaceManager.saveLevel(level)
     }
 
     @SubscribeEvent
@@ -41,6 +42,7 @@ object BikeLifecycle {
             val iterator = pendingRestoreLevels.iterator()
             while (iterator.hasNext()) {
                 val level = iterator.next()
+                RaceManager.loadLevel(level)
                 VehicleManager.restoreVehicles(level, BikeSavedData.get(level).records)
                 syncLevel(level)
                 iterator.remove()
@@ -71,6 +73,7 @@ object BikeLifecycle {
 
     fun saveLevel(level: ServerLevel) {
         BikeSavedData.get(level).replaceFromManager(level)
+        RaceManager.saveLevel(level)
     }
 
     fun syncLevel(level: ServerLevel) {
