@@ -538,8 +538,10 @@ object SkyridersNetwork {
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
-                if (player.vehicle is BikeSeatEntity) {
+                val seat = player.vehicle as? BikeSeatEntity
+                if (seat != null) {
                     player.stopRiding()
+                    seat.removeIfEmpty()
                 }
             }
             context.packetHandled = true

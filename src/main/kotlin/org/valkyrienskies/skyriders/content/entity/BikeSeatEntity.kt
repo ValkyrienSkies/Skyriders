@@ -13,6 +13,7 @@ import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.Entity.RemovalReason
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
@@ -37,6 +38,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         get() = entityData.get(SEAT_ID)
         set(value) = entityData.set(SEAT_ID, value)
     private var lastBikeYaw: Float? = null
+    private var cleanedUp = false
 
     init {
         blocksBuilding = false
@@ -47,17 +49,14 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     override fun tick() {
         super.tick()
         if (!level().isClientSide && passengers.isEmpty()) {
-            VehicleManager.clearInput(level().dimensionId, bodyId)
-            (level() as? ServerLevel)?.let { VehicleImpairmentEffects.clear(it, bodyId) }
-            kill()
+            removeSeat(RemovalReason.DISCARDED)
             return
         }
 
         val previousYaw = yRot
         if (!updateSeatPose()) {
             if (!level().isClientSide) {
-                passengers.forEach(Entity::stopRiding)
-                kill()
+                removeSeat(RemovalReason.DISCARDED)
             }
             return
         }
@@ -72,6 +71,17 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
     override fun getDismountLocationForPassenger(livingEntity: LivingEntity): Vec3 {
         return position().add(0.0, 0.2, 0.0)
+    }
+
+    fun removeIfEmpty() {
+        if (!level().isClientSide && passengers.isEmpty()) {
+            removeSeat(RemovalReason.DISCARDED)
+        }
+    }
+
+    override fun remove(reason: RemovalReason) {
+        cleanupSeat()
+        super.remove(reason)
     }
 
     override fun defineSynchedData() {
@@ -103,6 +113,25 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
 
         moveTo(seatWorld.x, seatWorld.y, seatWorld.z, yawFromForward(forward), xRot)
         return true
+    }
+
+    private fun removeSeat(reason: RemovalReason) {
+        cleanupSeat()
+        remove(reason)
+    }
+
+    private fun cleanupSeat() {
+        if (cleanedUp) return
+        cleanedUp = true
+        if (!level().isClientSide) {
+            VehicleManager.clearInput(level().dimensionId, bodyId)
+            (level() as? ServerLevel)?.let { VehicleImpairmentEffects.clear(it, bodyId) }
+        }
+        passengers.toList().forEach { passenger ->
+            if (passenger.vehicle == this) {
+                passenger.stopRiding()
+            }
+        }
     }
 
     private fun rotatePassengersByBikeYawDelta(fallbackPreviousYaw: Float) {
