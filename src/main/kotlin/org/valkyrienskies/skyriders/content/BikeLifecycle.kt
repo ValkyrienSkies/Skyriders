@@ -29,6 +29,7 @@ object BikeLifecycle {
     fun onLevelUnload(event: LevelEvent.Unload) {
         val level = event.level as? ServerLevel ?: return
         pendingRestoreLevels.remove(level)
+        RaceManager.unloadLevel(level)
         BoostPadHandler.clear(level)
     }
 

@@ -12,12 +12,15 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.phys.Vec3
+import net.minecraftforge.common.world.ForgeChunkManager
 import org.joml.Vector3d
 import org.joml.Vector3f
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.common.toWorldCoordinates
+import org.valkyrienskies.skyriders.SkyridersMod.MOD_ID
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
@@ -58,6 +61,9 @@ object RaceManager {
             .forEach { race ->
                 activeMarkersForRace(level, race).forEach { marker ->
                     tickCrossings(level, marker, race)
+                }
+                if (level.gameTime % 40L == 0L) {
+                    ensureRaceMarkerChunksLoaded(level, race)
                 }
                 if (level.gameTime % 40L == 0L) {
                     race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
@@ -223,6 +229,7 @@ object RaceManager {
             totalLaps = startMarker.lapCount,
             totalParticipants = participants.size
         )
+        ensureRaceMarkerChunksLoaded(level, race)
         participants.values.forEach { racer ->
             racer.lapStartedAtGameTime = level.gameTime
             racer.nextCheckpointIndex = race.firstCheckpointIndex()
@@ -328,9 +335,18 @@ object RaceManager {
     }
 
     private fun stopRace(level: ServerLevel, race: ActiveRace) {
+        releaseRaceMarkerChunks(level, race)
         race.active = false
         racesByKey.remove(RaceKey(race.dimension, race.colorId))
         sendRaceMusicStopToRacers(level, race)
+    }
+
+    fun unloadLevel(level: ServerLevel) {
+        val dimension = level.dimension().location().toString()
+        racesByKey.values
+            .filter { it.dimension == dimension }
+            .forEach { releaseRaceMarkerChunks(level, it) }
+        racesByKey.entries.removeIf { it.key.dimension == dimension }
     }
 
     private fun sendRaceMusicStartToRacers(level: ServerLevel, race: ActiveRace, track: ResourceLocation) {
@@ -435,6 +451,44 @@ object RaceManager {
             )
             .distinctBy { it.blockPos }
             .sortedBy { it.blockPos.asLong() }
+    }
+
+    private fun ensureRaceMarkerChunksLoaded(level: ServerLevel, race: ActiveRace) {
+        activeMarkersForRace(level, race)
+            .flatMap { marker -> marker.chunkKeys() }
+            .distinct()
+            .forEach { chunkKey ->
+                if (chunkKey in race.forceLoadedMarkerChunks) return@forEach
+                val chunkPos = ChunkPos(chunkKey)
+                val loaded = ForgeChunkManager.forceChunk(
+                    level,
+                    MOD_ID,
+                    race.startMarker.blockPos,
+                    chunkPos.x,
+                    chunkPos.z,
+                    true,
+                    true
+                )
+                if (loaded) {
+                    race.forceLoadedMarkerChunks.add(chunkKey)
+                }
+            }
+    }
+
+    private fun releaseRaceMarkerChunks(level: ServerLevel, race: ActiveRace) {
+        race.forceLoadedMarkerChunks.toList().forEach { chunkKey ->
+            val chunkPos = ChunkPos(chunkKey)
+            ForgeChunkManager.forceChunk(
+                level,
+                MOD_ID,
+                race.startMarker.blockPos,
+                chunkPos.x,
+                chunkPos.z,
+                false,
+                true
+            )
+        }
+        race.forceLoadedMarkerChunks.clear()
     }
 
     private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerSnapshot) {
@@ -610,6 +664,7 @@ object RaceManager {
         val checkpointIndices: Set<Int>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
+        val forceLoadedMarkerChunks: MutableSet<Long> = HashSet(),
         val musicTrack: ResourceLocation?,
         val totalLaps: Int,
         val totalParticipants: Int,
@@ -712,6 +767,13 @@ data class RaceMarkerSnapshot(
             )
         }
     }
+}
+
+private fun RaceMarkerSnapshot.chunkKeys(): List<Long> {
+    return listOfNotNull(
+        ChunkPos(blockPos).toLong(),
+        endpointPos?.let { ChunkPos(it).toLong() }
+    )
 }
 
 fun RaceMarkerBlockEntity.line(level: ServerLevel): RaceLine? {
