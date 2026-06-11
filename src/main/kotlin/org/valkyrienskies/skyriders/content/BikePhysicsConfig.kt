@@ -134,7 +134,7 @@ data class BikePhysicsConfig(
             maxRollAngleRad = Math.toRadians(65.0),
             maxAngularVelocity = 8.0,
             antiFlipStrength = 4000.0,
-            airbornePitchControlStrength = 1800.0,
+            airbornePitchControlStrength = 850.0,
             airborneRollControlStrength = 850.0,
             airborneBrakeDamping = 450.0,
             maxWheelieAngleRad = Math.toRadians(28.0),
