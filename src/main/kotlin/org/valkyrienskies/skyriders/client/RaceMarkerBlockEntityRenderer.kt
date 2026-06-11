@@ -46,7 +46,7 @@ class RaceMarkerBlockEntityRenderer(
         if (color < 0) return
 
         poseStack.pushPose()
-        poseStack.translate(0.5, 1.03, 0.5)
+        poseStack.translate(0.5, FLAG_Y_OFFSET, 0.5)
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0f))
         poseStack.scale(0.8f, 0.8f, 0.8f)
         Minecraft.getInstance().itemRenderer.renderStatic(
@@ -117,6 +117,7 @@ class RaceMarkerBlockEntityRenderer(
     }
 
     companion object {
+        private const val FLAG_Y_OFFSET = 1.36
         private const val TEXT_RENDER_DISTANCE = 48.0
         private const val TEXT_SCALE = 0.025f
         private const val TEXT_BACKGROUND_COLOR = 0x66000000
