@@ -44,7 +44,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     val ignited: Boolean
         get() = entityData.get(IGNITED)
 
-    private var distanceTravelled = 0.0
+    private var fuelTicksRemaining = 0
     private var motorDirection = Vec3(0.0, 0.0, 1.0)
 
     init {
@@ -75,12 +75,15 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             return
         }
 
-        val fueled = distanceTravelled < FUEL_DISTANCE
+        val fueled = fuelTicksRemaining > 0
         entityData.set(HAS_FUEL, fueled)
         if (fueled && homing) {
             updateHoming(serverLevel)
         }
         updateVelocity(fueled)
+        if (fueled) {
+            fuelTicksRemaining--
+        }
 
         val start = position()
         val velocity = deltaMovement
@@ -104,7 +107,6 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         }
 
         setPosition(next)
-        distanceTravelled += velocity.length()
         findHitVehicle(serverLevel, next)?.let { target ->
             explode(serverLevel, next, target)
         }
@@ -117,6 +119,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         moveTo(origin.x, origin.y, origin.z, rotation.first, rotation.second)
         entityData.set(IGNITED, false)
         entityData.set(HAS_FUEL, false)
+        fuelTicksRemaining = 0
         deltaMovement = inheritedVelocity.limitLength(PRE_IGNITION_INHERITED_SPEED_LIMIT)
             .add(randomTossVelocity())
     }
@@ -130,9 +133,11 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     override fun readAdditionalSaveData(compound: CompoundTag) {
         ownerBodyId = compound.getLong(OWNER_BODY_ID_KEY)
         homing = compound.getBoolean(HOMING_KEY)
-        distanceTravelled = compound.getDouble(DISTANCE_TRAVELLED_KEY)
-        entityData.set(HAS_FUEL, compound.getBoolean(HAS_FUEL_KEY).takeIf { compound.contains(HAS_FUEL_KEY) } ?: true)
-        entityData.set(IGNITED, compound.getBoolean(IGNITED_KEY).takeIf { compound.contains(IGNITED_KEY) } ?: true)
+        val savedHasFuel = compound.getBoolean(HAS_FUEL_KEY).takeIf { compound.contains(HAS_FUEL_KEY) } ?: true
+        val savedIgnited = compound.getBoolean(IGNITED_KEY).takeIf { compound.contains(IGNITED_KEY) } ?: true
+        fuelTicksRemaining = savedFuelTicksRemaining(compound, savedIgnited, savedHasFuel)
+        entityData.set(HAS_FUEL, fuelTicksRemaining > 0)
+        entityData.set(IGNITED, savedIgnited)
         motorDirection = Vec3(
             compound.getDouble(MOTOR_DIRECTION_X_KEY),
             compound.getDouble(MOTOR_DIRECTION_Y_KEY),
@@ -143,7 +148,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     override fun addAdditionalSaveData(compound: CompoundTag) {
         compound.putLong(OWNER_BODY_ID_KEY, ownerBodyId)
         compound.putBoolean(HOMING_KEY, homing)
-        compound.putDouble(DISTANCE_TRAVELLED_KEY, distanceTravelled)
+        compound.putInt(FUEL_TICKS_REMAINING_KEY, fuelTicksRemaining)
         compound.putBoolean(HAS_FUEL_KEY, hasFuel)
         compound.putBoolean(IGNITED_KEY, ignited)
         compound.putDouble(MOTOR_DIRECTION_X_KEY, motorDirection.x)
@@ -192,7 +197,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     private fun ignite(level: ServerLevel) {
         entityData.set(IGNITED, true)
         entityData.set(HAS_FUEL, true)
-        distanceTravelled = 0.0
+        fuelTicksRemaining = FUEL_TICKS
         deltaMovement = deltaMovement.scale(IGNITION_VELOCITY_CARRY)
             .add(motorDirection.scale(INITIAL_THRUST_SPEED))
             .limitLength(MAX_ROCKET_SPEED)
@@ -333,6 +338,18 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         return position().add(velocity)
     }
 
+    private fun savedFuelTicksRemaining(compound: CompoundTag, savedIgnited: Boolean, savedHasFuel: Boolean): Int {
+        if (!savedIgnited || !savedHasFuel) return 0
+        if (compound.contains(FUEL_TICKS_REMAINING_KEY)) {
+            return compound.getInt(FUEL_TICKS_REMAINING_KEY).coerceAtLeast(0)
+        }
+        if (!compound.contains(DISTANCE_TRAVELLED_KEY)) return FUEL_TICKS
+
+        val remainingFraction = 1.0 - (compound.getDouble(DISTANCE_TRAVELLED_KEY) / LEGACY_FUEL_DISTANCE)
+            .coerceIn(0.0, 1.0)
+        return (remainingFraction * FUEL_TICKS).toInt().coerceAtLeast(1)
+    }
+
     private fun setPosition(position: Vec3) {
         setPos(position.x, position.y, position.z)
     }
@@ -402,23 +419,25 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val HAS_FUEL_KEY = "HasFuel"
         private const val IGNITED_KEY = "Ignited"
         private const val DISTANCE_TRAVELLED_KEY = "DistanceTravelled"
+        private const val FUEL_TICKS_REMAINING_KEY = "FuelTicksRemaining"
         private const val MOTOR_DIRECTION_X_KEY = "MotorDirectionX"
         private const val MOTOR_DIRECTION_Y_KEY = "MotorDirectionY"
         private const val MOTOR_DIRECTION_Z_KEY = "MotorDirectionZ"
         private const val MAX_LIFETIME_TICKS = 20 * 14
-        private const val FUEL_DISTANCE = 30.0
-        private const val ROCKET_ACCELERATION = 0.115
-        private const val MAX_ROCKET_SPEED = 2.45
+        private const val FUEL_TICKS = 20 * 4
+        private const val LEGACY_FUEL_DISTANCE = 30.0
+        private const val ROCKET_ACCELERATION = 0.16
+        private const val MAX_ROCKET_SPEED = 4.0
         private const val IGNITION_DELAY_TICKS = 9
         private const val PRE_IGNITION_GRAVITY = 0.045
         private const val PRE_IGNITION_DRAG = 0.985
-        private const val PRE_IGNITION_INHERITED_SPEED_LIMIT = 1.0
+        private const val PRE_IGNITION_INHERITED_SPEED_LIMIT = 3.0
         private const val PRE_IGNITION_MIN_HORIZONTAL_TOSS = 0.08
         private const val PRE_IGNITION_MAX_HORIZONTAL_TOSS = 0.24
         private const val PRE_IGNITION_MIN_UPWARD_TOSS = 0.26
         private const val PRE_IGNITION_MAX_UPWARD_TOSS = 0.42
-        private const val IGNITION_VELOCITY_CARRY = 0.25
-        private const val INITIAL_THRUST_SPEED = 0.45
+        private const val IGNITION_VELOCITY_CARRY = 0.65
+        private const val INITIAL_THRUST_SPEED = 0.65
         private const val VELOCITY_ALIGNMENT_RATE = 0.28
         private const val OUT_OF_FUEL_DRAG = 0.975
         private const val OUT_OF_FUEL_GRAVITY = 0.055
