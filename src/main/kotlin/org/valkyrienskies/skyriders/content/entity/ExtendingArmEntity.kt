@@ -22,6 +22,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : Entity(type, level) {
@@ -40,7 +41,9 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
         get() = entityData.get(ATTACHED)
 
     private var direction = Vec3(0.0, 0.0, 1.0)
+    private var launchOrigin = Vec3.ZERO
     private var distanceTravelled = 0.0
+    private var extendTicksElapsed = 0
     private var attachedTargetBodyId: BodyId? = null
     private var attachedTicksRemaining = 0
     private var retractTicksRemaining = 0
@@ -72,19 +75,13 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
             return
         }
 
-        val maxTravel = if (armKind == GRABBY_HAND) GRABBY_NO_HIT_RANGE else BOXING_RANGE
-        if (distanceTravelled >= maxTravel) {
-            startRetracting(serverLevel)
-            return
-        }
-
         val start = position()
-        val velocity = deltaMovement
-        if (velocity.lengthSqr() < 1.0e-8) {
+        val next = nextEasedExtensionPosition()
+        val velocity = next.subtract(start)
+        if (velocity.lengthSqr() < 1.0e-8 && extendTicksElapsed > EXTEND_TICKS) {
             startRetracting(serverLevel)
             return
         }
-        val next = start.add(velocity)
 
         val blockHit = serverLevel.clip(
             ClipContext(
@@ -103,8 +100,13 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
 
         setPosition(next)
         distanceTravelled += velocity.length()
+        deltaMovement = velocity
+        extendTicksElapsed++
         findHitVehicle(serverLevel, next)?.let { vehicle ->
             onVehicleHit(serverLevel, vehicle)
+        }
+        if (!retracting && attachedTargetBodyId == null && extendTicksElapsed > EXTEND_TICKS) {
+            startRetracting(serverLevel)
         }
     }
 
@@ -113,9 +115,12 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
         this.ownerBodyId = ownerBodyId
         this.armKind = kind
         this.direction = safeDirection
+        this.launchOrigin = origin
+        this.extendTicksElapsed = 0
+        this.distanceTravelled = 0.0
         val rotation = rotationFromDirection(safeDirection)
         moveTo(origin.x, origin.y, origin.z, rotation.first, rotation.second)
-        deltaMovement = safeDirection.scale(EXTEND_SPEED).add(inheritedVelocity.limitLength(INHERITED_SPEED_LIMIT))
+        deltaMovement = safeDirection.scale(INITIAL_CLIENT_EXTEND_SPEED).add(inheritedVelocity.limitLength(INHERITED_SPEED_LIMIT))
         entityData.set(RETRACTING, false)
         entityData.set(ATTACHED, false)
     }
@@ -131,6 +136,7 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
         ownerBodyId = compound.getLong(OWNER_BODY_ID_KEY)
         armKind = compound.getInt(ARM_KIND_KEY)
         distanceTravelled = compound.getDouble(DISTANCE_TRAVELLED_KEY)
+        extendTicksElapsed = compound.getInt(EXTEND_TICKS_ELAPSED_KEY)
         entityData.set(RETRACTING, compound.getBoolean(RETRACTING_KEY))
         entityData.set(ATTACHED, compound.getBoolean(ATTACHED_KEY))
         attachedTargetBodyId = if (compound.contains(ATTACHED_TARGET_BODY_ID_KEY)) compound.getLong(ATTACHED_TARGET_BODY_ID_KEY) else null
@@ -141,12 +147,18 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
             compound.getDouble(DIRECTION_Y_KEY),
             compound.getDouble(DIRECTION_Z_KEY)
         ).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: Vec3(0.0, 0.0, 1.0)
+        launchOrigin = Vec3(
+            compound.getDouble(LAUNCH_ORIGIN_X_KEY),
+            compound.getDouble(LAUNCH_ORIGIN_Y_KEY),
+            compound.getDouble(LAUNCH_ORIGIN_Z_KEY)
+        )
     }
 
     override fun addAdditionalSaveData(compound: CompoundTag) {
         compound.putLong(OWNER_BODY_ID_KEY, ownerBodyId)
         compound.putInt(ARM_KIND_KEY, armKind)
         compound.putDouble(DISTANCE_TRAVELLED_KEY, distanceTravelled)
+        compound.putInt(EXTEND_TICKS_ELAPSED_KEY, extendTicksElapsed)
         compound.putBoolean(RETRACTING_KEY, retracting)
         compound.putBoolean(ATTACHED_KEY, attached)
         attachedTargetBodyId?.let { compound.putLong(ATTACHED_TARGET_BODY_ID_KEY, it) }
@@ -155,12 +167,23 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
         compound.putDouble(DIRECTION_X_KEY, direction.x)
         compound.putDouble(DIRECTION_Y_KEY, direction.y)
         compound.putDouble(DIRECTION_Z_KEY, direction.z)
+        compound.putDouble(LAUNCH_ORIGIN_X_KEY, launchOrigin.x)
+        compound.putDouble(LAUNCH_ORIGIN_Y_KEY, launchOrigin.y)
+        compound.putDouble(LAUNCH_ORIGIN_Z_KEY, launchOrigin.z)
     }
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> = ClientboundAddEntityPacket(this)
 
     override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
         return distance < RENDER_DISTANCE * RENDER_DISTANCE
+    }
+
+    private fun nextEasedExtensionPosition(): Vec3 {
+        val maxTravel = if (armKind == GRABBY_HAND) GRABBY_NO_HIT_RANGE else BOXING_RANGE
+        val nextTick = (extendTicksElapsed + 1).coerceAtMost(EXTEND_TICKS)
+        val progress = (nextTick.toDouble() / EXTEND_TICKS.toDouble()).coerceIn(0.0, 1.0)
+        val eased = easeOutBack(progress).coerceIn(0.0, 1.0)
+        return launchOrigin.add(direction.scale(maxTravel * eased))
     }
 
     private fun onVehicleHit(level: ServerLevel, target: IVehicle) {
@@ -338,6 +361,13 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
 
     private fun Vec3.toJoml(): Vector3d = Vector3d(x, y, z)
 
+    private fun easeOutBack(t: Double): Double {
+        val c1 = EXTEND_BACK_OVERSHOOT
+        val c3 = c1 + 1.0
+        val x = t - 1.0
+        return 1.0 + c3 * x.pow(3.0) + c1 * x.pow(2.0)
+    }
+
     companion object {
         const val BOXING_GLOVE = 0
         const val GRABBY_HAND = 1
@@ -350,12 +380,18 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
         private const val ATTACHED_TICKS_REMAINING_KEY = "AttachedTicksRemaining"
         private const val RETRACT_TICKS_REMAINING_KEY = "RetractTicksRemaining"
         private const val DISTANCE_TRAVELLED_KEY = "DistanceTravelled"
+        private const val EXTEND_TICKS_ELAPSED_KEY = "ExtendTicksElapsed"
         private const val DIRECTION_X_KEY = "DirectionX"
         private const val DIRECTION_Y_KEY = "DirectionY"
         private const val DIRECTION_Z_KEY = "DirectionZ"
+        private const val LAUNCH_ORIGIN_X_KEY = "LaunchOriginX"
+        private const val LAUNCH_ORIGIN_Y_KEY = "LaunchOriginY"
+        private const val LAUNCH_ORIGIN_Z_KEY = "LaunchOriginZ"
 
         private const val MAX_LIFETIME_TICKS = 20 * 6
-        private const val EXTEND_SPEED = 1.22
+        private const val INITIAL_CLIENT_EXTEND_SPEED = 1.8
+        private const val EXTEND_TICKS = 8
+        private const val EXTEND_BACK_OVERSHOOT = 1.65
         private const val RETRACT_SPEED = 1.55
         private const val RETRACT_TICKS = 18
         private const val RETRACT_DONE_DISTANCE = 0.85

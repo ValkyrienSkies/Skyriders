@@ -205,7 +205,12 @@ object RaceManager {
                 racer.nextTarget = nextTarget(level, racer, race)
                 successEffect(level, position)
                 pulseEndpoint(level, marker)
-                driverForBody(level, racer.bodyId)?.sendActionBar("Lap ${racer.currentLap}/${race.totalLaps}")
+                driverForBody(level, racer.bodyId)?.sendTitle(
+                    if (racer.currentLap == race.totalLaps) "FINAL LAP" else "Lap ${racer.currentLap}/${race.totalLaps}",
+                    fadeIn = 2,
+                    stay = 30,
+                    fadeOut = 8
+                )
                 return
             }
             race.finishOrder.add(racer.bodyId)
