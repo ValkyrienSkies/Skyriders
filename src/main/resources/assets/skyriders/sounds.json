@@ -225,6 +225,16 @@
     ],
     "subtitle": "skyriders.subtitle.race_start"
   },
+  "finish": {
+    "sounds": [
+      {
+        "name": "skyriders:finish",
+        "type": "file",
+        "attenuation_distance": 96
+      }
+    ],
+    "subtitle": "skyriders.subtitle.finish"
+  },
   "bergen_disc": {
     "sounds": [
       {

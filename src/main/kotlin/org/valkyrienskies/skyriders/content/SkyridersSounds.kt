@@ -93,6 +93,9 @@ object SkyridersSounds {
     val RACE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("race_start") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "race_start"))
     }
+    val RACE_FINISH_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("finish") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "finish"))
+    }
     val RACE_MUSIC_STORMCHASING: RegistryObject<SoundEvent> = SOUND_EVENTS.register("stormchasing") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "stormchasing"))
     }

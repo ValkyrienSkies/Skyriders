@@ -56,6 +56,9 @@ object RaceManager {
         racesByKey.values
             .filter { it.active && it.dimension == dimension }
             .forEach { race ->
+                activeMarkersForRace(level, race).forEach { marker ->
+                    tickCrossings(level, marker, race)
+                }
                 if (level.gameTime % 40L == 0L) {
                     race.musicTrack?.let { track -> sendRaceMusicStartToRacers(level, race, track) }
                 }
@@ -86,7 +89,6 @@ object RaceManager {
         val race = racesByKey[RaceKey(level.dimension().location().toString(), colorId)] ?: return
         if (!race.active) return
         val markerSnapshot = RaceMarkerSnapshot.from(marker)
-        tickCrossings(level, markerSnapshot, race)
         if (level.gameTime % 5L == 0L) {
             spawnLineParticles(level, markerSnapshot, race)
         }
@@ -112,7 +114,7 @@ object RaceManager {
         refreshRacerPosition(level, racer, race)
         val maxCheckpoint = race.maxCheckpointIndex()
         val markerOptions = if (racer.nextCheckpointIndex > maxCheckpoint) {
-            listOf(race.startMarker)
+            finishMarkersForRace(level, race)
         } else {
             race.checkpointMarkers.filter { it.checkpointIndex == racer.nextCheckpointIndex }
         }
@@ -190,9 +192,16 @@ object RaceManager {
         val color = startMarker.colorId and 0xFFFFFF
         val startSnapshot = RaceMarkerSnapshot.from(startMarker)
         val line = startSnapshot.line(level) ?: return
-        val checkpoints = collectMarkers(level, startMarker.colorId)
+        val knownMarkers = collectMarkers(level, startMarker.colorId)
+            .filter { it.endpointPos != null }
+        val checkpoints = knownMarkers
             .filter { it.markerType == RaceMarkerTypes.CHECKPOINT && it.endpointPos != null }
             .sortedBy { it.checkpointIndex }
+        val startFinishMarkers = knownMarkers
+            .filter { it.markerType == RaceMarkerTypes.START_FINISH }
+            .plus(startSnapshot)
+            .distinctBy { it.blockPos }
+            .sortedBy { it.blockPos.asLong() }
         val participants = VehicleManager.getVehicles(level)
             .filter { VehicleRaceParticipants.matchesColor(it, color) }
             .mapNotNull { vehicle -> createRacerIfNearStart(level, vehicle, line) }
@@ -205,6 +214,7 @@ object RaceManager {
             dimension = level.dimension().location().toString(),
             colorId = startMarker.colorId,
             startMarker = startSnapshot,
+            startFinishMarkers = startFinishMarkers,
             checkpointMarkers = checkpoints,
             checkpointIndices = checkpoints.mapTo(HashSet()) { it.checkpointIndex },
             racers = participants,
@@ -217,7 +227,11 @@ object RaceManager {
             racer.lapStartedAtGameTime = level.gameTime
             racer.nextCheckpointIndex = race.firstCheckpointIndex()
             racer.nextTarget = nextTarget(level, racer, race)
-            racer.previousDistances[startSnapshot.blockPos.asLong()] = line.signedDistance(racer.position)
+            activeMarkersForRace(level, race).forEach { marker ->
+                marker.line(level)?.let { markerLine ->
+                    racer.previousDistances[marker.blockPos.asLong()] = markerLine.signedDistance(racer.position)
+                }
+            }
         }
         racesByKey[RaceKey(race.dimension, race.colorId)] = race
         race.musicTrack?.let { track ->
@@ -295,6 +309,7 @@ object RaceManager {
             }
             race.finishOrder.add(racer.bodyId)
             successEffect(level, position)
+            finishSound(level, position)
             pulseEndpoint(level, marker)
             val place = race.finishOrder.size
             val total = race.totalParticipants
@@ -398,7 +413,28 @@ object RaceManager {
         val nextCheckpoint = race.checkpointMarkers
             .filter { it.checkpointIndex == racer.nextCheckpointIndex }
             .minByOrNull { it.blockPos.distSqr(BlockPos.containing(racer.position.x, racer.position.y, racer.position.z)) }
-        return nextCheckpoint?.line(level)?.center ?: race.startMarker.line(level)?.center
+        if (nextCheckpoint != null) return nextCheckpoint.line(level)?.center
+        val racerBlockPos = BlockPos.containing(racer.position.x, racer.position.y, racer.position.z)
+        return finishMarkersForRace(level, race)
+            .minByOrNull { it.blockPos.distSqr(racerBlockPos) }
+            ?.line(level)
+            ?.center
+    }
+
+    private fun activeMarkersForRace(level: ServerLevel, race: ActiveRace): List<RaceMarkerSnapshot> {
+        return race.checkpointMarkers
+            .plus(finishMarkersForRace(level, race))
+            .distinctBy { it.blockPos }
+    }
+
+    private fun finishMarkersForRace(level: ServerLevel, race: ActiveRace): List<RaceMarkerSnapshot> {
+        return race.startFinishMarkers
+            .plus(
+                collectMarkers(level, race.colorId)
+                    .filter { it.markerType == RaceMarkerTypes.START_FINISH && it.endpointPos != null }
+            )
+            .distinctBy { it.blockPos }
+            .sortedBy { it.blockPos.asLong() }
     }
 
     private fun pulseEndpoint(level: ServerLevel, marker: RaceMarkerSnapshot) {
@@ -462,6 +498,19 @@ object RaceManager {
             SoundSource.PLAYERS,
             0.85f,
             1.25f
+        )
+    }
+
+    private fun finishSound(level: ServerLevel, position: Vector3d) {
+        level.playSound(
+            null,
+            position.x,
+            position.y,
+            position.z,
+            SkyridersSounds.RACE_FINISH_SOUND.get(),
+            SoundSource.PLAYERS,
+            1.0f,
+            1.0f
         )
     }
 
@@ -556,6 +605,7 @@ object RaceManager {
         val dimension: String,
         val colorId: Int,
         val startMarker: RaceMarkerSnapshot,
+        val startFinishMarkers: List<RaceMarkerSnapshot>,
         val checkpointMarkers: List<RaceMarkerSnapshot>,
         val checkpointIndices: Set<Int>,
         val racers: LinkedHashMap<Long, RacerState>,
