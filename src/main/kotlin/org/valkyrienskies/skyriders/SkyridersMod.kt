@@ -233,21 +233,21 @@ object SkyridersMod {
     val CAVENDISH_ENTITY: RegistryObject<EntityType<CavendishEntity>> = ENTITIES.register("cavendish") {
         EntityType.Builder.of(::CavendishEntity, MobCategory.MISC)
             .sized(0.35f, 0.18f)
-            .clientTrackingRange(12)
+            .clientTrackingRange(96)
             .updateInterval(1)
             .build("$MOD_ID:cavendish")
     }
     val ITEM_BOX_ENTITY: RegistryObject<EntityType<ItemBoxEntity>> = ENTITIES.register("item_box") {
         EntityType.Builder.of(::ItemBoxEntity, MobCategory.MISC)
             .sized(1.25f, 1.65f)
-            .clientTrackingRange(12)
+            .clientTrackingRange(96)
             .updateInterval(1)
             .build("$MOD_ID:item_box")
     }
     val FAKE_ITEM_BOX_ENTITY: RegistryObject<EntityType<FakeItemBoxEntity>> = ENTITIES.register("fake_item_box") {
         EntityType.Builder.of(::FakeItemBoxEntity, MobCategory.MISC)
             .sized(0.9f, 0.9f)
-            .clientTrackingRange(16)
+            .clientTrackingRange(96)
             .updateInterval(1)
             .build("$MOD_ID:fake_item_box")
     }

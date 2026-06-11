@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3dc
@@ -24,7 +25,9 @@ import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
+import org.valkyrienskies.skyriders.content.entity.FakeItemBoxEntity
 
 class HoneyCanisterItem(properties: Properties) : RacingVehicleItem(properties) {
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
@@ -72,6 +75,7 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
         val sourcePosition = sourceBody.kinematics.position
         playThunderboltSound(level, player)
         spawnThunderboltBurst(level, sourcePosition)
+        destroyStageHazards(level, sourcePosition)
 
         VehicleManager.getVehicles(level).forEach { target ->
             if (target.bodyId == vehicle.bodyId) return@forEach
@@ -119,6 +123,37 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
         }
     }
 
+    private fun destroyStageHazards(level: ServerLevel, center: Vector3dc) {
+        val centerVec = Vec3(center.x(), center.y(), center.z())
+        val bounds = AABB.ofSize(centerVec, RADIUS * 2.0, RADIUS * 2.0, RADIUS * 2.0)
+        level.getEntitiesOfClass(CavendishEntity::class.java, bounds).forEach { hazard ->
+            if (hazard.position().distanceToSqr(centerVec) <= RADIUS * RADIUS) {
+                spawnHazardDestroyBurst(level, hazard.position())
+                hazard.discard()
+            }
+        }
+        level.getEntitiesOfClass(FakeItemBoxEntity::class.java, bounds).forEach { hazard ->
+            if (hazard.position().distanceToSqr(centerVec) <= RADIUS * RADIUS) {
+                spawnHazardDestroyBurst(level, hazard.position())
+                hazard.discard()
+            }
+        }
+    }
+
+    private fun spawnHazardDestroyBurst(level: ServerLevel, position: Vec3) {
+        level.sendParticles(
+            ParticleTypes.ELECTRIC_SPARK,
+            position.x,
+            position.y + HAZARD_DESTROY_Y_OFFSET,
+            position.z,
+            HAZARD_DESTROY_SPARK_COUNT,
+            0.28,
+            0.22,
+            0.28,
+            0.14
+        )
+    }
+
     private fun spawnVehicleStrike(level: ServerLevel, position: Vector3dc) {
         val lightning = EntityType.LIGHTNING_BOLT.create(level)
         if (lightning != null) {
@@ -154,11 +189,13 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
     }
 
     private companion object {
-        const val RADIUS = 10.0
+        const val RADIUS = 15.0
         const val BURST_SPARK_COUNT = 96
         const val STRIKE_SPARK_COUNT = 32
         const val STRIKE_SPARK_Y_OFFSET = 0.85
         const val LIGHTNING_Y_OFFSET = 0.1
+        const val HAZARD_DESTROY_SPARK_COUNT = 14
+        const val HAZARD_DESTROY_Y_OFFSET = 0.35
     }
 }
 

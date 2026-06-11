@@ -103,6 +103,10 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> = ClientboundAddEntityPacket(this)
 
+    override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
+        return distance < RENDER_DISTANCE * RENDER_DISTANCE
+    }
+
     override fun skipAttackInteraction(attacker: Entity): Boolean {
         val player = attacker as? Player ?: return false
         if (player.vehicle != null) return false
@@ -318,6 +322,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         private const val RECHARGE_TICKS_DEFAULT = 20 * 5
         private const val PICKUP_RADIUS = 0.85
         private const val PICKUP_Y_OFFSET = 0.85
+        private const val RENDER_DISTANCE = 192.0
         private val RECHARGE_TICKS: EntityDataAccessor<Int> =
             SynchedEntityData.defineId(ItemBoxEntity::class.java, EntityDataSerializers.INT)
         private val FROZEN_ROTATION_TICK: EntityDataAccessor<Int> =

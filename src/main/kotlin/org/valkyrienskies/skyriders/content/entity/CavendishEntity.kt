@@ -30,6 +30,7 @@ class CavendishEntity(type: EntityType<CavendishEntity>, level: Level) : Entity(
     init {
         blocksBuilding = false
         noPhysics = true
+        noCulling = true
     }
 
     override fun tick() {
@@ -76,6 +77,10 @@ class CavendishEntity(type: EntityType<CavendishEntity>, level: Level) : Entity(
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> {
         return ClientboundAddEntityPacket(this)
+    }
+
+    override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
+        return distance < RENDER_DISTANCE * RENDER_DISTANCE
     }
 
     fun toss(origin: Vec3, velocity: Vec3, yaw: Float) {
@@ -126,6 +131,7 @@ class CavendishEntity(type: EntityType<CavendishEntity>, level: Level) : Entity(
         const val GRAVITY = 0.055
         const val AIR_DRAG = 0.985
         const val FLOOR_SETTLE_OFFSET = 0.015
+        const val RENDER_DISTANCE = 192.0
         val SETTLED: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(CavendishEntity::class.java, EntityDataSerializers.BOOLEAN)
     }
