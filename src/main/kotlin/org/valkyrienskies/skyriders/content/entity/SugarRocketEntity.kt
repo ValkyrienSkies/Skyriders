@@ -28,6 +28,8 @@ import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.acos
+import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -165,6 +167,10 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     }
 
     private fun tickUnlit(level: ServerLevel) {
+        if (!homing) {
+            updatePreIgnitionAimAssist(level)
+        }
+
         val start = position()
         val nextVelocity = updateUnlitVelocity(deltaMovement)
         val next = start.add(nextVelocity)
@@ -216,31 +222,73 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
     }
 
     private fun updateHoming(level: ServerLevel) {
-        val target = findHomingTarget(level) ?: return
-        val desired = target.subtract(position()).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
-        val current = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: desired
+        val currentPosition = position()
         val speed = deltaMovement.length().coerceAtLeast(INITIAL_THRUST_SPEED)
+        val target = findHomingTarget(level) ?: return
+        val predictedTarget = predictedTargetPosition(target, currentPosition, speed)
+        val desired = predictedTarget.subtract(currentPosition).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
+        val current = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: desired
         val maxTurnRadians = (HOMING_LATERAL_ACCELERATION / speed)
             .coerceIn(HOMING_MIN_TURN_RADIANS, HOMING_MAX_TURN_RADIANS)
         motorDirection = rotateTowards(current, desired, maxTurnRadians)
     }
 
-    private fun findHomingTarget(level: ServerLevel): Vec3? {
+    private fun updatePreIgnitionAimAssist(level: ServerLevel) {
+        val currentPosition = position()
+        val current = motorDirection.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
+        val target = findPreIgnitionAssistTarget(level, currentPosition, current) ?: return
+        val predictedTarget = predictedTargetPosition(target, currentPosition, MAX_ROCKET_SPEED)
+        val desired = predictedTarget.subtract(currentPosition).normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: return
+        val distance = target.position.distanceTo(currentPosition).coerceAtLeast(1.0)
+        val allowedAngle = PRE_IGNITION_ASSIST_MAX_ANGLE_RADIANS + atan(target.radius / distance)
+        val angle = angleBetween(current, desired)
+        if (angle > allowedAngle) return
+
+        motorDirection = rotateTowards(current, desired, PRE_IGNITION_ASSIST_TURN_RADIANS)
+        applyMotorRotation()
+    }
+
+    private fun findHomingTarget(level: ServerLevel): RocketTarget? {
         val shipWorld = level.shipWorld ?: return null
         val pos = position()
         var bestDistanceSq = HOMING_RANGE * HOMING_RANGE
-        var bestTarget: Vec3? = null
+        var bestTarget: RocketTarget? = null
 
         VehicleManager.getVehicles(level).forEach { vehicle ->
             if (vehicle.bodyId == ownerBodyId) return@forEach
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
-            val target = Vec3(body.kinematics.position.x(), body.kinematics.position.y(), body.kinematics.position.z())
-            val toTarget = target.subtract(pos)
+            val target = rocketTarget(vehicle, body.kinematics.position, body.kinematics.velocity)
+            val toTarget = target.position.subtract(pos)
             val distanceSq = toTarget.lengthSqr()
             if (distanceSq > bestDistanceSq) return@forEach
             bestDistanceSq = distanceSq
             bestTarget = target
         }
+        return bestTarget
+    }
+
+    private fun findPreIgnitionAssistTarget(level: ServerLevel, pos: Vec3, current: Vec3): RocketTarget? {
+        val shipWorld = level.shipWorld ?: return null
+        var bestAngle = Double.POSITIVE_INFINITY
+        var bestTarget: RocketTarget? = null
+
+        VehicleManager.getVehicles(level).forEach { vehicle ->
+            if (vehicle.bodyId == ownerBodyId) return@forEach
+            val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
+            val target = rocketTarget(vehicle, body.kinematics.position, body.kinematics.velocity)
+            val distanceSq = target.position.distanceToSqr(pos)
+            if (distanceSq > PRE_IGNITION_ASSIST_RANGE * PRE_IGNITION_ASSIST_RANGE) return@forEach
+            val predictedTarget = predictedTargetPosition(target, pos, MAX_ROCKET_SPEED)
+            val desired = predictedTarget.subtract(pos).normalize().takeIf { it.lengthSqr() > 1.0e-8 }
+                ?: return@forEach
+            val distance = sqrt(distanceSq).coerceAtLeast(1.0)
+            val allowedAngle = PRE_IGNITION_ASSIST_MAX_ANGLE_RADIANS + atan(target.radius / distance)
+            val angle = angleBetween(current, desired)
+            if (angle > allowedAngle || angle >= bestAngle) return@forEach
+            bestAngle = angle
+            bestTarget = target
+        }
+
         return bestTarget
     }
 
@@ -390,9 +438,65 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         return yaw to pitch
     }
 
+    private fun applyMotorRotation() {
+        val rotation = rotationFromDirection(motorDirection)
+        yRotO = rotation.first
+        xRotO = rotation.second
+        yRot = rotation.first
+        xRot = rotation.second
+    }
+
+    private fun rocketTarget(
+        vehicle: IVehicle,
+        position: Vector3dc,
+        velocity: Vector3dc
+    ): RocketTarget {
+        return RocketTarget(
+            position = Vec3(position.x(), position.y(), position.z()),
+            velocity = Vec3(
+                velocity.x() / TICKS_PER_SECOND,
+                velocity.y() / TICKS_PER_SECOND,
+                velocity.z() / TICKS_PER_SECOND
+            ),
+            radius = vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
+        )
+    }
+
+    private fun predictedTargetPosition(target: RocketTarget, origin: Vec3, projectileSpeed: Double): Vec3 {
+        val relativePosition = target.position.subtract(origin)
+        val speed = projectileSpeed.coerceAtLeast(PREDICTION_MIN_PROJECTILE_SPEED)
+        val a = target.velocity.lengthSqr() - speed * speed
+        val b = 2.0 * relativePosition.dot(target.velocity)
+        val c = relativePosition.lengthSqr()
+        val interceptTicks = interceptTicks(a, b, c, speed)
+            .coerceIn(0.0, PREDICTIVE_AIM_MAX_TICKS)
+        return target.position.add(target.velocity.scale(interceptTicks))
+    }
+
+    private fun interceptTicks(a: Double, b: Double, c: Double, projectileSpeed: Double): Double {
+        val fallback = sqrt(c) / projectileSpeed
+        if (abs(a) < 1.0e-6) {
+            if (abs(b) < 1.0e-6) return fallback
+            return (-c / b).takeIf { it.isFinite() && it > 0.0 } ?: fallback
+        }
+
+        val discriminant = b * b - 4.0 * a * c
+        if (discriminant < 0.0) return fallback
+        val sqrtDiscriminant = sqrt(discriminant)
+        val first = (-b - sqrtDiscriminant) / (2.0 * a)
+        val second = (-b + sqrtDiscriminant) / (2.0 * a)
+        return listOf(first, second)
+            .filter { it.isFinite() && it > 0.0 }
+            .minOrNull()
+            ?: fallback
+    }
+
+    private fun angleBetween(current: Vec3, desired: Vec3): Double {
+        return acos(current.dot(desired).coerceIn(-1.0, 1.0))
+    }
+
     private fun rotateTowards(current: Vec3, desired: Vec3, maxRadians: Double): Vec3 {
-        val dot = current.dot(desired).coerceIn(-1.0, 1.0)
-        val angle = acos(dot)
+        val angle = angleBetween(current, desired)
         if (angle <= maxRadians || angle < 1.0e-6) {
             return desired
         }
@@ -427,6 +531,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val MAX_LIFETIME_TICKS = 20 * 14
         private const val FUEL_TICKS = 20 * 3
         private const val LEGACY_FUEL_DISTANCE = 30.0
+        private const val TICKS_PER_SECOND = 20.0
         private const val ROCKET_ACCELERATION = 0.16
         private const val MAX_ROCKET_SPEED = 4.0
         private const val IGNITION_DELAY_TICKS = 9
@@ -455,6 +560,11 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val HOMING_LATERAL_ACCELERATION = 0.18
         private const val HOMING_MIN_TURN_RADIANS = 0.035
         private const val HOMING_MAX_TURN_RADIANS = 0.2
+        private const val PRE_IGNITION_ASSIST_RANGE = 24.0
+        private val PRE_IGNITION_ASSIST_MAX_ANGLE_RADIANS = Math.toRadians(6.5)
+        private val PRE_IGNITION_ASSIST_TURN_RADIANS = Math.toRadians(1.1)
+        private const val PREDICTIVE_AIM_MAX_TICKS = 26.0
+        private const val PREDICTION_MIN_PROJECTILE_SPEED = 0.25
         private const val RENDER_DISTANCE = 192.0
         private val HOMING: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
@@ -463,4 +573,10 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private val IGNITED: EntityDataAccessor<Boolean> =
             SynchedEntityData.defineId(SugarRocketEntity::class.java, EntityDataSerializers.BOOLEAN)
     }
+
+    private data class RocketTarget(
+        val position: Vec3,
+        val velocity: Vec3,
+        val radius: Double
+    )
 }
