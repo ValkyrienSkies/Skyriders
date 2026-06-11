@@ -213,8 +213,22 @@ class CavendishItem(properties: Properties) : RacingVehicleItem(properties) {
             yaw = level.random.nextFloat() * 360.0f
         )
         level.addFreshEntity(entity)
+        playCavendishEatSound(level, player)
         playItemUseSound(level, player)
         return true
+    }
+
+    private fun playCavendishEatSound(level: ServerLevel, player: Player) {
+        level.playSound(
+            null,
+            player.x,
+            player.y,
+            player.z,
+            SoundEvents.GENERIC_EAT,
+            SoundSource.PLAYERS,
+            0.85f,
+            0.95f + level.random.nextFloat() * 0.2f
+        )
     }
 
     private fun tossOrigin(body: VsBody, forward: Vector3d): Vector3d {

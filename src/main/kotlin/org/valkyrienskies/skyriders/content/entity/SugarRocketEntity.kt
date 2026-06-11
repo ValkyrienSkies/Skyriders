@@ -288,8 +288,9 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             val distance = player.position().distanceTo(position)
             if (distance > EXPLOSION_SOUND_RADIUS) return@forEach
             val falloff = (1.0 - distance / EXPLOSION_SOUND_RADIUS).coerceIn(0.0, 1.0)
-            val volume = (0.35 + falloff * 0.75).toFloat()
-            SkyridersNetwork.sendRocketExplosionSound(player, position, volume, 1.0f)
+            val volume = (0.25 + falloff * 0.75).toFloat()
+            val randomPitch = 0.9f + level.random.nextFloat() * 0.1f // pitch between 0.9 and 1.0
+            SkyridersNetwork.sendRocketExplosionSound(player, position, volume, randomPitch)
         }
     }
 
