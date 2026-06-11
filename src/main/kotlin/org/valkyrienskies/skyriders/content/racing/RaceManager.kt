@@ -324,8 +324,7 @@ object RaceManager {
         }
 
         if (marker.markerType == RaceMarkerTypes.START_FINISH) {
-            val maxCheckpoint = race.maxCheckpointIndex(racer.currentLap)
-            if (racer.nextCheckpointIndex <= maxCheckpoint) return
+            if (!racer.isReadyForFinishLine(race)) return
             if (race.finishOrder.contains(racer.bodyId)) return
             if (racer.currentLap < race.totalLaps) {
                 racer.currentLap++
@@ -574,8 +573,7 @@ object RaceManager {
             if (marker.checkpointIndex in racer.crossedCheckpoints) return LineParticleState.CROSSED
             return if (marker.checkpointIndex == racer.nextCheckpointIndex) LineParticleState.NEXT else LineParticleState.BLOCKED
         }
-        val maxCheckpoint = race.maxCheckpointIndex(racer.currentLap)
-        return if (racer.nextCheckpointIndex > maxCheckpoint) LineParticleState.NEXT else LineParticleState.BLOCKED
+        return if (racer.isReadyForFinishLine(race)) LineParticleState.NEXT else LineParticleState.BLOCKED
     }
 
     private fun lineParticle(state: LineParticleState): DustParticleOptions {
@@ -755,7 +753,11 @@ object RaceManager {
         val crossedCheckpoints: MutableSet<Int> = HashSet(),
         val previousDistances: MutableMap<Long, Double> = HashMap(),
         var nextTarget: Vector3d? = null
-    )
+    ) {
+        fun isReadyForFinishLine(race: ActiveRace): Boolean {
+            return nextCheckpointIndex > race.maxCheckpointIndex(currentLap)
+        }
+    }
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
 

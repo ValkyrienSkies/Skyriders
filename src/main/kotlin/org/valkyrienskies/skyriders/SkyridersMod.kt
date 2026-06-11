@@ -70,6 +70,7 @@ import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockItem
 import org.valkyrienskies.skyriders.content.racing.RaceFlagColoringRecipe
 import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlock
 import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlockEntity
+import org.valkyrienskies.skyriders.content.racing.RaceMarkerBlockItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
@@ -115,7 +116,7 @@ object SkyridersMod {
         )
     }
     val RACE_MARKER_ITEM: RegistryObject<Item> = ITEMS.register("race_marker") {
-        BlockItem(RACE_MARKER_BLOCK.get(), Item.Properties())
+        RaceMarkerBlockItem(RACE_MARKER_BLOCK.get(), Item.Properties())
     }
     val RACE_ENDPOINT_BLOCK: RegistryObject<Block> = BLOCKS.register("race_endpoint") {
         RaceEndpointBlock(

@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.context.BlockPlaceContext
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.BlockGetter
@@ -194,7 +195,28 @@ class RaceEndpointBlock(properties: Properties) : BaseEntityBlock(properties) {
     }
 }
 
-class RaceEndpointBlockItem(block: net.minecraft.world.level.block.Block, properties: Properties) : net.minecraft.world.item.BlockItem(block, properties) {
+class RaceMarkerBlockItem(block: net.minecraft.world.level.block.Block, properties: Properties) : BlockItem(block, properties) {
+    override fun useOn(context: UseOnContext): InteractionResult {
+        val level = context.level
+        val pos = context.clickedPos
+        val marker = level.getBlockEntity(pos) as? RaceMarkerBlockEntity
+        if (marker?.markerType == RaceMarkerTypes.CHECKPOINT) {
+            if (!level.isClientSide) {
+                if (context.player?.isShiftKeyDown == true) {
+                    val lapRequirement = marker.cycleCheckpointLapRequirement()
+                    context.player?.displayClientMessage(Component.literal("Checkpoint lap: $lapRequirement"), true)
+                } else {
+                    val index = marker.decrementCheckpointIndex()
+                    context.player?.displayClientMessage(Component.literal("Checkpoint index: $index"), true)
+                }
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide)
+        }
+        return super.useOn(context)
+    }
+}
+
+class RaceEndpointBlockItem(block: net.minecraft.world.level.block.Block, properties: Properties) : BlockItem(block, properties) {
     override fun useOn(context: UseOnContext): InteractionResult {
         val level = context.level
         val pos = context.clickedPos
