@@ -59,6 +59,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
 
         if (level().isClientSide) {
             spawnHoneyParticles()
+            spawnTetherDripParticles()
             if (!ignited) {
                 deltaMovement = updateUnlitVelocity(deltaMovement)
             }
@@ -73,12 +74,12 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
         }
 
         if (tickCount > MAX_LIFETIME_TICKS) {
-            discard()
+            breakApart(serverLevel)
             return
         }
 
         if (lineConnected && distanceFromOwner(serverLevel, position()) > TETHER_RANGE) {
-            snapLine()
+            snapLine(serverLevel)
         }
 
         if (!ignited) {
@@ -96,7 +97,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
         val start = position()
         val velocity = deltaMovement
         if (velocity.lengthSqr() < 1.0e-8) {
-            discard()
+            breakApart(serverLevel)
             return
         }
         val next = start.add(velocity)
@@ -110,7 +111,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
             )
         )
         if (blockHit.type != HitResult.Type.MISS) {
-            discard()
+            breakApart(serverLevel)
             return
         }
 
@@ -121,7 +122,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
             if (lineConnected) {
                 attachToVehicle(serverLevel, hitVehicle.bodyId)
             } else {
-                discard()
+                breakApart(serverLevel)
             }
         }
     }
@@ -189,7 +190,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
         val nextVelocity = updateUnlitVelocity(deltaMovement)
         val next = start.add(nextVelocity)
         if (lineConnected && distanceFromOwner(level, next) > TETHER_RANGE) {
-            snapLine()
+            snapLine(level)
         }
 
         val blockHit = level.clip(
@@ -275,7 +276,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
     }
 
     private fun tickAttached(level: ServerLevel) {
-        val targetBodyId = attachedTargetBodyId ?: return discard()
+        val targetBodyId = attachedTargetBodyId ?: return breakApart(level)
         val shipWorld = level.shipWorld ?: return snapAndDiscard()
         val ownerBody = shipWorld.allBodies.getById(ownerBodyId) ?: return snapAndDiscard()
         val targetBody = shipWorld.allBodies.getById(targetBodyId) ?: return snapAndDiscard()
@@ -345,18 +346,49 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
         }
     }
 
+    private fun spawnTetherDripParticles() {
+        if (!lineConnected || random.nextFloat() > TETHER_DRIP_CHANCE) return
+        val ownerPosition = ownerPosition() ?: return
+        val t = random.nextDouble()
+        val px = x + (ownerPosition.x - x) * t + (random.nextDouble() - 0.5) * 0.08
+        val py = y + (ownerPosition.y + 0.45 - y) * t - TETHER_DRIP_Y_OFFSET + (random.nextDouble() - 0.5) * 0.06
+        val pz = z + (ownerPosition.z - z) * t + (random.nextDouble() - 0.5) * 0.08
+        level().addParticle(ParticleTypes.FALLING_HONEY, px, py, pz, 0.0, -0.08, 0.0)
+    }
+
     private fun distanceFromOwner(level: ServerLevel, position: Vec3): Double {
         val ownerBody = level.shipWorld?.allBodies?.getById(ownerBodyId) ?: return Double.POSITIVE_INFINITY
         return sqrt(ownerBody.kinematics.position.distanceSquared(Vector3d(position.x, position.y, position.z)))
     }
 
-    private fun snapLine() {
+    private fun ownerPosition(): Vector3d? {
+        val ownerBody = level().shipWorld?.allBodies?.getById(ownerBodyId) ?: return null
+        return Vector3d(ownerBody.kinematics.position)
+    }
+
+    private fun snapLine(level: ServerLevel? = null) {
+        if (!lineConnected) return
         entityData.set(LINE_CONNECTED, false)
+        if (level != null) {
+            spawnHoneyBurst(level, BURST_PARTICLES_ON_SNAP)
+        }
     }
 
     private fun snapAndDiscard() {
+        breakApart(level() as? ServerLevel)
+    }
+
+    private fun breakApart(level: ServerLevel?) {
+        if (level != null) {
+            spawnHoneyBurst(level, BURST_PARTICLES_ON_BREAK)
+        }
         snapLine()
         discard()
+    }
+
+    private fun spawnHoneyBurst(level: ServerLevel, count: Int) {
+        level.sendParticles(ParticleTypes.FALLING_HONEY, x, y, z, count, 0.42, 0.32, 0.42, 0.09)
+        level.sendParticles(ParticleTypes.DRIPPING_HONEY, x, y, z, count / 2, 0.34, 0.24, 0.34, 0.02)
     }
 
     private fun setPosition(position: Vec3) {
@@ -442,6 +474,10 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
         private const val FUEL_STEAL_PER_SECOND = 3.0
         private const val FUEL_STEAL_PER_TICK = FUEL_STEAL_PER_SECOND / 20.0
         private const val ATTACHED_SOUND_INTERVAL_TICKS = 8
+        private const val TETHER_DRIP_CHANCE = 0.18f
+        private const val TETHER_DRIP_Y_OFFSET = 0.18
+        private const val BURST_PARTICLES_ON_SNAP = 18
+        private const val BURST_PARTICLES_ON_BREAK = 42
         private const val RENDER_DISTANCE = 192.0
         private val OWNER_BODY_ID: EntityDataAccessor<Long> =
             SynchedEntityData.defineId(HoneyHeisterEntity::class.java, EntityDataSerializers.LONG)
