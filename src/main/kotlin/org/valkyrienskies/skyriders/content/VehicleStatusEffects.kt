@@ -29,6 +29,10 @@ object VehicleStatusEffects {
     private const val DEFAULT_PULL_DURATION = 0.55
     private const val DEFAULT_PULL_ACCELERATION = 42.0
     private const val DEFAULT_PULL_MAX_SPEED = 24.0
+    private const val DEFAULT_CARRY_DURATION = 0.3
+    private const val DEFAULT_CARRY_STIFFNESS = 10.0
+    private const val DEFAULT_CARRY_DAMPING = 7.0
+    private const val DEFAULT_CARRY_MAX_ACCELERATION = 85.0
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -85,6 +89,23 @@ object VehicleStatusEffects {
         state.pullMaxSpeed = maxSpeed.coerceAtLeast(0.0)
     }
 
+    fun applyCarryToPoint(
+        vehicle: IVehicle,
+        target: Vector3d,
+        duration: Double = DEFAULT_CARRY_DURATION,
+        stiffness: Double = DEFAULT_CARRY_STIFFNESS,
+        damping: Double = DEFAULT_CARRY_DAMPING,
+        maxAcceleration: Double = DEFAULT_CARRY_MAX_ACCELERATION
+    ) {
+        if (!VehiclePhysicsMath.isFinite(target)) return
+        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+        state.carryTarget = Vector3d(target)
+        state.carryTimeRemaining = max(state.carryTimeRemaining, duration.coerceAtLeast(0.05))
+        state.carryStiffness = stiffness.coerceAtLeast(0.0)
+        state.carryDamping = damping.coerceAtLeast(0.0)
+        state.carryMaxAcceleration = maxAcceleration.coerceAtLeast(0.0)
+    }
+
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
         return if (isSpinningOut(vehicle)) {
             VehicleInput.EMPTY.copy(
@@ -128,6 +149,13 @@ object VehicleStatusEffects {
             state.pullTimeRemaining = (state.pullTimeRemaining - safeDt).coerceAtLeast(0.0)
             if (state.pullTimeRemaining <= 0.0) {
                 state.pullTarget = null
+            }
+        }
+        if (state.carryTimeRemaining > 0.0) {
+            applyCarryForce(vehicle, body, state)
+            state.carryTimeRemaining = (state.carryTimeRemaining - safeDt).coerceAtLeast(0.0)
+            if (state.carryTimeRemaining <= 0.0) {
+                state.carryTarget = null
             }
         }
         if (state.isIdle()) {
@@ -185,6 +213,27 @@ object VehicleStatusEffects {
         val ramp = (state.pullTimeRemaining / state.pullDuration.coerceAtLeast(0.001)).coerceIn(0.15, 1.0)
         val force = direction.mul(vehicle.vehicleDefinition.body.mass * state.pullAcceleration * speedScale * ramp)
         VehiclePhysicsMath.safeApplyWorldForce(body, force, body.kinematics.position)
+    }
+
+    private fun applyCarryForce(vehicle: IVehicle, body: PhysVsBody, state: RuntimeState) {
+        val target = state.carryTarget ?: return
+        val offset = Vector3d(target).sub(body.kinematics.position)
+        if (!VehiclePhysicsMath.isFinite(offset)) return
+        val velocity = body.kinematics.velocity
+        val acceleration = Vector3d(offset)
+            .mul(state.carryStiffness)
+            .fma(-state.carryDamping, velocity)
+        if (!VehiclePhysicsMath.isFinite(acceleration) || acceleration.lengthSquared() < 1.0e-8) return
+        val accelerationMagnitude = acceleration.length()
+        val maxAcceleration = state.carryMaxAcceleration
+        if (maxAcceleration > 0.0 && accelerationMagnitude > maxAcceleration) {
+            acceleration.mul(maxAcceleration / accelerationMagnitude)
+        }
+        VehiclePhysicsMath.safeApplyWorldForce(
+            body,
+            acceleration.mul(vehicle.vehicleDefinition.body.mass),
+            body.kinematics.position
+        )
     }
 
     private fun finishSpinOut(vehicle: IVehicle, state: RuntimeState) {
@@ -263,12 +312,18 @@ object VehicleStatusEffects {
         var pullAcceleration: Double = 0.0
         var pullMaxSpeed: Double = 0.0
         var pullTarget: Vector3d? = null
+        var carryTimeRemaining: Double = 0.0
+        var carryStiffness: Double = 0.0
+        var carryDamping: Double = 0.0
+        var carryMaxAcceleration: Double = 0.0
+        var carryTarget: Vector3d? = null
 
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
                 spinOutImmunityRemaining <= 0.0 &&
                 boostTimeRemaining <= 0.0 &&
-                pullTimeRemaining <= 0.0
+                pullTimeRemaining <= 0.0 &&
+                carryTimeRemaining <= 0.0
         }
     }
 }

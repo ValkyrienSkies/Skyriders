@@ -14,6 +14,7 @@ import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.minecraftforge.common.world.ForgeChunkManager
 import org.joml.Vector3d
@@ -29,7 +30,9 @@ import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.sin
 import kotlin.math.sqrt
 import java.util.concurrent.ConcurrentHashMap
 
@@ -53,13 +56,25 @@ object RaceManager {
     private const val LINE_PARTICLE_SPACING = 0.55
     private const val START_CAPTURE_RANGE = 128.0
     private const val MIN_LINE_LENGTH = 0.75
-    private const val DANGER_RECOVERY_TICKS = 45
+    private const val DANGER_RECOVERY_MIN_TICKS = 24
+    private const val DANGER_RECOVERY_MAX_TICKS = 70
+    private const val DANGER_RECOVERY_HOLD_TICKS = 28
     private const val DANGER_RECOVERY_COOLDOWN_TICKS = 60
-    private const val DANGER_RECOVERY_HEIGHT = 2.0
-    private const val DANGER_RECOVERY_PULL_DURATION = 0.35
-    private const val DANGER_RECOVERY_PULL_ACCELERATION = 80.0
-    private const val DANGER_RECOVERY_PULL_MAX_SPEED = 42.0
-    private const val DANGER_RECOVERY_SNAP_DISTANCE = 2.25
+    private const val DANGER_RECOVERY_BASE_HEIGHT = 1.75
+    private const val DANGER_RECOVERY_EXTRA_HEIGHT = 4.0
+    private const val DANGER_RECOVERY_MAX_ARC_HEIGHT = 10.0
+    private const val DANGER_RECOVERY_BLOCK_PADDING = 0.35
+    private const val DANGER_RECOVERY_FORCE_DURATION = 0.35
+    private const val DANGER_RECOVERY_CARRY_STIFFNESS = 9.0
+    private const val DANGER_RECOVERY_CARRY_DAMPING = 6.5
+    private const val DANGER_RECOVERY_CARRY_MAX_ACCELERATION = 85.0
+    private const val DANGER_RECOVERY_HOLD_STIFFNESS = 14.0
+    private const val DANGER_RECOVERY_HOLD_DAMPING = 13.0
+    private const val DANGER_RECOVERY_HOLD_MAX_ACCELERATION = 120.0
+    private val dangerRecoveryLineSamples = listOf(0.5, 0.35, 0.65, 0.2, 0.8)
+    private val dangerRecoveryForwardOffsets = listOf(0.0, -0.75, 0.75, -1.5, 1.5)
+    private val dangerRecoveryVerticalOffsets = listOf(1.75, 2.25, 2.75, 3.5, 4.5, 6.0)
+    private val dangerCarryVerticalAdjustments = listOf(0.0, 0.75, 1.5, 2.5, 4.0)
     private val racesByKey = HashMap<RaceKey, ActiveRace>()
     private val markerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceMarkerSnapshot>>()
     private val dangerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceDangerSnapshot>>()
@@ -273,7 +288,7 @@ object RaceManager {
             .sortedBy { it.blockPos.asLong() }
         val participants = VehicleManager.getVehicles(level)
             .filter { VehicleRaceParticipants.matchesColor(it, color) }
-            .mapNotNull { vehicle -> createRacerIfNearStart(level, vehicle, line) }
+            .mapNotNull { vehicle -> createRacerIfNearStart(level, vehicle, line, startSnapshot.blockPos) }
             .associateByTo(LinkedHashMap()) { it.bodyId }
         if (participants.isEmpty()) {
             broadcastActionBarNear(level, startMarker.blockPos, "No matching racers near start line.")
@@ -311,7 +326,12 @@ object RaceManager {
         broadcastTitleNear(level, startMarker.blockPos, "GO!", fadeIn = 0, stay = 24, fadeOut = 6)
     }
 
-    private fun createRacerIfNearStart(level: ServerLevel, vehicle: IVehicle, line: RaceLine): RacerState? {
+    private fun createRacerIfNearStart(
+        level: ServerLevel,
+        vehicle: IVehicle,
+        line: RaceLine,
+        recoveryMarkerPos: BlockPos
+    ): RacerState? {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return null
         val position = Vector3d(body.kinematics.position)
         if (line.distanceToSegment(position) > START_CAPTURE_RANGE) return null
@@ -322,7 +342,8 @@ object RaceManager {
             driverName = driver?.gameProfile?.name ?: vehicle.vehicleDefinition.displayName,
             vehicleType = vehicle.vehicleDefinition.id.toString(),
             position = position,
-            lastRecoveryTarget = Vector3d(line.center)
+            lastRecoveryTarget = Vector3d(line.center),
+            lastRecoveryMarkerPos = recoveryMarkerPos
         )
     }
 
@@ -353,7 +374,10 @@ object RaceManager {
             if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return
             if (marker.checkpointIndex != racer.nextCheckpointIndex) return
             racer.crossedCheckpoints.add(marker.checkpointIndex)
-            marker.line(level)?.let { line -> racer.lastRecoveryTarget = Vector3d(line.center) }
+            marker.line(level)?.let { line ->
+                racer.lastRecoveryTarget = Vector3d(line.center)
+                racer.lastRecoveryMarkerPos = marker.blockPos
+            }
             racer.nextCheckpointIndex = race.nextCheckpointIndexAfter(marker.checkpointIndex, racer.currentLap)
             racer.nextTarget = nextTarget(level, racer, race)
             successEffect(level, position)
@@ -369,7 +393,10 @@ object RaceManager {
                 racer.currentLap++
                 racer.lapStartedAtGameTime = level.gameTime
                 racer.crossedCheckpoints.clear()
-                marker.line(level)?.let { line -> racer.lastRecoveryTarget = Vector3d(line.center) }
+                marker.line(level)?.let { line ->
+                    racer.lastRecoveryTarget = Vector3d(line.center)
+                    racer.lastRecoveryMarkerPos = marker.blockPos
+                }
                 racer.nextCheckpointIndex = race.firstCheckpointIndex(racer.currentLap)
                 racer.nextTarget = nextTarget(level, racer, race)
                 successEffect(level, position)
@@ -513,15 +540,20 @@ object RaceManager {
         val target = racer.lastRecoveryTarget
             ?: race.startMarker.line(level)?.center
             ?: return
-        racer.dangerRecovery = DangerRecovery(Vector3d(target), DANGER_RECOVERY_TICKS)
-        racer.dangerRecoveryCooldownTicks = DANGER_RECOVERY_COOLDOWN_TICKS
-        VehicleStatusEffects.applyPullToPoint(
-            vehicle = vehicle,
-            target = recoveryTarget(target),
-            duration = DANGER_RECOVERY_PULL_DURATION,
-            acceleration = DANGER_RECOVERY_PULL_ACCELERATION,
-            maxSpeed = DANGER_RECOVERY_PULL_MAX_SPEED
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return
+        val start = Vector3d(body.kinematics.position)
+        val safeTarget = findSafeRecoveryTarget(level, race, racer, vehicle, target)
+        val distance = start.distance(safeTarget)
+        val totalTicks = (distance / 1.1).toInt().coerceIn(DANGER_RECOVERY_MIN_TICKS, DANGER_RECOVERY_MAX_TICKS)
+        racer.dangerRecovery = DangerRecovery(
+            start = start,
+            target = safeTarget,
+            totalTicks = totalTicks,
+            ticksRemaining = totalTicks,
+            holdTicksRemaining = DANGER_RECOVERY_HOLD_TICKS
         )
+        racer.dangerRecoveryCooldownTicks = DANGER_RECOVERY_COOLDOWN_TICKS
+        VehicleManager.clearInput(level.dimensionId, racer.bodyId)
         dangerEffect(level, racer.position)
         level.playSound(null, danger.blockPos, SoundEvents.ENDERMAN_TELEPORT, SoundSource.BLOCKS, 0.8f, 1.35f)
         driverForBody(level, racer.bodyId)?.sendActionBar("Danger! Returning to checkpoint.")
@@ -535,25 +567,43 @@ object RaceManager {
         recovery: DangerRecovery
     ) {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return
-        val target = recoveryTarget(recovery.target)
-        VehicleStatusEffects.applyPullToPoint(
-            vehicle = vehicle,
-            target = target,
-            duration = DANGER_RECOVERY_PULL_DURATION,
-            acceleration = DANGER_RECOVERY_PULL_ACCELERATION,
-            maxSpeed = DANGER_RECOVERY_PULL_MAX_SPEED
-        )
-        recovery.ticksRemaining--
-        val closeEnough = Vector3d(body.kinematics.position).distanceSquared(target) <=
-            DANGER_RECOVERY_SNAP_DISTANCE * DANGER_RECOVERY_SNAP_DISTANCE
-        if (recovery.ticksRemaining > 0 && !closeEnough) return
+        if (recovery.ticksRemaining > 0) {
+            val progress = 1.0 - recovery.ticksRemaining.toDouble() / recovery.totalTicks.toDouble()
+            val carried = carriedRecoveryPosition(recovery, progress.coerceIn(0.0, 1.0))
+            val clearPosition = findClearCarryPosition(level, vehicle, carried) ?: carried
+            VehicleStatusEffects.applyCarryToPoint(
+                vehicle = vehicle,
+                target = clearPosition,
+                duration = DANGER_RECOVERY_FORCE_DURATION,
+                stiffness = DANGER_RECOVERY_CARRY_STIFFNESS,
+                damping = DANGER_RECOVERY_CARRY_DAMPING,
+                maxAcceleration = DANGER_RECOVERY_CARRY_MAX_ACCELERATION
+            )
+            racer.position = Vector3d(body.kinematics.position)
+            VehicleManager.clearInput(level.dimensionId, racer.bodyId)
+            recovery.ticksRemaining--
+            return
+        }
 
-        VehicleManager.teleportVehicle(level, racer.bodyId, target)
-        racer.position = Vector3d(target)
+        val holdTarget = findClearCarryPosition(level, vehicle, recovery.target) ?: recovery.target
+        VehicleStatusEffects.applyCarryToPoint(
+            vehicle = vehicle,
+            target = holdTarget,
+            duration = DANGER_RECOVERY_FORCE_DURATION,
+            stiffness = DANGER_RECOVERY_HOLD_STIFFNESS,
+            damping = DANGER_RECOVERY_HOLD_DAMPING,
+            maxAcceleration = DANGER_RECOVERY_HOLD_MAX_ACCELERATION
+        )
+        racer.position = Vector3d(body.kinematics.position)
+        VehicleManager.clearInput(level.dimensionId, racer.bodyId)
+        recovery.holdTicksRemaining--
+        if (recovery.holdTicksRemaining > 0) return
+
         racer.dangerRecovery = null
-        resetRacerLineDistances(level, racer, race, target)
+        val releasePosition = Vector3d(body.kinematics.position)
+        resetRacerLineDistances(level, racer, race, releasePosition)
         racer.nextTarget = nextTarget(level, racer, race)
-        dangerReturnEffect(level, target)
+        dangerReturnEffect(level, releasePosition)
     }
 
     private fun resetRacerLineDistances(level: ServerLevel, racer: RacerState, race: ActiveRace, position: Vector3d) {
@@ -565,7 +615,70 @@ object RaceManager {
         }
     }
 
-    private fun recoveryTarget(target: Vector3d): Vector3d = Vector3d(target).add(0.0, DANGER_RECOVERY_HEIGHT, 0.0)
+    private fun findSafeRecoveryTarget(
+        level: ServerLevel,
+        race: ActiveRace,
+        racer: RacerState,
+        vehicle: IVehicle,
+        desiredTarget: Vector3d
+    ): Vector3d {
+        val line = racer.lastRecoveryMarkerPos
+            ?.let { markerPos -> activeMarkersForRace(level, race).firstOrNull { it.blockPos == markerPos } }
+            ?.line(level)
+            ?: race.startMarker.line(level)
+        val basePoints = line
+            ?.let { recoveryLine -> dangerRecoveryLineSamples.map(recoveryLine::point) }
+            ?: listOf(desiredTarget)
+        val normal = line?.horizontalNormal() ?: Vector3d()
+        basePoints.forEach { base ->
+            dangerRecoveryForwardOffsets.forEach { forwardOffset ->
+                dangerRecoveryVerticalOffsets.forEach { verticalOffset ->
+                    val candidate = Vector3d(base)
+                        .fma(forwardOffset, normal)
+                        .add(0.0, verticalOffset, 0.0)
+                    if (recoverySpaceClear(level, vehicle, candidate)) {
+                        return candidate
+                    }
+                }
+            }
+        }
+        val fallback = Vector3d(desiredTarget).add(0.0, DANGER_RECOVERY_BASE_HEIGHT, 0.0)
+        return findClearCarryPosition(level, vehicle, fallback) ?: fallback
+    }
+
+    private fun carriedRecoveryPosition(recovery: DangerRecovery, progress: Double): Vector3d {
+        val eased = smoothstep(progress)
+        val position = Vector3d(recovery.start).lerp(recovery.target, eased)
+        val horizontalDistance = Vector3d(recovery.target.x - recovery.start.x, 0.0, recovery.target.z - recovery.start.z).length()
+        val arcHeight = (DANGER_RECOVERY_EXTRA_HEIGHT + horizontalDistance * 0.08).coerceAtMost(DANGER_RECOVERY_MAX_ARC_HEIGHT)
+        position.y += sin(progress.coerceIn(0.0, 1.0) * PI) * arcHeight
+        return position
+    }
+
+    private fun findClearCarryPosition(level: ServerLevel, vehicle: IVehicle, position: Vector3d): Vector3d? {
+        dangerCarryVerticalAdjustments.forEach { yOffset ->
+            val candidate = Vector3d(position).add(0.0, yOffset, 0.0)
+            if (recoverySpaceClear(level, vehicle, candidate)) return candidate
+        }
+        return null
+    }
+
+    private fun recoverySpaceClear(level: ServerLevel, vehicle: IVehicle, position: Vector3d): Boolean {
+        if (!position.isFinite()) return false
+        val size = vehicle.vehicleDefinition.body.collisionBoxSize
+        val box = AABB.ofSize(
+            Vec3(position.x, position.y, position.z),
+            (size.x + DANGER_RECOVERY_BLOCK_PADDING).coerceAtLeast(0.8),
+            (size.y + DANGER_RECOVERY_BLOCK_PADDING).coerceAtLeast(0.8),
+            (size.z + DANGER_RECOVERY_BLOCK_PADDING).coerceAtLeast(0.8)
+        )
+        return level.noCollision(box)
+    }
+
+    private fun smoothstep(value: Double): Double {
+        val t = value.coerceIn(0.0, 1.0)
+        return t * t * (3.0 - 2.0 * t)
+    }
 
     private fun dangerBlocksForRace(level: ServerLevel, race: ActiveRace): List<RaceDangerSnapshot> {
         return race.dangerBlocks
@@ -929,6 +1042,7 @@ object RaceManager {
         val previousDistances: MutableMap<Long, Double> = HashMap(),
         var nextTarget: Vector3d? = null,
         var lastRecoveryTarget: Vector3d? = null,
+        var lastRecoveryMarkerPos: BlockPos? = null,
         var dangerRecovery: DangerRecovery? = null,
         var dangerRecoveryCooldownTicks: Int = 0
     ) {
@@ -938,8 +1052,11 @@ object RaceManager {
     }
 
     private data class DangerRecovery(
+        val start: Vector3d,
         val target: Vector3d,
-        var ticksRemaining: Int
+        val totalTicks: Int,
+        var ticksRemaining: Int,
+        var holdTicksRemaining: Int
     )
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
@@ -995,6 +1112,8 @@ data class RaceLine(val start: Vector3d, val end: Vector3d) {
         return Vector3d(start.x + horizontalSegment.x * t, position.y, start.z + horizontalSegment.z * t)
             .distance(position)
     }
+
+    fun horizontalNormal(): Vector3d = Vector3d(normal)
 
     fun point(t: Double): Vector3d = Vector3d(start).lerp(end, t)
 }

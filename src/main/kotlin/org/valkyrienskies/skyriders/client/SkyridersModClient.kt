@@ -1,6 +1,7 @@
 package org.valkyrienskies.skyriders.client
 
 import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.item.ItemProperties
@@ -26,6 +27,14 @@ import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import net.minecraftforge.common.MinecraftForge
 import org.valkyrienskies.skyriders.content.VehicleDefinitions
+import org.valkyrienskies.skyriders.content.racing.RaceDangerBlockEntity
+import org.joml.Vector3f
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.Vec3
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 object SkyridersModClient {
     private var lastSentInput = VehicleInput.EMPTY
@@ -157,6 +166,7 @@ object SkyridersModClient {
             RaceHudClientState.tick()
             RaceMusicClientState.tick()
             val player = minecraft.player ?: return
+            tickRaceDangerRadiusPreview(minecraft)
             if (player.vehicle !is BikeSeatEntity) return
 
             while (bikeDismountKey.consumeClick()) {
@@ -223,6 +233,33 @@ object SkyridersModClient {
             BikeClientHoistState.hoisting = false
             RaceHudClientState.clear()
             RaceMusicClientState.stop()
+        }
+
+        private fun tickRaceDangerRadiusPreview(minecraft: Minecraft) {
+            val level = minecraft.level ?: return
+            val player = minecraft.player ?: return
+            val dangerItem = SkyridersMod.RACE_DANGER_BLOCK.get().asItem()
+            if (player.mainHandItem.item != dangerItem && player.offhandItem.item != dangerItem) return
+            if (level.gameTime % 5L != 0L) return
+            val hit = minecraft.hitResult as? BlockHitResult ?: return
+            if (hit.type != HitResult.Type.BLOCK) return
+            val danger = level.getBlockEntity(hit.blockPos) as? RaceDangerBlockEntity ?: return
+            val radius = danger.radius
+            val center = Vec3.atCenterOf(hit.blockPos)
+            val count = (radius * 7.0).toInt().coerceIn(24, 192)
+            val particle = DustParticleOptions(Vector3f(0.95f, 0.1f, 1.0f), 1.0f)
+            for (i in 0 until count) {
+                val angle = i.toDouble() / count.toDouble() * PI * 2.0
+                level.addParticle(
+                    particle,
+                    center.x + cos(angle) * radius,
+                    center.y + 0.08,
+                    center.z + sin(angle) * radius,
+                    0.0,
+                    0.0,
+                    0.0
+                )
+            }
         }
     }
 }
