@@ -65,6 +65,7 @@ object SkyridersCommands {
                     literal("input")
                         .then(
                             argument("bodyId", LongArgumentType.longArg())
+                                .suggests { ctx, builder -> suggestLoadedVehicleIds(ctx.source, builder) }
                                 .then(inputSetter("steer", -1.0, 1.0) { input, value -> input.copy(steer = value, riderPresent = true) })
                                 .then(inputSetter("throttle", -1.0, 1.0) { input, value -> input.copy(throttle = value, riderPresent = true) })
                                 .then(inputSetter("brake", 0.0, 1.0) { input, value -> input.copy(brake = value, riderPresent = true) })
@@ -90,6 +91,7 @@ object SkyridersCommands {
                     literal("remove")
                         .then(
                             argument("bodyId", LongArgumentType.longArg())
+                                .suggests { ctx, builder -> suggestLoadedVehicleIds(ctx.source, builder) }
                                 .executes { ctx ->
                                     removeBike(ctx.source, LongArgumentType.getLong(ctx, "bodyId"))
                                 }
@@ -99,9 +101,27 @@ object SkyridersCommands {
                     literal("ride")
                         .then(
                             argument("bodyId", LongArgumentType.longArg())
+                                .suggests { ctx, builder -> suggestLoadedVehicleIds(ctx.source, builder) }
                                 .executes { ctx ->
                                     rideBike(ctx.source, LongArgumentType.getLong(ctx, "bodyId"))
                                 }
+                        )
+                )
+                .then(
+                    literal("teleport")
+                        .then(
+                            argument("bodyId", LongArgumentType.longArg())
+                                .suggests { ctx, builder -> suggestLoadedVehicleIds(ctx.source, builder) }
+                                .then(
+                                    argument("pos", Vec3Argument.vec3())
+                                        .executes { ctx ->
+                                            teleportVehicle(
+                                                ctx.source,
+                                                LongArgumentType.getLong(ctx, "bodyId"),
+                                                Vec3Argument.getVec3(ctx, "pos")
+                                            )
+                                        }
+                                )
                         )
                 )
                 .then(
@@ -160,6 +180,19 @@ object SkyridersCommands {
         } else {
             null
         }
+    }
+
+    private fun suggestLoadedVehicleIds(
+        source: CommandSourceStack,
+        builder: com.mojang.brigadier.suggestion.SuggestionsBuilder
+    ): java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> {
+        return SharedSuggestionProvider.suggest(loadedVehicleIdSuggestions(source), builder)
+    }
+
+    private fun loadedVehicleIdSuggestions(source: CommandSourceStack): Iterable<String> {
+        return VehicleManager.getVehicles(source.level.dimensionId)
+            .map { it.bodyId.toString() }
+            .sorted()
     }
 
     private fun parseRaceColor(input: String): Int? {
@@ -311,6 +344,33 @@ object SkyridersCommands {
             return 0
         }
         source.sendSuccess({ Component.literal("Mounted ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) with VS body $bodyId") }, false)
+        return 1
+    }
+
+    private fun teleportVehicle(source: CommandSourceStack, bodyId: BodyId, pos: Vec3): Int {
+        val level = source.level as? ServerLevel
+            ?: run {
+                source.sendFailure(Component.literal("Vehicles can only be teleported on the server."))
+                return 0
+            }
+        val vehicle = try {
+            VehicleManager.teleportVehicle(level, bodyId, Vector3d(pos.x, pos.y, pos.z))
+        } catch (ex: IllegalStateException) {
+            source.sendFailure(Component.literal(ex.message ?: "VS body world is not ready."))
+            return 0
+        }
+        if (vehicle == null) {
+            source.sendFailure(Component.literal("No vehicle with VS body id $bodyId in this dimension."))
+            return 0
+        }
+        source.sendSuccess(
+            {
+                Component.literal(
+                    "Teleported ${vehicle.vehicleDefinition.displayName} (${vehicle.id}) body $bodyId to ${formatCoord(pos.x)}, ${formatCoord(pos.y)}, ${formatCoord(pos.z)}."
+                )
+            },
+            true
+        )
         return 1
     }
 

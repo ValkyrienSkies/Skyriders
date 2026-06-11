@@ -13,6 +13,7 @@ import org.joml.Quaterniond
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.VsBodyCreateData
+import org.valkyrienskies.core.api.bodies.ServerBaseVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.core.api.world.properties.DimensionId
@@ -257,6 +258,17 @@ object VehicleManager {
 
     fun clearInput(dimensionId: DimensionId, bodyId: BodyId): VehicleInput? {
         return updateInput(dimensionId, bodyId) { VehicleInput.EMPTY }
+    }
+
+    fun teleportVehicle(level: ServerLevel, bodyId: BodyId, position: Vector3dc): IVehicle? {
+        val vehicle = getVehicle(level.dimensionId, bodyId) ?: return null
+        val body = level.shipWorld?.allBodies?.getById(bodyId) as? ServerBaseVsBody
+            ?: throw IllegalStateException("Vehicle $bodyId is bound to a missing VS body.")
+        body.setPosition(position)
+        clearInput(level.dimensionId, bodyId)
+        BikeLifecycle.saveLevel(level)
+        BikeLifecycle.syncLevel(level)
+        return vehicle
     }
 
     fun toggleEngine(level: ServerLevel, bodyId: BodyId): Boolean? {
