@@ -2,15 +2,19 @@ package org.valkyrienskies.skyriders.command
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.DoubleArgumentType
+import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.LongArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
+import net.minecraft.ChatFormatting
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands.argument
 import net.minecraft.commands.Commands.literal
 import net.minecraft.commands.SharedSuggestionProvider
 import net.minecraft.commands.arguments.coordinates.Vec3Argument
+import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.HoverEvent
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
@@ -102,6 +106,23 @@ object SkyridersCommands {
                 )
                 .then(
                     literal("race")
+                        .then(
+                            literal("locatenext")
+                                .executes { ctx -> locateNextRaceCheckpoint(ctx.source) }
+                        )
+                        .then(
+                            literal("tpnext")
+                                .executes { ctx -> teleportToNextRaceCheckpoint(ctx.source, null) }
+                                .then(
+                                    argument("choice", IntegerArgumentType.integer(1))
+                                        .executes { ctx ->
+                                            teleportToNextRaceCheckpoint(
+                                                ctx.source,
+                                                IntegerArgumentType.getInteger(ctx, "choice")
+                                            )
+                                        }
+                                )
+                        )
                         .then(
                             literal("end")
                                 .then(
@@ -312,4 +333,98 @@ object SkyridersCommands {
         source.sendSuccess({ Component.literal("Ended race %06X.".format(color)) }, true)
         return 1
     }
+
+    private fun locateNextRaceCheckpoint(source: CommandSourceStack): Int {
+        val level = source.level as? ServerLevel
+            ?: run {
+                source.sendFailure(Component.literal("Race checkpoints can only be located on the server."))
+                return 0
+            }
+        val player = source.player as? ServerPlayer
+            ?: run {
+                source.sendFailure(Component.literal("Only players can locate their next race checkpoint."))
+                return 0
+            }
+        val options = RaceManager.nextMarkerOptions(level, player)
+            ?: run {
+                source.sendFailure(Component.literal("You are not driving in an active race, or the next checkpoint has no valid linked line."))
+                return 0
+            }
+
+        val label = nextRaceMarkerLabel(options.markerType, options.nextCheckpointIndex)
+        val message = Component.literal(
+            "Next race target for %06X, lap ${options.currentLap}/${options.totalLaps}: $label (${options.options.size} line${if (options.options.size == 1) "" else "s"})"
+                .format(options.colorId)
+        )
+        options.options.forEachIndexed { index, option ->
+            val choice = index + 1
+            val center = option.center
+            val endpoint = option.endpointPos?.let { " -> ${it.x}, ${it.y}, ${it.z}" } ?: ""
+            val command = "/skyriders race tpnext $choice"
+            val tp = Component.literal(" [TP]")
+                .withStyle { style ->
+                    style
+                        .withColor(ChatFormatting.AQUA)
+                        .withClickEvent(ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
+                        .withHoverEvent(HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(command)))
+                }
+            message.append(
+                Component.literal(
+                    "\n#$choice center=${formatCoord(center.x)}, ${formatCoord(center.y)}, ${formatCoord(center.z)} marker=${option.markerPos.x}, ${option.markerPos.y}, ${option.markerPos.z}$endpoint"
+                )
+            ).append(tp)
+        }
+
+        source.sendSuccess({ message }, false)
+        return options.options.size
+    }
+
+    private fun teleportToNextRaceCheckpoint(source: CommandSourceStack, choice: Int?): Int {
+        val level = source.level as? ServerLevel
+            ?: run {
+                source.sendFailure(Component.literal("Race checkpoints can only be teleported to on the server."))
+                return 0
+            }
+        val player = source.player as? ServerPlayer
+            ?: run {
+                source.sendFailure(Component.literal("Only players can teleport to their next race checkpoint."))
+                return 0
+            }
+        val options = RaceManager.nextMarkerOptions(level, player)
+            ?: run {
+                source.sendFailure(Component.literal("You are not driving in an active race, or the next checkpoint has no valid linked line."))
+                return 0
+            }
+        if (choice == null && options.options.size != 1) {
+            source.sendFailure(Component.literal("There are ${options.options.size} next checkpoint lines. Use /skyriders race locatenext, then /skyriders race tpnext <choice>."))
+            return 0
+        }
+        val index = (choice ?: 1) - 1
+        val option = options.options.getOrNull(index)
+            ?: run {
+                source.sendFailure(Component.literal("Invalid checkpoint choice ${choice ?: 1}; valid range is 1-${options.options.size}."))
+                return 0
+            }
+        val center = option.center
+        player.teleportTo(level, center.x, center.y + 1.0, center.z, player.yRot, player.xRot)
+        source.sendSuccess(
+            {
+                Component.literal(
+                    "Teleported to ${nextRaceMarkerLabel(options.markerType, options.nextCheckpointIndex)} #${index + 1} at ${formatCoord(center.x)}, ${formatCoord(center.y + 1.0)}, ${formatCoord(center.z)}."
+                )
+            },
+            false
+        )
+        return 1
+    }
+
+    private fun nextRaceMarkerLabel(markerType: String, checkpointIndex: Int): String {
+        return if (markerType == "start_finish") {
+            "start/finish"
+        } else {
+            "checkpoint index $checkpointIndex"
+        }
+    }
+
+    private fun formatCoord(value: Double): String = "%.2f".format(value)
 }

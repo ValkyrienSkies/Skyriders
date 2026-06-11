@@ -101,6 +101,42 @@ object RaceManager {
         return state.nextTarget
     }
 
+    fun nextMarkerOptions(level: ServerLevel, player: ServerPlayer): RaceNextMarkerOptions? {
+        val seat = player.vehicle as? BikeSeatEntity ?: return null
+        if (!seat.isDriverSeat()) return null
+        val dimension = level.dimension().location().toString()
+        val race = racesByKey.values.firstOrNull { activeRace ->
+            activeRace.active && activeRace.dimension == dimension && activeRace.racers[seat.bodyId]?.driverId == player.uuid
+        } ?: return null
+        val racer = race.racers[seat.bodyId] ?: return null
+        refreshRacerPosition(level, racer, race)
+        val maxCheckpoint = race.maxCheckpointIndex()
+        val markerOptions = if (racer.nextCheckpointIndex > maxCheckpoint) {
+            listOf(race.startMarker)
+        } else {
+            race.checkpointMarkers.filter { it.checkpointIndex == racer.nextCheckpointIndex }
+        }
+        val markers = markerOptions.mapNotNull { marker ->
+            val line = marker.line(level) ?: return@mapNotNull null
+            RaceNextMarkerOption(
+                markerType = marker.markerType,
+                checkpointIndex = marker.checkpointIndex,
+                markerPos = marker.blockPos,
+                endpointPos = marker.endpointPos,
+                center = line.center
+            )
+        }
+        if (markers.isEmpty()) return null
+        return RaceNextMarkerOptions(
+            colorId = race.colorId and 0xFFFFFF,
+            currentLap = racer.currentLap,
+            totalLaps = race.totalLaps,
+            nextCheckpointIndex = racer.nextCheckpointIndex,
+            markerType = if (racer.nextCheckpointIndex > maxCheckpoint) RaceMarkerTypes.START_FINISH else RaceMarkerTypes.CHECKPOINT,
+            options = markers
+        )
+    }
+
     fun placementFor(level: ServerLevel, bodyId: Long): RacePlacement? {
         val race = racesByKey.values.firstOrNull { race ->
             race.active && race.dimension == level.dimension().location().toString() && race.racers.containsKey(bodyId)
@@ -552,6 +588,23 @@ object RaceManager {
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
 
     data class RacePlacement(val place: Int, val total: Int)
+
+    data class RaceNextMarkerOptions(
+        val colorId: Int,
+        val currentLap: Int,
+        val totalLaps: Int,
+        val nextCheckpointIndex: Int,
+        val markerType: String,
+        val options: List<RaceNextMarkerOption>
+    )
+
+    data class RaceNextMarkerOption(
+        val markerType: String,
+        val checkpointIndex: Int,
+        val markerPos: BlockPos,
+        val endpointPos: BlockPos?,
+        val center: Vector3d
+    )
 }
 
 data class RaceLine(val start: Vector3d, val end: Vector3d) {
