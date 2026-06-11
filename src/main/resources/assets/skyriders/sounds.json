@@ -251,6 +251,14 @@
       }
     ]
   },
+  "fasterthanavalkyrie": {
+    "sounds": [
+      {
+        "name": "skyriders:race_music/fasterthanavalkyrie",
+        "stream": true
+      }
+    ]
+  },
   "extending_spring": {
     "sounds": [
       {
