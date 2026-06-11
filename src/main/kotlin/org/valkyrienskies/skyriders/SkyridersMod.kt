@@ -1,10 +1,13 @@
 package org.valkyrienskies.skyriders
 
+import net.minecraft.core.registries.Registries
+import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.entity.animal.horse.Horse
 import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.item.CreativeModeTab
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
@@ -82,6 +85,7 @@ object SkyridersMod {
     private val ENTITIES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MOD_ID)
     private val BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID)
     private val RECIPE_SERIALIZERS = DeferredRegister.create(ForgeRegistries.RECIPE_SERIALIZERS, MOD_ID)
+    private val CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MOD_ID)
     // Put RegistryObjects here:
     val BOOST_PAD_BLOCK: RegistryObject<Block> = registerBlockAndItem("boost_pad") {
         BoostPadBlock(
@@ -190,6 +194,35 @@ object SkyridersMod {
         BergenDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     }
 
+    val SKYRIDERS_TAB: RegistryObject<CreativeModeTab> = CREATIVE_TABS.register("skyriders") {
+        CreativeModeTab.builder()
+            .title(Component.translatable("itemGroup.skyriders"))
+            .icon { ItemStack(HONEY_CANISTER.get()) }
+            .displayItems { _, output ->
+                output.accept(BOOST_PAD_BLOCK.get())
+                output.accept(BOOST_PAD_FLOOR_BLOCK.get())
+                output.accept(RACE_MARKER_ITEM.get())
+                output.accept(RACE_ENDPOINT_ITEM.get())
+                output.accept(CREATIVE_JERRY_CAN.get())
+                output.accept(RACE_FLAG.get())
+                output.accept(ITEM_BOX.get())
+                output.accept(RACING_ROULETTE.get())
+                output.accept(RACE_COMPASS.get())
+                output.accept(HONEY_CANISTER.get())
+                output.accept(HONEY_TANK.get())
+                output.accept(FAKE_ITEM_BOX.get())
+                output.accept(CAVENDISH.get())
+                output.accept(SUGAR_ROCKET.get())
+                output.accept(HOMING_SUGAR_ROCKET.get())
+                output.accept(GLASSO.get())
+                output.accept(HONEY_HEISTER.get())
+                output.accept(BOXING_GLOVE.get())
+                output.accept(GRABBY_HAND.get())
+                output.accept(THUNDERBOLT.get())
+            }
+            .build()
+    }
+
     val BIKE_SEAT_ENTITY: RegistryObject<EntityType<BikeSeatEntity>> = ENTITIES.register("bike_seat") {
         EntityType.Builder.of(::BikeSeatEntity, MobCategory.MISC)
             .sized(0.05f, 0.05f)
@@ -264,6 +297,7 @@ object SkyridersMod {
         ENTITIES.register(modEventBus)
         BLOCK_ENTITIES.register(modEventBus)
         RECIPE_SERIALIZERS.register(modEventBus)
+        CREATIVE_TABS.register(modEventBus)
         SkyridersSounds.register(modEventBus)
 
         modEventBus.addListener(::init)

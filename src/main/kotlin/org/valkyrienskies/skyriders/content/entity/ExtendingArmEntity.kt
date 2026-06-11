@@ -311,9 +311,6 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
             acceleration = GRABBY_FOLLOW_ACCELERATION,
             maxSpeed = targetSpeed + GRABBY_FOLLOW_SPEED_MARGIN
         )
-        if (attachedTicksRemaining == GRABBY_ATTACH_TICKS) {
-            VehicleStatusEffects.applySpinOut(target, duration = 0.65, yawSpeed = 2.2)
-        }
 
         attachedTicksRemaining--
         if (attachedTicksRemaining <= 0) {

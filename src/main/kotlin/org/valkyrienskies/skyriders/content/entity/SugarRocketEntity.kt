@@ -18,6 +18,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
+import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -266,6 +267,13 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             if (body.kinematics.position.distanceSquared(explosionPos) > radius * radius) return@forEach
             val duration = if (vehicle.bodyId == directTarget?.bodyId) 2.25 else 1.45
             VehicleStatusEffects.applySpinOut(vehicle, duration = duration, yawSpeed = 6.0)
+            VehicleStatusEffects.applyPullToPoint(
+                vehicle = vehicle,
+                target = explosionShoveTarget(body.kinematics.position, explosionPos),
+                duration = EXPLOSION_SHOVE_DURATION,
+                acceleration = EXPLOSION_SHOVE_ACCELERATION,
+                maxSpeed = EXPLOSION_SHOVE_MAX_SPEED
+            )
         }
         discard()
     }
@@ -331,6 +339,17 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
 
     private fun vehicleApproxRadius(size: Vector3d): Double {
         return sqrt(size.x * size.x + size.z * size.z) * 0.5
+    }
+
+    private fun explosionShoveTarget(vehiclePosition: Vector3dc, explosionPosition: Vector3d): Vector3d {
+        val away = Vector3d(vehiclePosition).sub(explosionPosition)
+        away.y = 0.0
+        if (away.lengthSquared() < 1.0e-6) {
+            away.set(0.0, 0.0, 1.0)
+        }
+        return Vector3d(vehiclePosition)
+            .add(away.normalize().mul(EXPLOSION_SHOVE_DISTANCE))
+            .add(0.0, EXPLOSION_SHOVE_UP, 0.0)
     }
 
     private fun randomTossVelocity(): Vec3 {
@@ -405,6 +424,11 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val OUT_OF_FUEL_GRAVITY = 0.055
         private const val DIRECT_HIT_RADIUS = 0.35
         private const val BLAST_RADIUS = 4.75
+        private const val EXPLOSION_SHOVE_DISTANCE = 9.0
+        private const val EXPLOSION_SHOVE_UP = 1.4
+        private const val EXPLOSION_SHOVE_DURATION = 0.34
+        private const val EXPLOSION_SHOVE_ACCELERATION = 86.0
+        private const val EXPLOSION_SHOVE_MAX_SPEED = 31.0
         private const val EXPLOSION_SOUND_RADIUS = 128.0
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val HOMING_RANGE = 28.0

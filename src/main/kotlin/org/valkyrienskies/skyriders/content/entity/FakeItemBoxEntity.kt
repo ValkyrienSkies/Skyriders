@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
+import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -34,7 +35,10 @@ class FakeItemBoxEntity(type: EntityType<FakeItemBoxEntity>, level: Level) : Ent
 
     override fun tick() {
         super.tick()
-        if (level().isClientSide) return
+        if (level().isClientSide) {
+            spawnTellParticles()
+            return
+        }
 
         val serverLevel = level() as? ServerLevel ?: return
         if (tickCount > MAX_LIFETIME_TICKS) {
@@ -133,6 +137,13 @@ class FakeItemBoxEntity(type: EntityType<FakeItemBoxEntity>, level: Level) : Ent
             if (body.kinematics.position.distanceSquared(explosionPos) > radius * radius) return@forEach
             val duration = if (vehicle.bodyId == directTarget.bodyId) 2.25 else 1.45
             VehicleStatusEffects.applySpinOut(vehicle, duration = duration, yawSpeed = 6.0)
+            VehicleStatusEffects.applyPullToPoint(
+                vehicle = vehicle,
+                target = explosionShoveTarget(body.kinematics.position, explosionPos),
+                duration = EXPLOSION_SHOVE_DURATION,
+                acceleration = EXPLOSION_SHOVE_ACCELERATION,
+                maxSpeed = EXPLOSION_SHOVE_MAX_SPEED
+            )
         }
         discard()
     }
@@ -147,8 +158,32 @@ class FakeItemBoxEntity(type: EntityType<FakeItemBoxEntity>, level: Level) : Ent
         }
     }
 
+    private fun spawnTellParticles() {
+        if (random.nextFloat() > SPARK_CHANCE) return
+        level().addParticle(
+            ParticleTypes.ELECTRIC_SPARK,
+            x + (random.nextDouble() - 0.5) * 0.58,
+            y + 0.42 + random.nextDouble() * 0.48,
+            z + (random.nextDouble() - 0.5) * 0.58,
+            (random.nextDouble() - 0.5) * 0.035,
+            random.nextDouble() * 0.035,
+            (random.nextDouble() - 0.5) * 0.035
+        )
+    }
+
     private fun vehicleApproxRadius(size: Vector3d): Double {
         return sqrt(size.x * size.x + size.z * size.z) * 0.5
+    }
+
+    private fun explosionShoveTarget(vehiclePosition: Vector3dc, explosionPosition: Vector3d): Vector3d {
+        val away = Vector3d(vehiclePosition).sub(explosionPosition)
+        away.y = 0.0
+        if (away.lengthSquared() < 1.0e-6) {
+            away.set(0.0, 0.0, 1.0)
+        }
+        return Vector3d(vehiclePosition)
+            .add(away.normalize().mul(EXPLOSION_SHOVE_DISTANCE))
+            .add(0.0, EXPLOSION_SHOVE_UP, 0.0)
     }
 
     companion object {
@@ -161,8 +196,14 @@ class FakeItemBoxEntity(type: EntityType<FakeItemBoxEntity>, level: Level) : Ent
         private const val LANDED_Y_OFFSET = 0.43
         private const val TRIGGER_RADIUS = 0.62
         private const val BLAST_RADIUS = 4.75
+        private const val EXPLOSION_SHOVE_DISTANCE = 9.0
+        private const val EXPLOSION_SHOVE_UP = 1.4
+        private const val EXPLOSION_SHOVE_DURATION = 0.34
+        private const val EXPLOSION_SHOVE_ACCELERATION = 86.0
+        private const val EXPLOSION_SHOVE_MAX_SPEED = 31.0
         private const val EXPLOSION_SOUND_RADIUS = 128.0
         private const val EXPLOSION_VISUAL_Y_OFFSET = 0.85
         private const val RENDER_DISTANCE = 192.0
+        private const val SPARK_CHANCE = 0.18f
     }
 }

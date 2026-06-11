@@ -41,9 +41,9 @@ class FakeItemBoxRenderer(context: EntityRendererProvider.Context) : EntityRende
             maxY = 0.43f,
             maxZ = 0.43f,
             red = 1.0f,
-            green = 0.34f,
-            blue = 0.34f,
-            alpha = 0.92f,
+            green = 0.82f,
+            blue = 0.78f,
+            alpha = 0.95f,
             packedLight = packedLight
         )
         poseStack.popPose()

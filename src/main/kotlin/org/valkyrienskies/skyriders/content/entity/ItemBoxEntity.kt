@@ -18,6 +18,8 @@ import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.storage.loot.LootDataId
@@ -100,6 +102,24 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
     }
 
     override fun getAddEntityPacket(): Packet<ClientGamePacketListener> = ClientboundAddEntityPacket(this)
+
+    override fun skipAttackInteraction(attacker: Entity): Boolean {
+        val player = attacker as? Player ?: return false
+        if (player.vehicle != null) return false
+        if (!level().isClientSide) {
+            level().addFreshEntity(
+                ItemEntity(
+                    level(),
+                    x,
+                    y + 0.45,
+                    z,
+                    ItemStack(SkyridersMod.ITEM_BOX.get())
+                )
+            )
+            discard()
+        }
+        return true
+    }
 
     fun placeAt(x: Double, y: Double, z: Double, yaw: Float) {
         moveTo(x, y, z, yaw, 0.0f)
