@@ -35,6 +35,15 @@ object RaceMarkerTypes {
     const val CHECKPOINT = "checkpoint"
 }
 
+object RaceCheckpointLapModes {
+    const val ALL = "all"
+    const val EXACT = "exact"
+    const val FINAL = "final"
+    const val PENULTIMATE = "penultimate"
+    const val NOT_FINAL = "not_final"
+    const val NOT_PENULTIMATE = "not_penultimate"
+}
+
 object RaceManager {
     private const val COUNTDOWN_TICKS = 80
     private const val COUNTDOWN_MESSAGE_INTERVAL = 20
@@ -136,11 +145,11 @@ object RaceManager {
         } ?: return null
         val racer = race.racers[seat.bodyId] ?: return null
         refreshRacerPosition(level, racer, race)
-        val maxCheckpoint = race.maxCheckpointIndex()
+        val maxCheckpoint = race.maxCheckpointIndex(racer.currentLap)
         val markerOptions = if (racer.nextCheckpointIndex > maxCheckpoint) {
             finishMarkersForRace(level, race)
         } else {
-            race.checkpointMarkers.filter { it.checkpointIndex == racer.nextCheckpointIndex }
+            race.activeCheckpointMarkers(racer.currentLap).filter { it.checkpointIndex == racer.nextCheckpointIndex }
         }
         val markers = markerOptions.mapNotNull { marker ->
             val line = marker.line(level) ?: return@mapNotNull null
@@ -240,7 +249,6 @@ object RaceManager {
             startMarker = startSnapshot,
             startFinishMarkers = startFinishMarkers,
             checkpointMarkers = checkpoints,
-            checkpointIndices = checkpoints.mapTo(HashSet()) { it.checkpointIndex },
             racers = participants,
             active = true,
             musicTrack = selectRaceMusicTrack(level),
@@ -251,7 +259,7 @@ object RaceManager {
         participants.values.forEach { racer ->
             racer.raceStartedAtGameTime = level.gameTime
             racer.lapStartedAtGameTime = level.gameTime
-            racer.nextCheckpointIndex = race.firstCheckpointIndex()
+            racer.nextCheckpointIndex = race.firstCheckpointIndex(racer.currentLap)
             racer.nextTarget = nextTarget(level, racer, race)
             activeMarkersForRace(level, race).forEach { marker ->
                 marker.line(level)?.let { markerLine ->
@@ -304,9 +312,10 @@ object RaceManager {
         position: Vector3d
     ) {
         if (marker.markerType == RaceMarkerTypes.CHECKPOINT) {
+            if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return
             if (marker.checkpointIndex != racer.nextCheckpointIndex) return
             racer.crossedCheckpoints.add(marker.checkpointIndex)
-            racer.nextCheckpointIndex = race.nextCheckpointIndexAfter(marker.checkpointIndex)
+            racer.nextCheckpointIndex = race.nextCheckpointIndexAfter(marker.checkpointIndex, racer.currentLap)
             racer.nextTarget = nextTarget(level, racer, race)
             successEffect(level, position)
             pulseEndpoint(level, marker)
@@ -315,14 +324,14 @@ object RaceManager {
         }
 
         if (marker.markerType == RaceMarkerTypes.START_FINISH) {
-            val maxCheckpoint = race.maxCheckpointIndex()
+            val maxCheckpoint = race.maxCheckpointIndex(racer.currentLap)
             if (racer.nextCheckpointIndex <= maxCheckpoint) return
             if (race.finishOrder.contains(racer.bodyId)) return
             if (racer.currentLap < race.totalLaps) {
                 racer.currentLap++
                 racer.lapStartedAtGameTime = level.gameTime
                 racer.crossedCheckpoints.clear()
-                racer.nextCheckpointIndex = race.firstCheckpointIndex()
+                racer.nextCheckpointIndex = race.firstCheckpointIndex(racer.currentLap)
                 racer.nextTarget = nextTarget(level, racer, race)
                 successEffect(level, position)
                 pulseEndpoint(level, marker)
@@ -448,6 +457,7 @@ object RaceManager {
 
     private fun nextTarget(level: ServerLevel, racer: RacerState, race: ActiveRace): Vector3d? {
         val nextCheckpoint = race.checkpointMarkers
+            .filter { it.isActiveForLap(racer.currentLap, race.totalLaps) }
             .filter { it.checkpointIndex == racer.nextCheckpointIndex }
             .minByOrNull { it.blockPos.distSqr(BlockPos.containing(racer.position.x, racer.position.y, racer.position.z)) }
         if (nextCheckpoint != null) return nextCheckpoint.line(level)?.center
@@ -559,10 +569,11 @@ object RaceManager {
 
     private fun markerStateForRacer(marker: RaceMarkerSnapshot, racer: RacerState, race: ActiveRace): LineParticleState {
         if (marker.markerType == RaceMarkerTypes.CHECKPOINT) {
+            if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return LineParticleState.BLOCKED
             if (marker.checkpointIndex in racer.crossedCheckpoints) return LineParticleState.CROSSED
             return if (marker.checkpointIndex == racer.nextCheckpointIndex) LineParticleState.NEXT else LineParticleState.BLOCKED
         }
-        val maxCheckpoint = race.maxCheckpointIndex()
+        val maxCheckpoint = race.maxCheckpointIndex(racer.currentLap)
         return if (racer.nextCheckpointIndex > maxCheckpoint) LineParticleState.NEXT else LineParticleState.BLOCKED
     }
 
@@ -705,7 +716,6 @@ object RaceManager {
         val startMarker: RaceMarkerSnapshot,
         val startFinishMarkers: List<RaceMarkerSnapshot>,
         val checkpointMarkers: List<RaceMarkerSnapshot>,
-        val checkpointIndices: Set<Int>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
         val forceLoadedMarkerChunks: MutableSet<Long> = HashSet(),
@@ -714,10 +724,15 @@ object RaceManager {
         val totalParticipants: Int,
         var active: Boolean
     ) {
-        fun maxCheckpointIndex(): Int = checkpointIndices.maxOrNull() ?: -1
-        fun firstCheckpointIndex(): Int = checkpointIndices.minOrNull() ?: 0
-        fun nextCheckpointIndexAfter(current: Int): Int {
-            return checkpointIndices.filter { it > current }.minOrNull() ?: (maxCheckpointIndex() + 1)
+        fun activeCheckpointMarkers(lap: Int): List<RaceMarkerSnapshot> {
+            return checkpointMarkers.filter { it.isActiveForLap(lap, totalLaps) }
+        }
+
+        fun maxCheckpointIndex(lap: Int): Int = activeCheckpointMarkers(lap).maxOfOrNull { it.checkpointIndex } ?: -1
+        fun firstCheckpointIndex(lap: Int): Int = activeCheckpointMarkers(lap).minOfOrNull { it.checkpointIndex } ?: 0
+        fun nextCheckpointIndexAfter(current: Int, lap: Int): Int {
+            val indices = activeCheckpointMarkers(lap).mapTo(HashSet()) { it.checkpointIndex }
+            return indices.filter { it > current }.minOrNull() ?: (maxCheckpointIndex(lap) + 1)
         }
     }
 
@@ -799,6 +814,8 @@ data class RaceMarkerSnapshot(
     val colorId: Int,
     val markerType: String,
     val checkpointIndex: Int,
+    val checkpointLapMode: String,
+    val checkpointLap: Int,
     val lapCount: Int
 ) {
     fun save(): net.minecraft.nbt.CompoundTag {
@@ -808,6 +825,8 @@ data class RaceMarkerSnapshot(
         tag.putInt(COLOR_KEY, colorId and 0xFFFFFF)
         tag.putString(TYPE_KEY, markerType)
         tag.putInt(CHECKPOINT_KEY, checkpointIndex)
+        tag.putString(CHECKPOINT_LAP_MODE_KEY, checkpointLapMode)
+        tag.putInt(CHECKPOINT_LAP_KEY, checkpointLap)
         tag.putInt(LAP_COUNT_KEY, lapCount)
         return tag
     }
@@ -818,6 +837,8 @@ data class RaceMarkerSnapshot(
         private const val COLOR_KEY = "ColorId"
         private const val TYPE_KEY = "MarkerType"
         private const val CHECKPOINT_KEY = "CheckpointIndex"
+        private const val CHECKPOINT_LAP_MODE_KEY = "CheckpointLapMode"
+        private const val CHECKPOINT_LAP_KEY = "CheckpointLap"
         private const val LAP_COUNT_KEY = "LapCount"
 
         fun from(marker: RaceMarkerBlockEntity): RaceMarkerSnapshot {
@@ -827,6 +848,8 @@ data class RaceMarkerSnapshot(
                 colorId = marker.colorId,
                 markerType = marker.markerType,
                 checkpointIndex = marker.checkpointIndex,
+                checkpointLapMode = marker.checkpointLapMode,
+                checkpointLap = marker.checkpointLap,
                 lapCount = marker.lapCount
             )
         }
@@ -842,6 +865,17 @@ data class RaceMarkerSnapshot(
                 colorId = org.valkyrienskies.skyriders.content.item.RaceFlagItem.normalizeSavedRaceColor(tag.getInt(COLOR_KEY)),
                 markerType = type,
                 checkpointIndex = tag.getInt(CHECKPOINT_KEY).coerceIn(0, 99),
+                checkpointLapMode = tag.getString(CHECKPOINT_LAP_MODE_KEY)
+                    .takeIf {
+                        it == RaceCheckpointLapModes.ALL ||
+                            it == RaceCheckpointLapModes.EXACT ||
+                            it == RaceCheckpointLapModes.FINAL ||
+                            it == RaceCheckpointLapModes.PENULTIMATE ||
+                            it == RaceCheckpointLapModes.NOT_FINAL ||
+                            it == RaceCheckpointLapModes.NOT_PENULTIMATE
+                    }
+                    ?: RaceCheckpointLapModes.ALL,
+                checkpointLap = if (tag.contains(CHECKPOINT_LAP_KEY)) tag.getInt(CHECKPOINT_LAP_KEY).coerceAtLeast(1) else 1,
                 lapCount = if (tag.contains(LAP_COUNT_KEY)) tag.getInt(LAP_COUNT_KEY).coerceAtLeast(1) else 3
             )
         }
@@ -853,6 +887,17 @@ private fun RaceMarkerSnapshot.chunkKeys(): List<Long> {
         ChunkPos(blockPos).toLong(),
         endpointPos?.let { ChunkPos(it).toLong() }
     )
+}
+
+private fun RaceMarkerSnapshot.isActiveForLap(currentLap: Int, totalLaps: Int): Boolean {
+    return when (checkpointLapMode) {
+        RaceCheckpointLapModes.EXACT -> currentLap == checkpointLap
+        RaceCheckpointLapModes.FINAL -> currentLap == totalLaps
+        RaceCheckpointLapModes.PENULTIMATE -> totalLaps > 1 && currentLap == totalLaps - 1
+        RaceCheckpointLapModes.NOT_FINAL -> currentLap != totalLaps
+        RaceCheckpointLapModes.NOT_PENULTIMATE -> totalLaps <= 1 || currentLap != totalLaps - 1
+        else -> true
+    }
 }
 
 fun RaceMarkerBlockEntity.line(level: ServerLevel): RaceLine? {
