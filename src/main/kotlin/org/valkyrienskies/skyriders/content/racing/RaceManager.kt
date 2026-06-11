@@ -73,8 +73,9 @@ object RaceManager {
     private const val DANGER_RECOVERY_HOLD_MAX_ACCELERATION = 120.0
     private val dangerRecoveryLineSamples = listOf(0.5, 0.35, 0.65, 0.2, 0.8)
     private val dangerRecoveryForwardOffsets = listOf(0.0, -0.75, 0.75, -1.5, 1.5)
-    private val dangerRecoveryVerticalOffsets = listOf(1.75, 2.25, 2.75, 3.5, 4.5, 6.0)
-    private val dangerCarryVerticalAdjustments = listOf(0.0, 0.75, 1.5, 2.5, 4.0)
+    private val dangerRecoveryVerticalOffsets = listOf(1.75, 2.25, 2.75, 3.5, 4.5, 6.0, 8.0, 12.0)
+    private val dangerCarryVerticalAdjustments = listOf(0.0, 0.75, 1.5, 2.5, 4.0, 6.0, 9.0)
+    private val dangerCarryProgressFallbacks = listOf(0.0, -0.04, 0.04, -0.08, 0.08, -0.14, 0.14)
     private val racesByKey = HashMap<RaceKey, ActiveRace>()
     private val markerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceMarkerSnapshot>>()
     private val dangerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceDangerSnapshot>>()
@@ -550,7 +551,8 @@ object RaceManager {
             target = safeTarget,
             totalTicks = totalTicks,
             ticksRemaining = totalTicks,
-            holdTicksRemaining = DANGER_RECOVERY_HOLD_TICKS
+            holdTicksRemaining = DANGER_RECOVERY_HOLD_TICKS,
+            lastClearTarget = findClearCarryPosition(level, vehicle, start) ?: start
         )
         racer.dangerRecoveryCooldownTicks = DANGER_RECOVERY_COOLDOWN_TICKS
         VehicleManager.clearInput(level.dimensionId, racer.bodyId)
@@ -569,8 +571,7 @@ object RaceManager {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return
         if (recovery.ticksRemaining > 0) {
             val progress = 1.0 - recovery.ticksRemaining.toDouble() / recovery.totalTicks.toDouble()
-            val carried = carriedRecoveryPosition(recovery, progress.coerceIn(0.0, 1.0))
-            val clearPosition = findClearCarryPosition(level, vehicle, carried) ?: carried
+            val clearPosition = findSafeArcCarryPosition(level, vehicle, recovery, progress)
             VehicleStatusEffects.applyCarryToPoint(
                 vehicle = vehicle,
                 target = clearPosition,
@@ -585,7 +586,7 @@ object RaceManager {
             return
         }
 
-        val holdTarget = findClearCarryPosition(level, vehicle, recovery.target) ?: recovery.target
+        val holdTarget = findClearCarryPosition(level, vehicle, recovery.target) ?: recovery.lastClearTarget
         VehicleStatusEffects.applyCarryToPoint(
             vehicle = vehicle,
             target = holdTarget,
@@ -644,6 +645,24 @@ object RaceManager {
         }
         val fallback = Vector3d(desiredTarget).add(0.0, DANGER_RECOVERY_BASE_HEIGHT, 0.0)
         return findClearCarryPosition(level, vehicle, fallback) ?: fallback
+    }
+
+    private fun findSafeArcCarryPosition(
+        level: ServerLevel,
+        vehicle: IVehicle,
+        recovery: DangerRecovery,
+        progress: Double
+    ): Vector3d {
+        dangerCarryProgressFallbacks.forEach { offset ->
+            val sampledProgress = (progress + offset).coerceIn(0.0, 1.0)
+            val carried = carriedRecoveryPosition(recovery, sampledProgress)
+            val clear = findClearCarryPosition(level, vehicle, carried)
+            if (clear != null) {
+                recovery.lastClearTarget = Vector3d(clear)
+                return clear
+            }
+        }
+        return Vector3d(recovery.lastClearTarget)
     }
 
     private fun carriedRecoveryPosition(recovery: DangerRecovery, progress: Double): Vector3d {
@@ -1056,7 +1075,8 @@ object RaceManager {
         val target: Vector3d,
         val totalTicks: Int,
         var ticksRemaining: Int,
-        var holdTicksRemaining: Int
+        var holdTicksRemaining: Int,
+        var lastClearTarget: Vector3d
     )
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
