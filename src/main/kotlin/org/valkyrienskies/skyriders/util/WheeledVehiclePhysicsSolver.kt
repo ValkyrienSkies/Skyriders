@@ -5,6 +5,7 @@ import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.WheelAxleConfig
 import org.valkyrienskies.skyriders.content.WheeledVehiclePhysicsConfig
 import org.valkyrienskies.skyriders.content.WheeledVehicleRuntimeState
@@ -40,6 +41,7 @@ object WheeledVehiclePhysicsSolver {
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
+        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val driftSpeed = planarSpeed(body, contactUp)
@@ -83,10 +85,10 @@ object WheeledVehiclePhysicsSolver {
         state.debugDriveWork = 0.0
         state.debugStepAssistWork = 0.0
 
-        loaded.forEach { applyLateralGrip(body, it, driftGripActive, config) }
+        loaded.forEach { applyLateralGrip(body, it, driftGripActive, config, tractionScale) }
         val parkingBrakeActive = state.parkingBrakeEngaged || activeInput.handbrake > 0.0
         if (activeInput.riderPresent) {
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt, tractionScale)
             if (parkingBrakeActive) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
@@ -103,7 +105,7 @@ object WheeledVehiclePhysicsSolver {
             if (state.parkingBrakeEngaged) {
                 applyParkingBrake(body, loaded, terrainUp, config)
             }
-            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt)
+            updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt, tractionScale)
         }
 
         if (stabilizedGrounded) {
@@ -546,7 +548,8 @@ object WheeledVehiclePhysicsSolver {
         body: PhysVsBody,
         loaded: LoadedWheelContact,
         drifting: Boolean,
-        config: WheeledVehiclePhysicsConfig
+        config: WheeledVehiclePhysicsConfig,
+        tractionScale: Double
     ) {
         val contact = loaded.contact
         if (!contact.grounded || loaded.normalForce <= 0.0) return
@@ -565,7 +568,8 @@ object WheeledVehiclePhysicsSolver {
             config.tireFrictionCoefficient *
             contact.surfaceFriction *
             loaded.wheel.axle.lateralGrip *
-            driftGripScale.coerceAtLeast(0.0)
+            driftGripScale.coerceAtLeast(0.0) *
+            tractionScale
         VehicleWheelPhysics.applyContactForce(
             body,
             contact,
@@ -581,7 +585,8 @@ object WheeledVehiclePhysicsSolver {
         drifting: Boolean,
         config: WheeledVehiclePhysicsConfig,
         state: WheeledVehicleRuntimeState,
-        dt: Double
+        dt: Double,
+        tractionScale: Double
     ) {
         val throttle = driveCommand.throttle.coerceIn(-1.0, 1.0)
         val brake = if (drifting) {
@@ -642,14 +647,18 @@ object WheeledVehiclePhysicsSolver {
                     0.35
                 }
                 val forceScale = if (brake > 0.0) 1.0 else driveForceScale
-                val gripLimit = loaded.normalForce * config.tireFrictionCoefficient * loaded.contact.surfaceFriction * axle.longitudinalGrip
+                val gripLimit = loaded.normalForce *
+                    config.tireFrictionCoefficient *
+                    loaded.contact.surfaceFriction *
+                    axle.longitudinalGrip *
+                    tractionScale
                 val maxForce = gripLimit * forceScale
                 val engineBrakeForce = if (axle.driven && brake <= 0.0 && abs(throttle) < 0.05 && driveCommand.engineBrakeScale > 0.0 && abs(groundSpeed) > 0.1) {
                     -groundSpeed.signOrZero() * gripLimit * driveCommand.engineBrakeScale
                 } else {
                     0.0
                 }
-                val rollingForce = (-groundSpeed * config.rollingResistance / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
+                val rollingForce = (-groundSpeed * config.rollingResistance * tractionScale / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
                 val driveForceMag = shapedSlip * maxForce
                 if (axle.driven && throttle != 0.0) {
                     val drivePower = driveForceMag * VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)

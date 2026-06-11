@@ -33,6 +33,8 @@ object VehicleStatusEffects {
     private const val DEFAULT_CARRY_STIFFNESS = 10.0
     private const val DEFAULT_CARRY_DAMPING = 7.0
     private const val DEFAULT_CARRY_MAX_ACCELERATION = 85.0
+    private const val DEFAULT_SLIPPERY_DURATION = 2.35
+    private const val DEFAULT_SLIPPERY_TRACTION_SCALE = 0.18
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -43,7 +45,8 @@ object VehicleStatusEffects {
     fun applySpinOut(
         vehicle: IVehicle,
         duration: Double = DEFAULT_SPIN_OUT_DURATION,
-        yawSpeed: Double = DEFAULT_SPIN_OUT_YAW_SPEED
+        yawSpeed: Double = DEFAULT_SPIN_OUT_YAW_SPEED,
+        preserveMomentum: Boolean = false
     ) {
         val state = states.getOrPut(key(vehicle)) { RuntimeState() }
         if (state.spinOutImmunityRemaining > 0.0 && state.spinOutTimeRemaining <= 0.0) return
@@ -52,6 +55,7 @@ object VehicleStatusEffects {
         state.spinOutTimeRemaining = state.spinOutDuration
         state.spinOutYawSpeed = yawSpeed.coerceAtLeast(0.0)
         state.spinOutDirection = if (ThreadLocalRandom.current().nextBoolean()) 1.0 else -1.0
+        state.spinOutPreserveMomentum = preserveMomentum
         state.spinOutEngineWasOn = state.spinOutEngineWasOn || isEngineOn(vehicle)
         setEngineOn(vehicle, false)
         playOneShot(vehicle, SkyridersSounds.SPINOUT_SOUND.get(), 0.85f, randomPitch(0.92f, 1.08f))
@@ -106,8 +110,19 @@ object VehicleStatusEffects {
         state.carryMaxAcceleration = maxAcceleration.coerceAtLeast(0.0)
     }
 
+    fun applySlippery(
+        vehicle: IVehicle,
+        duration: Double = DEFAULT_SLIPPERY_DURATION,
+        tractionScale: Double = DEFAULT_SLIPPERY_TRACTION_SCALE
+    ) {
+        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+        state.slipperyTimeRemaining = max(state.slipperyTimeRemaining, duration.coerceAtLeast(0.05))
+        state.slipperyTractionScale = tractionScale.coerceIn(0.02, 1.0)
+    }
+
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
-        return if (isSpinningOut(vehicle)) {
+        val state = states[key(vehicle)]
+        return if ((state?.spinOutTimeRemaining ?: 0.0) > 0.0 && state?.spinOutPreserveMomentum != true) {
             VehicleInput.EMPTY.copy(
                 brake = 1.0,
                 handbrake = 1.0,
@@ -124,6 +139,11 @@ object VehicleStatusEffects {
 
     fun isBoosting(vehicle: IVehicle): Boolean {
         return (states[key(vehicle)]?.boostTimeRemaining ?: 0.0) > 0.0
+    }
+
+    fun tractionScale(dimensionId: DimensionId, bodyId: BodyId): Double {
+        val state = states[VehicleKey(dimensionId, bodyId)] ?: return 1.0
+        return if (state.slipperyTimeRemaining > 0.0) state.slipperyTractionScale else 1.0
     }
 
     fun physTick(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
@@ -158,6 +178,9 @@ object VehicleStatusEffects {
                 state.carryTarget = null
             }
         }
+        if (state.slipperyTimeRemaining > 0.0) {
+            state.slipperyTimeRemaining = (state.slipperyTimeRemaining - safeDt).coerceAtLeast(0.0)
+        }
         if (state.isIdle()) {
             states.remove(key(vehicle), state)
         }
@@ -167,7 +190,7 @@ object VehicleStatusEffects {
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, WORLD_UP)
         val velocity = body.kinematics.velocity
         val planarVelocity = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, up), up)
-        if (VehiclePhysicsMath.isFinite(planarVelocity)) {
+        if (!state.spinOutPreserveMomentum && VehiclePhysicsMath.isFinite(planarVelocity)) {
             val dampingAcceleration = planarVelocity.length().coerceAtMost(SPIN_OUT_MAX_DAMPING_ACCELERATION)
             val dampingForce = if (planarVelocity.lengthSquared() > 1.0e-8) {
                 planarVelocity.normalize().mul(-vehicle.vehicleDefinition.body.mass * dampingAcceleration * SPIN_OUT_PLANAR_DAMPING)
@@ -241,6 +264,7 @@ object VehicleStatusEffects {
             setEngineOn(vehicle, true)
         }
         state.spinOutEngineWasOn = false
+        state.spinOutPreserveMomentum = false
         state.spinOutImmunityRemaining = SPIN_OUT_IMMUNITY_SECONDS
     }
 
@@ -301,6 +325,7 @@ object VehicleStatusEffects {
         var spinOutYawSpeed: Double = 0.0
         var spinOutDirection: Double = 1.0
         var spinOutEngineWasOn: Boolean = false
+        var spinOutPreserveMomentum: Boolean = false
         var spinOutImmunityRemaining: Double = 0.0
         var boostTimeRemaining: Double = 0.0
         var boostDuration: Double = 0.0
@@ -317,13 +342,16 @@ object VehicleStatusEffects {
         var carryDamping: Double = 0.0
         var carryMaxAcceleration: Double = 0.0
         var carryTarget: Vector3d? = null
+        var slipperyTimeRemaining: Double = 0.0
+        var slipperyTractionScale: Double = 1.0
 
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
                 spinOutImmunityRemaining <= 0.0 &&
                 boostTimeRemaining <= 0.0 &&
                 pullTimeRemaining <= 0.0 &&
-                carryTimeRemaining <= 0.0
+                carryTimeRemaining <= 0.0 &&
+                slipperyTimeRemaining <= 0.0
         }
     }
 }

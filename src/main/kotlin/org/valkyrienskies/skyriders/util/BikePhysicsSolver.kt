@@ -7,6 +7,7 @@ import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikePhysicsConfig
 import org.valkyrienskies.skyriders.content.BikeRuntimeState
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.WheelContact
 import kotlin.math.abs
 import kotlin.math.atan
@@ -90,10 +91,11 @@ object BikePhysicsSolver {
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
         applyLandingDamping(body, terrainUp, state, config, dt)
-        applyTireForces(body, frontContact, true, drifting, config)
-        applyTireForces(body, rearContact, false, drifting, config)
+        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id)
+        applyTireForces(body, frontContact, true, drifting, config, tractionScale)
+        applyTireForces(body, rearContact, false, drifting, config, tractionScale)
         if (riderPresent) {
-            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, drifting, config, state, dt)
+            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, drifting, config, state, dt, tractionScale)
         } else {
             state.frontWheelAngularVelocity = applyParkingBrake(
                 body,
@@ -337,7 +339,8 @@ object BikePhysicsSolver {
         contact: WheelContact,
         isFrontWheel: Boolean,
         drifting: Boolean,
-        config: BikePhysicsConfig
+        config: BikePhysicsConfig,
+        tractionScale: Double
     ) {
         if (!contact.grounded) return
 
@@ -357,7 +360,8 @@ object BikePhysicsSolver {
             config.frictionCoefficient *
             contact.surfaceFriction *
             config.lateralGrip *
-            driftGripScale
+            driftGripScale *
+            tractionScale
         val lateralForceMag = -gripFactor * maxLateralForce
 
         applyContactForce(
@@ -376,7 +380,8 @@ object BikePhysicsSolver {
         drifting: Boolean,
         config: BikePhysicsConfig,
         state: BikeRuntimeState,
-        dt: Double
+        dt: Double,
+        tractionScale: Double
     ) {
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
         val driveScale = if (drifting) config.driftDriveForceScale else 1.0
@@ -395,7 +400,8 @@ object BikePhysicsSolver {
             forceScale = frontForceScale,
             config = config,
             state = state,
-            dt = dt
+            dt = dt,
+            tractionScale = tractionScale
         )
         state.rearWheelAngularVelocity = applyWheelLongitudinalPhysics(
             body = body,
@@ -407,7 +413,8 @@ object BikePhysicsSolver {
             forceScale = rearForceScale,
             config = config,
             state = state,
-            dt = dt
+            dt = dt,
+            tractionScale = tractionScale
         )
     }
 
@@ -421,7 +428,8 @@ object BikePhysicsSolver {
         forceScale: Double,
         config: BikePhysicsConfig,
         state: BikeRuntimeState,
-        dt: Double
+        dt: Double,
+        tractionScale: Double
     ): Double {
         val stepDt = dt.coerceIn(0.0, 0.1)
         val radius = max(config.wheelRadius, 0.05)
@@ -459,7 +467,8 @@ object BikePhysicsSolver {
                 contact.surfaceFriction *
                 config.longitudinalGrip *
                 forceScale *
-                brakeForceScale
+                brakeForceScale *
+                tractionScale
             val forceMag = gripFactor * maxLongitudinalForce
             if (driven && throttle != 0.0) {
                 val drivePower = forceMag * safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
