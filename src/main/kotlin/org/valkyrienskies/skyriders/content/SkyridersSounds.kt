@@ -81,6 +81,15 @@ object SkyridersSounds {
     val SUGAR_ROCKET_EXPLODE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("sugar_rocket_explode") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "sugar_rocket_explode"))
     }
+    val EXTENDING_SPRING_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("extending_spring") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "extending_spring"))
+    }
+    val BOXING_GLOVE_HIT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boxing_glove_hit") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "boxing_glove_hit"))
+    }
+    val GRABBY_HAND_GRAB_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("grabby_hand_grab") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "grabby_hand_grab"))
+    }
     val RACE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("race_start") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "race_start"))
     }

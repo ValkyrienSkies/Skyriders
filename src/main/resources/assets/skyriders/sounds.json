@@ -240,5 +240,40 @@
         "stream": true
       }
     ]
+  },
+  "extending_spring": {
+    "sounds": [
+      {
+        "name": "skyriders:extending_spring_1",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:extending_spring_2",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.extending_spring"
+  },
+  "boxing_glove_hit": {
+    "sounds": [
+      {
+        "name": "skyriders:boxing_glove_hit",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.boxing_glove_hit"
+  },
+  "grabby_hand_grab": {
+    "sounds": [
+      {
+        "name": "skyriders:grabby_hand_grab",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.grabby_hand_grab"
   }
 }

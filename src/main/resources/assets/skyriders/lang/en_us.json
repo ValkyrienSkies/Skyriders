@@ -51,6 +51,9 @@
 
   "skyriders.subtitle.thunderbolt": "Thunderbolt used",
   "skyriders.subtitle.sugar_rocket_explode": "Sugar rocket explodes",
+  "skyriders.subtitle.extending_spring": "Spring extends",
+  "skyriders.subtitle.boxing_glove_hit": "Boxing glove hits",
+  "skyriders.subtitle.grabby_hand_grab": "Grabby hand grabs",
   "skyriders.subtitle.race_start": "Race starts",
 
   "death.attack.skyriders.vehicle_impact": "%1$s was run over",

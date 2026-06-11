@@ -20,6 +20,7 @@ import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import kotlin.math.pow
@@ -189,11 +190,11 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
     private fun onVehicleHit(level: ServerLevel, target: IVehicle) {
         if (armKind == BOXING_GLOVE) {
             smackVehicle(level, target)
-            level.playSound(null, x, y, z, SoundEvents.ANVIL_LAND, SoundSource.NEUTRAL, 0.55f, 1.65f)
+            playBoxingHitSound(level, 1.0f)
             startRetracting(level)
         } else {
             attachToVehicle(level, target.bodyId)
-            level.playSound(null, x, y, z, SoundEvents.LEASH_KNOT_PLACE, SoundSource.NEUTRAL, 0.85f, 1.2f)
+            playGrabbyGrabSound(level, 1.0f)
         }
     }
 
@@ -211,7 +212,7 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
                 acceleration = BOXING_RECOIL_ACCELERATION,
                 maxSpeed = BOXING_RECOIL_MAX_SPEED
             )
-            level.playSound(null, x, y, z, SoundEvents.SLIME_BLOCK_HIT, SoundSource.NEUTRAL, 0.9f, 0.8f)
+            playBoxingHitSound(level, 0.86f)
         } else {
             VehicleStatusEffects.applyPullToPoint(
                 vehicle = owner,
@@ -220,9 +221,35 @@ class ExtendingArmEntity(type: EntityType<ExtendingArmEntity>, level: Level) : E
                 acceleration = GRABBY_TERRAIN_PULL_ACCELERATION,
                 maxSpeed = GRABBY_TERRAIN_PULL_MAX_SPEED
             )
-            level.playSound(null, x, y, z, SoundEvents.LEASH_KNOT_PLACE, SoundSource.NEUTRAL, 0.85f, 1.0f)
+            playGrabbyGrabSound(level, 0.9f)
         }
         startRetracting(level)
+    }
+
+    private fun playBoxingHitSound(level: ServerLevel, pitch: Float) {
+        level.playSound(
+            null,
+            x,
+            y,
+            z,
+            SkyridersSounds.BOXING_GLOVE_HIT_SOUND.get(),
+            SoundSource.NEUTRAL,
+            0.9f,
+            pitch
+        )
+    }
+
+    private fun playGrabbyGrabSound(level: ServerLevel, pitch: Float) {
+        level.playSound(
+            null,
+            x,
+            y,
+            z,
+            SkyridersSounds.GRABBY_HAND_GRAB_SOUND.get(),
+            SoundSource.NEUTRAL,
+            0.85f,
+            pitch
+        )
     }
 
     private fun smackVehicle(level: ServerLevel, target: IVehicle) {

@@ -275,7 +275,16 @@ class ExtendingArmItem(
             kind = armKind
         )
         level.addFreshEntity(entity)
-        playItemUseSound(level, player)
+        level.playSound(
+            null,
+            origin.x,
+            origin.y,
+            origin.z,
+            SkyridersSounds.EXTENDING_SPRING_SOUND.get(),
+            SoundSource.PLAYERS,
+            0.8f,
+            if (armKind == ExtendingArmEntity.GRABBY_HAND) 0.92f else 1.08f
+        )
         return true
     }
 
