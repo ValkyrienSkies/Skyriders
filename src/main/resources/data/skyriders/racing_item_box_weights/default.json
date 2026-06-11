@@ -1,7 +1,7 @@
 ﻿{
   "entries": [
-    { "item": "skyriders:honey_canister", "weight": 8, "frontMultiplier": 1.15, "backMultiplier": 0.8 },
-    { "item": "skyriders:royal_jelly_canister", "weight": 3, "frontMultiplier": 1.05, "backMultiplier": 0.65 },
+    { "item": "skyriders:honey_canister", "weight": 8, "frontMultiplier": 0.2, "backMultiplier": 1.8 },
+    { "item": "skyriders:royal_jelly_canister", "weight": 3, "frontMultiplier": 0.15, "backMultiplier": 1.65 },
     { "item": "skyriders:honey_tank", "weight": 6, "frontMultiplier": 1.50, "backMultiplier": 0.5 },
     { "item": "skyriders:cavendish", "weight": 7, "frontMultiplier": 1.35, "backMultiplier": 0.7 },
     { "item": "skyriders:fake_item_box", "weight": 5, "frontMultiplier": 1.4, "backMultiplier": 0.75 },
