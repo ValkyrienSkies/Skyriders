@@ -48,6 +48,12 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
         return checkpointIndex
     }
 
+    fun decrementCheckpointIndex(): Int {
+        checkpointIndex = (checkpointIndex - 1).coerceAtLeast(0)
+        markDirtyAndSync()
+        return checkpointIndex
+    }
+
     fun cycleLapCount(): Int {
         lapCount = if (lapCount >= MAX_CONFIGURABLE_LAP_COUNT) 1 else lapCount + 1
         markDirtyAndSync()

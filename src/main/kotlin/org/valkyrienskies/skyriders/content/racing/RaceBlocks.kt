@@ -70,6 +70,13 @@ class RaceMarkerBlock(properties: Properties) : BaseEntityBlock(properties) {
             }
             return InteractionResult.sidedSuccess(level.isClientSide)
         }
+        if (stack.item == SkyridersMod.RACE_MARKER_ITEM.get() && marker.markerType == RaceMarkerTypes.CHECKPOINT) {
+            if (!level.isClientSide) {
+                val index = marker.decrementCheckpointIndex()
+                player.displayClientMessage(Component.literal("Checkpoint index: $index"), true)
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide)
+        }
         if (stack.isEmpty) {
             if (!level.isClientSide) {
                 if (player.isShiftKeyDown) {

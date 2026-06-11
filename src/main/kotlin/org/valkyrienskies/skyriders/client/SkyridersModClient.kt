@@ -5,6 +5,7 @@ import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.item.ItemProperties
 import net.minecraft.client.renderer.entity.EntityRenderers
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
 import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.event.InputEvent
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent
@@ -89,6 +90,7 @@ object SkyridersModClient {
                 RacingOpenModelEntityRenderer.honeyHeister(context)
             }
             EntityRenderers.register(SkyridersMod.EXTENDING_ARM_ENTITY.get(), ::ExtendingArmRenderer)
+            BlockEntityRenderers.register(SkyridersMod.RACE_MARKER_BLOCK_ENTITY.get(), ::RaceMarkerBlockEntityRenderer)
             ItemProperties.register(SkyridersMod.RACE_COMPASS.get(), ResourceLocation("angle")) { _, _, entity, seed ->
                 RaceCompassClientState.angle(entity, seed)
             }
