@@ -31,6 +31,10 @@ object BikePhysicsSolver {
     private const val WHEEL_GROUND_DRAG = 0.04
     private const val WHEEL_INERTIA_MASS_SCALE = 0.018
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
+    private const val LOW_SPEED_BRAKE_ASSIST_SPEED = 1.25
+    private const val LOW_SPEED_BRAKE_SNAP_SPEED = 0.12
+    private const val LOW_SPEED_BRAKE_DEAD_SPEED = 0.015
+    private const val LOW_SPEED_BRAKE_DAMPING = 10.0
     private const val MIN_STEP_ASSIST_RISE = 0.35
     private const val STEP_SIDE_PROBE_BIAS = 0.025
 
@@ -465,6 +469,15 @@ object BikePhysicsSolver {
             }
 
             applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+            applyLowSpeedBrakeAssist(
+                body = body,
+                contact = contact,
+                groundSpeed = groundSpeed,
+                brake = brake,
+                maxLongitudinalForce = maxLongitudinalForce,
+                config = config,
+                dt = stepDt
+            )
 
             val wheelInertia = max(0.08, config.mass * radius * radius * WHEEL_INERTIA_MASS_SCALE)
             val reactionDelta = (forceMag * radius / wheelInertia * stepDt)
@@ -479,6 +492,31 @@ object BikePhysicsSolver {
         }
 
         return omega.coerceIn(-maxOmega, maxOmega)
+    }
+
+    private fun applyLowSpeedBrakeAssist(
+        body: PhysVsBody,
+        contact: WheelContact,
+        groundSpeed: Double,
+        brake: Double,
+        maxLongitudinalForce: Double,
+        config: BikePhysicsConfig,
+        dt: Double
+    ) {
+        val brakeInput = brake.coerceIn(0.0, 1.0)
+        val speed = abs(groundSpeed)
+        if (brakeInput <= 0.0 || speed <= LOW_SPEED_BRAKE_DEAD_SPEED || speed >= LOW_SPEED_BRAKE_ASSIST_SPEED) return
+
+        val assist = 1.0 - smoothstep(LOW_SPEED_BRAKE_DEAD_SPEED, LOW_SPEED_BRAKE_ASSIST_SPEED, speed)
+        val dampingForce = -groundSpeed * config.mass * LOW_SPEED_BRAKE_DAMPING * brakeInput * assist
+        val snapForce = if (speed <= LOW_SPEED_BRAKE_SNAP_SPEED && dt > 1.0e-6) {
+            -groundSpeed * config.mass * brakeInput / dt
+        } else {
+            0.0
+        }
+        val forceMag = (dampingForce + snapForce)
+            .coerceIn(-maxLongitudinalForce, maxLongitudinalForce)
+        applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
     }
 
     private fun applyParkingBrake(
