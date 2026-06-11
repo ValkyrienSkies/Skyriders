@@ -130,6 +130,68 @@ class RaceMarkerBlock(properties: Properties) : BaseEntityBlock(properties) {
     }
 }
 
+class RaceDangerBlock(properties: Properties) : BaseEntityBlock(properties) {
+    override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity = RaceDangerBlockEntity(pos, state)
+
+    override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
+
+    override fun getShape(state: BlockState, level: BlockGetter, pos: BlockPos, context: CollisionContext): VoxelShape = SHAPE
+
+    override fun <T : BlockEntity> getTicker(
+        level: Level,
+        state: BlockState,
+        blockEntityType: BlockEntityType<T>
+    ): BlockEntityTicker<T>? {
+        if (level.isClientSide || blockEntityType != SkyridersMod.RACE_DANGER_BLOCK_ENTITY.get()) return null
+        @Suppress("UNCHECKED_CAST")
+        return object : BlockEntityTicker<T> {
+            override fun tick(tickLevel: Level, tickPos: BlockPos, tickState: BlockState, blockEntity: T) {
+                RaceDangerBlockEntity.serverTick(tickLevel, tickPos, tickState, blockEntity as RaceDangerBlockEntity)
+            }
+        }
+    }
+
+    override fun use(
+        state: BlockState,
+        level: Level,
+        pos: BlockPos,
+        player: Player,
+        hand: InteractionHand,
+        hit: BlockHitResult
+    ): InteractionResult {
+        val danger = level.getBlockEntity(pos) as? RaceDangerBlockEntity ?: return InteractionResult.PASS
+        val stack = player.getItemInHand(hand)
+        if (stack.item is RaceFlagItem) {
+            if (!level.isClientSide) {
+                val color = RaceFlagItem.getColor(stack)
+                danger.setColor(color)
+                player.displayClientMessage(Component.literal("Race danger color set to ${RaceFlagItem.describeColor(color)}"), true)
+                if (!player.abilities.instabuild) stack.shrink(1)
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide)
+        }
+        if (stack.isEmpty) {
+            if (!level.isClientSide) {
+                val radius = danger.adjustRadius(if (player.isShiftKeyDown) -1.0 else 1.0)
+                player.displayClientMessage(Component.literal("Danger radius: ${radius.toInt()} blocks"), true)
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide)
+        }
+        return InteractionResult.PASS
+    }
+
+    override fun onRemove(state: BlockState, level: Level, pos: BlockPos, newState: BlockState, movedByPiston: Boolean) {
+        if (state.block != newState.block) {
+            (level as? ServerLevel)?.let { RaceManager.unregisterDanger(it, pos) }
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston)
+    }
+
+    companion object {
+        private val SHAPE: VoxelShape = box(3.0, 0.0, 3.0, 13.0, 12.0, 13.0)
+    }
+}
+
 class RaceEndpointBlock(properties: Properties) : BaseEntityBlock(properties) {
     override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity = RaceEndpointBlockEntity(pos, state)
 

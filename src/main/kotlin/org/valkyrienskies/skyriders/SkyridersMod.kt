@@ -65,6 +65,8 @@ import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
+import org.valkyrienskies.skyriders.content.racing.RaceDangerBlock
+import org.valkyrienskies.skyriders.content.racing.RaceDangerBlockEntity
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlock
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockEntity
 import org.valkyrienskies.skyriders.content.racing.RaceEndpointBlockItem
@@ -131,6 +133,15 @@ object SkyridersMod {
     val RACE_ENDPOINT_ITEM: RegistryObject<Item> = ITEMS.register("race_endpoint") {
         RaceEndpointBlockItem(RACE_ENDPOINT_BLOCK.get(), Item.Properties())
     }
+    val RACE_DANGER_BLOCK: RegistryObject<Block> = registerBlockAndItem("race_danger") {
+        RaceDangerBlock(
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_PURPLE)
+                .strength(1.0f)
+                .sound(SoundType.METAL)
+                .noOcclusion()
+        )
+    }
     val RACE_MARKER_BLOCK_ENTITY: RegistryObject<BlockEntityType<RaceMarkerBlockEntity>> =
         BLOCK_ENTITIES.register("race_marker") {
             BlockEntityType.Builder.of(::RaceMarkerBlockEntity, RACE_MARKER_BLOCK.get()).build(null)
@@ -138,6 +149,10 @@ object SkyridersMod {
     val RACE_ENDPOINT_BLOCK_ENTITY: RegistryObject<BlockEntityType<RaceEndpointBlockEntity>> =
         BLOCK_ENTITIES.register("race_endpoint") {
             BlockEntityType.Builder.of(::RaceEndpointBlockEntity, RACE_ENDPOINT_BLOCK.get()).build(null)
+        }
+    val RACE_DANGER_BLOCK_ENTITY: RegistryObject<BlockEntityType<RaceDangerBlockEntity>> =
+        BLOCK_ENTITIES.register("race_danger") {
+            BlockEntityType.Builder.of(::RaceDangerBlockEntity, RACE_DANGER_BLOCK.get()).build(null)
         }
     val CREATIVE_JERRY_CAN: RegistryObject<Item> = ITEMS.register("creative_jerry_can") {
         CreativeJerryCanItem(Item.Properties().stacksTo(1))
@@ -205,6 +220,7 @@ object SkyridersMod {
                 output.accept(BOOST_PAD_FLOOR_BLOCK.get())
                 output.accept(RACE_MARKER_ITEM.get())
                 output.accept(RACE_ENDPOINT_ITEM.get())
+                output.accept(RACE_DANGER_BLOCK.get())
                 output.accept(CREATIVE_JERRY_CAN.get())
                 output.accept(RACE_FLAG.get())
                 output.accept(ITEM_BOX.get())

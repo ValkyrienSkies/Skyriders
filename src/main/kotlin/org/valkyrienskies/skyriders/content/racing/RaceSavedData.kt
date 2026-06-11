@@ -10,12 +10,17 @@ import java.util.UUID
 
 class RaceSavedData : SavedData() {
     val markers: MutableMap<Long, RaceMarkerSnapshot> = LinkedHashMap()
+    val dangers: MutableMap<Long, RaceDangerSnapshot> = LinkedHashMap()
     val leaderboard: MutableList<RaceLeaderboardEntry> = mutableListOf()
 
     override fun save(tag: CompoundTag): CompoundTag {
         val markerList = ListTag()
         markers.values.map(RaceMarkerSnapshot::save).forEach(markerList::add)
         tag.put(MARKERS_KEY, markerList)
+
+        val dangerList = ListTag()
+        dangers.values.map(RaceDangerSnapshot::save).forEach(dangerList::add)
+        tag.put(DANGERS_KEY, dangerList)
 
         val leaderboardList = ListTag()
         leaderboard.map(RaceLeaderboardEntry::save).forEach(leaderboardList::add)
@@ -35,11 +40,31 @@ class RaceSavedData : SavedData() {
         }
     }
 
+    fun setDanger(danger: RaceDangerSnapshot) {
+        if (dangers[danger.blockPos.asLong()] == danger) return
+        dangers[danger.blockPos.asLong()] = danger
+        setDirty()
+    }
+
+    fun removeDanger(pos: BlockPos) {
+        if (dangers.remove(pos.asLong()) != null) {
+            setDirty()
+        }
+    }
+
     fun replaceMarkers(newMarkers: Collection<RaceMarkerSnapshot>) {
         val replacement = newMarkers.associateBy { it.blockPos.asLong() }
         if (markers == replacement) return
         markers.clear()
         markers.putAll(replacement)
+        setDirty()
+    }
+
+    fun replaceDangers(newDangers: Collection<RaceDangerSnapshot>) {
+        val replacement = newDangers.associateBy { it.blockPos.asLong() }
+        if (dangers == replacement) return
+        dangers.clear()
+        dangers.putAll(replacement)
         setDirty()
     }
 
@@ -51,6 +76,7 @@ class RaceSavedData : SavedData() {
     companion object {
         const val SAVED_DATA_ID = "skyriders_races"
         private const val MARKERS_KEY = "markers"
+        private const val DANGERS_KEY = "dangers"
         private const val LEADERBOARD_KEY = "leaderboard"
 
         fun createEmpty(): RaceSavedData = RaceSavedData()
@@ -65,6 +91,11 @@ class RaceSavedData : SavedData() {
             tag.getList(MARKERS_KEY, Tag.TAG_COMPOUND.toInt()).forEach { element ->
                 RaceMarkerSnapshot.load(element as CompoundTag)?.let { snapshot ->
                     data.markers[snapshot.blockPos.asLong()] = snapshot
+                }
+            }
+            tag.getList(DANGERS_KEY, Tag.TAG_COMPOUND.toInt()).forEach { element ->
+                RaceDangerSnapshot.load(element as CompoundTag)?.let { snapshot ->
+                    data.dangers[snapshot.blockPos.asLong()] = snapshot
                 }
             }
             tag.getList(LEADERBOARD_KEY, Tag.TAG_COMPOUND.toInt()).forEach { element ->

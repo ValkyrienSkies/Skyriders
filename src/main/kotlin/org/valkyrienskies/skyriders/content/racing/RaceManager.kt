@@ -2,6 +2,7 @@ package org.valkyrienskies.skyriders.content.racing
 
 import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.DustParticleOptions
+import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket
@@ -25,9 +26,11 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.abs
+import kotlin.math.sqrt
 import java.util.concurrent.ConcurrentHashMap
 
 object RaceMarkerTypes {
@@ -50,8 +53,16 @@ object RaceManager {
     private const val LINE_PARTICLE_SPACING = 0.55
     private const val START_CAPTURE_RANGE = 128.0
     private const val MIN_LINE_LENGTH = 0.75
+    private const val DANGER_RECOVERY_TICKS = 45
+    private const val DANGER_RECOVERY_COOLDOWN_TICKS = 60
+    private const val DANGER_RECOVERY_HEIGHT = 2.0
+    private const val DANGER_RECOVERY_PULL_DURATION = 0.35
+    private const val DANGER_RECOVERY_PULL_ACCELERATION = 80.0
+    private const val DANGER_RECOVERY_PULL_MAX_SPEED = 42.0
+    private const val DANGER_RECOVERY_SNAP_DISTANCE = 2.25
     private val racesByKey = HashMap<RaceKey, ActiveRace>()
     private val markerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceMarkerSnapshot>>()
+    private val dangerSnapshotsByDimension = ConcurrentHashMap<String, MutableMap<Long, RaceDangerSnapshot>>()
 
     fun registerMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
         val snapshots = markerSnapshotsByDimension
@@ -66,19 +77,41 @@ object RaceManager {
         RaceSavedData.get(level).removeMarker(pos)
     }
 
+    fun registerDanger(level: ServerLevel, danger: RaceDangerBlockEntity) {
+        val snapshots = dangerSnapshotsByDimension
+            .getOrPut(level.dimension().location().toString()) { ConcurrentHashMap() }
+        val snapshot = RaceDangerSnapshot.from(danger)
+        snapshots[danger.blockPos.asLong()] = snapshot
+        RaceSavedData.get(level).setDanger(snapshot)
+    }
+
+    fun unregisterDanger(level: ServerLevel, pos: BlockPos) {
+        dangerSnapshotsByDimension[level.dimension().location().toString()]?.remove(pos.asLong())
+        RaceSavedData.get(level).removeDanger(pos)
+    }
+
     fun loadLevel(level: ServerLevel) {
         val dimension = level.dimension().location().toString()
-        val snapshots = markerSnapshotsByDimension
+        val savedData = RaceSavedData.get(level)
+        val markerSnapshots = markerSnapshotsByDimension
             .getOrPut(dimension) { ConcurrentHashMap() }
-        snapshots.clear()
-        RaceSavedData.get(level).markers.forEach { (key, snapshot) ->
-            snapshots[key] = snapshot
+        markerSnapshots.clear()
+        savedData.markers.forEach { (key, snapshot) ->
+            markerSnapshots[key] = snapshot
+        }
+        val dangerSnapshots = dangerSnapshotsByDimension
+            .getOrPut(dimension) { ConcurrentHashMap() }
+        dangerSnapshots.clear()
+        savedData.dangers.forEach { (key, snapshot) ->
+            dangerSnapshots[key] = snapshot
         }
     }
 
     fun saveLevel(level: ServerLevel) {
         val dimension = level.dimension().location().toString()
-        RaceSavedData.get(level).replaceMarkers(markerSnapshotsByDimension[dimension]?.values.orEmpty())
+        val savedData = RaceSavedData.get(level)
+        savedData.replaceMarkers(markerSnapshotsByDimension[dimension]?.values.orEmpty())
+        savedData.replaceDangers(dangerSnapshotsByDimension[dimension]?.values.orEmpty())
     }
 
     fun tickLevel(level: ServerLevel) {
@@ -89,6 +122,7 @@ object RaceManager {
                 activeMarkersForRace(level, race).forEach { marker ->
                     tickCrossings(level, marker, race)
                 }
+                tickDangerBlocks(level, race)
                 if (level.gameTime % 40L == 0L) {
                     ensureRaceMarkerChunksLoaded(level, race)
                 }
@@ -235,6 +269,8 @@ object RaceManager {
             .plus(startSnapshot)
             .distinctBy { it.blockPos }
             .sortedBy { it.blockPos.asLong() }
+        val dangers = collectDangers(level, color)
+            .sortedBy { it.blockPos.asLong() }
         val participants = VehicleManager.getVehicles(level)
             .filter { VehicleRaceParticipants.matchesColor(it, color) }
             .mapNotNull { vehicle -> createRacerIfNearStart(level, vehicle, line) }
@@ -249,6 +285,7 @@ object RaceManager {
             startMarker = startSnapshot,
             startFinishMarkers = startFinishMarkers,
             checkpointMarkers = checkpoints,
+            dangerBlocks = dangers,
             racers = participants,
             active = true,
             musicTrack = selectRaceMusicTrack(level),
@@ -284,7 +321,8 @@ object RaceManager {
             driverId = driver?.uuid,
             driverName = driver?.gameProfile?.name ?: vehicle.vehicleDefinition.displayName,
             vehicleType = vehicle.vehicleDefinition.id.toString(),
-            position = position
+            position = position,
+            lastRecoveryTarget = Vector3d(line.center)
         )
     }
 
@@ -315,6 +353,7 @@ object RaceManager {
             if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return
             if (marker.checkpointIndex != racer.nextCheckpointIndex) return
             racer.crossedCheckpoints.add(marker.checkpointIndex)
+            marker.line(level)?.let { line -> racer.lastRecoveryTarget = Vector3d(line.center) }
             racer.nextCheckpointIndex = race.nextCheckpointIndexAfter(marker.checkpointIndex, racer.currentLap)
             racer.nextTarget = nextTarget(level, racer, race)
             successEffect(level, position)
@@ -330,6 +369,7 @@ object RaceManager {
                 racer.currentLap++
                 racer.lapStartedAtGameTime = level.gameTime
                 racer.crossedCheckpoints.clear()
+                marker.line(level)?.let { line -> racer.lastRecoveryTarget = Vector3d(line.center) }
                 racer.nextCheckpointIndex = race.firstCheckpointIndex(racer.currentLap)
                 racer.nextTarget = nextTarget(level, racer, race)
                 successEffect(level, position)
@@ -441,6 +481,100 @@ object RaceManager {
         return racer.nextTarget?.distance(racer.position) ?: Double.MAX_VALUE
     }
 
+    private fun tickDangerBlocks(level: ServerLevel, race: ActiveRace) {
+        val dangers = dangerBlocksForRace(level, race)
+        if (dangers.isEmpty()) return
+        val shipWorld = level.shipWorld ?: return
+        race.racers.values.toList().forEach { racer ->
+            val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return@forEach
+            val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
+            racer.position = Vector3d(body.kinematics.position)
+            racer.dangerRecovery?.let { recovery ->
+                tickDangerRecovery(level, race, racer, vehicle, recovery)
+                return@forEach
+            }
+            if (racer.dangerRecoveryCooldownTicks > 0) {
+                racer.dangerRecoveryCooldownTicks--
+                return@forEach
+            }
+            val vehicleRadius = vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
+            val danger = dangers.firstOrNull { it.contains(level, racer.position, vehicleRadius) } ?: return@forEach
+            startDangerRecovery(level, race, racer, vehicle, danger)
+        }
+    }
+
+    private fun startDangerRecovery(
+        level: ServerLevel,
+        race: ActiveRace,
+        racer: RacerState,
+        vehicle: IVehicle,
+        danger: RaceDangerSnapshot
+    ) {
+        val target = racer.lastRecoveryTarget
+            ?: race.startMarker.line(level)?.center
+            ?: return
+        racer.dangerRecovery = DangerRecovery(Vector3d(target), DANGER_RECOVERY_TICKS)
+        racer.dangerRecoveryCooldownTicks = DANGER_RECOVERY_COOLDOWN_TICKS
+        VehicleStatusEffects.applyPullToPoint(
+            vehicle = vehicle,
+            target = recoveryTarget(target),
+            duration = DANGER_RECOVERY_PULL_DURATION,
+            acceleration = DANGER_RECOVERY_PULL_ACCELERATION,
+            maxSpeed = DANGER_RECOVERY_PULL_MAX_SPEED
+        )
+        dangerEffect(level, racer.position)
+        level.playSound(null, danger.blockPos, SoundEvents.ENDERMAN_TELEPORT, SoundSource.BLOCKS, 0.8f, 1.35f)
+        driverForBody(level, racer.bodyId)?.sendActionBar("Danger! Returning to checkpoint.")
+    }
+
+    private fun tickDangerRecovery(
+        level: ServerLevel,
+        race: ActiveRace,
+        racer: RacerState,
+        vehicle: IVehicle,
+        recovery: DangerRecovery
+    ) {
+        val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return
+        val target = recoveryTarget(recovery.target)
+        VehicleStatusEffects.applyPullToPoint(
+            vehicle = vehicle,
+            target = target,
+            duration = DANGER_RECOVERY_PULL_DURATION,
+            acceleration = DANGER_RECOVERY_PULL_ACCELERATION,
+            maxSpeed = DANGER_RECOVERY_PULL_MAX_SPEED
+        )
+        recovery.ticksRemaining--
+        val closeEnough = Vector3d(body.kinematics.position).distanceSquared(target) <=
+            DANGER_RECOVERY_SNAP_DISTANCE * DANGER_RECOVERY_SNAP_DISTANCE
+        if (recovery.ticksRemaining > 0 && !closeEnough) return
+
+        VehicleManager.teleportVehicle(level, racer.bodyId, target)
+        racer.position = Vector3d(target)
+        racer.dangerRecovery = null
+        resetRacerLineDistances(level, racer, race, target)
+        racer.nextTarget = nextTarget(level, racer, race)
+        dangerReturnEffect(level, target)
+    }
+
+    private fun resetRacerLineDistances(level: ServerLevel, racer: RacerState, race: ActiveRace, position: Vector3d) {
+        racer.previousDistances.clear()
+        activeMarkersForRace(level, race).forEach { marker ->
+            marker.line(level)?.let { line ->
+                racer.previousDistances[marker.blockPos.asLong()] = line.signedDistance(position)
+            }
+        }
+    }
+
+    private fun recoveryTarget(target: Vector3d): Vector3d = Vector3d(target).add(0.0, DANGER_RECOVERY_HEIGHT, 0.0)
+
+    private fun dangerBlocksForRace(level: ServerLevel, race: ActiveRace): List<RaceDangerSnapshot> {
+        return race.dangerBlocks
+            .plus(collectDangers(level, race.colorId))
+            .filter { it.colorId == race.colorId }
+            .distinctBy { it.blockPos }
+            .sortedBy { it.blockPos.asLong() }
+    }
+
     private fun notifyOtherRacersFinished(
         level: ServerLevel,
         race: ActiveRace,
@@ -485,8 +619,10 @@ object RaceManager {
     }
 
     private fun ensureRaceMarkerChunksLoaded(level: ServerLevel, race: ActiveRace) {
-        activeMarkersForRace(level, race)
-            .flatMap { marker -> marker.chunkKeys() }
+        val chunkKeys = activeMarkersForRace(level, race)
+            .flatMap { marker -> marker.chunkKeys() } +
+            dangerBlocksForRace(level, race).flatMap { danger -> danger.chunkKeys() }
+        chunkKeys
             .distinct()
             .forEach { chunkKey ->
                 if (chunkKey in race.forceLoadedMarkerChunks) return@forEach
@@ -609,6 +745,35 @@ object RaceManager {
         )
     }
 
+    private fun dangerEffect(level: ServerLevel, position: Vector3d) {
+        level.sendParticles(
+            ParticleTypes.PORTAL,
+            position.x,
+            position.y + 0.8,
+            position.z,
+            34,
+            0.8,
+            0.7,
+            0.8,
+            0.08
+        )
+    }
+
+    private fun dangerReturnEffect(level: ServerLevel, position: Vector3d) {
+        level.sendParticles(
+            DustParticleOptions(Vector3f(0.95f, 0.1f, 1.0f), 1.15f),
+            position.x,
+            position.y,
+            position.z,
+            30,
+            0.8,
+            0.55,
+            0.8,
+            0.08
+        )
+        level.playSound(null, position.x, position.y, position.z, SoundEvents.CHORUS_FRUIT_TELEPORT, SoundSource.PLAYERS, 0.8f, 1.2f)
+    }
+
     private fun finishSound(level: ServerLevel, position: Vector3d) {
         level.playSound(
             null,
@@ -671,6 +836,15 @@ object RaceManager {
         return snapshots.values.filter { it.colorId == colorId }
     }
 
+    private fun collectDangers(level: ServerLevel, colorId: Int): List<RaceDangerSnapshot> {
+        val snapshots = dangerSnapshotsByDimension[level.dimension().location().toString()] ?: return emptyList()
+        return snapshots.values.filter { it.colorId == colorId }
+    }
+
+    private fun vehicleApproxRadius(size: Vector3d): Double {
+        return sqrt(size.x * size.x + size.z * size.z) * 0.5
+    }
+
     private fun driverForVehicle(level: ServerLevel, bodyId: Long): ServerPlayer? {
         return level.players().firstOrNull { player ->
             val seat = player.vehicle as? BikeSeatEntity ?: return@firstOrNull false
@@ -720,6 +894,7 @@ object RaceManager {
         val startMarker: RaceMarkerSnapshot,
         val startFinishMarkers: List<RaceMarkerSnapshot>,
         val checkpointMarkers: List<RaceMarkerSnapshot>,
+        val dangerBlocks: List<RaceDangerSnapshot>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
         val forceLoadedMarkerChunks: MutableSet<Long> = HashSet(),
@@ -752,12 +927,20 @@ object RaceManager {
         var nextCheckpointIndex: Int = 0,
         val crossedCheckpoints: MutableSet<Int> = HashSet(),
         val previousDistances: MutableMap<Long, Double> = HashMap(),
-        var nextTarget: Vector3d? = null
+        var nextTarget: Vector3d? = null,
+        var lastRecoveryTarget: Vector3d? = null,
+        var dangerRecovery: DangerRecovery? = null,
+        var dangerRecoveryCooldownTicks: Int = 0
     ) {
         fun isReadyForFinishLine(race: ActiveRace): Boolean {
             return nextCheckpointIndex > race.maxCheckpointIndex(currentLap)
         }
     }
+
+    private data class DangerRecovery(
+        val target: Vector3d,
+        var ticksRemaining: Int
+    )
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
 
@@ -890,11 +1073,68 @@ data class RaceMarkerSnapshot(
     }
 }
 
+data class RaceDangerSnapshot(
+    val blockPos: BlockPos,
+    val colorId: Int,
+    val radius: Double
+) {
+    fun save(): net.minecraft.nbt.CompoundTag {
+        val tag = net.minecraft.nbt.CompoundTag()
+        tag.putLong(BLOCK_POS_KEY, blockPos.asLong())
+        tag.putInt(COLOR_KEY, colorId and 0xFFFFFF)
+        tag.putDouble(RADIUS_KEY, radius.coerceIn(RaceDangerBlockEntity.MIN_RADIUS, RaceDangerBlockEntity.MAX_RADIUS))
+        return tag
+    }
+
+    fun center(level: ServerLevel): Vector3d {
+        return level.toWorldCoordinates(Vec3.atCenterOf(blockPos)).let { Vector3d(it.x, it.y, it.z) }
+    }
+
+    companion object {
+        private const val BLOCK_POS_KEY = "BlockPos"
+        private const val COLOR_KEY = "ColorId"
+        private const val RADIUS_KEY = "Radius"
+
+        fun from(danger: RaceDangerBlockEntity): RaceDangerSnapshot {
+            return RaceDangerSnapshot(
+                blockPos = danger.blockPos,
+                colorId = danger.colorId,
+                radius = danger.radius.coerceIn(RaceDangerBlockEntity.MIN_RADIUS, RaceDangerBlockEntity.MAX_RADIUS)
+            )
+        }
+
+        fun load(tag: net.minecraft.nbt.CompoundTag): RaceDangerSnapshot? {
+            if (!tag.contains(BLOCK_POS_KEY)) return null
+            val radius = if (tag.contains(RADIUS_KEY)) {
+                tag.getDouble(RADIUS_KEY)
+            } else {
+                RaceDangerBlockEntity.DEFAULT_RADIUS
+            }
+            return RaceDangerSnapshot(
+                blockPos = BlockPos.of(tag.getLong(BLOCK_POS_KEY)),
+                colorId = org.valkyrienskies.skyriders.content.item.RaceFlagItem.normalizeSavedRaceColor(tag.getInt(COLOR_KEY)),
+                radius = radius.coerceIn(RaceDangerBlockEntity.MIN_RADIUS, RaceDangerBlockEntity.MAX_RADIUS)
+            )
+        }
+    }
+}
+
 private fun RaceMarkerSnapshot.chunkKeys(): List<Long> {
     return listOfNotNull(
         ChunkPos(blockPos).toLong(),
         endpointPos?.let { ChunkPos(it).toLong() }
     )
+}
+
+private fun RaceDangerSnapshot.chunkKeys(): List<Long> {
+    return listOf(ChunkPos(blockPos).toLong())
+}
+
+private fun RaceDangerSnapshot.contains(level: ServerLevel, position: Vector3d, extraRadius: Double): Boolean {
+    val center = center(level)
+    if (!center.isFinite()) return false
+    val effectiveRadius = radius + extraRadius
+    return center.distanceSquared(position) <= effectiveRadius * effectiveRadius
 }
 
 private fun RaceMarkerSnapshot.isActiveForLap(currentLap: Int, totalLaps: Int): Boolean {
