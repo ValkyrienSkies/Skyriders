@@ -18,6 +18,10 @@ object VehicleRefuelSources {
         Registries.ITEM,
         ResourceLocation(SkyridersMod.MOD_ID, "jerry_can")
     )
+    val LOW_FUEL_RESCUE_TAG: TagKey<Item> = TagKey.create(
+        Registries.ITEM,
+        ResourceLocation(SkyridersMod.MOD_ID, "low_fuel_rescue")
+    )
     private val externalSources = CopyOnWriteArrayList<ExternalVehicleRefuelSource>()
 
     fun canRefuelFromHeldItem(player: Player): Boolean {

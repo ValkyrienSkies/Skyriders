@@ -31,8 +31,11 @@ import org.joml.Vector3d
 import org.joml.Vector3f
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
+import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleRefuelSources
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import org.valkyrienskies.skyriders.content.racing.RaceManager
 import net.minecraftforge.registries.ForgeRegistries
@@ -78,7 +81,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: continue
             val radius = PICKUP_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(center) > radius * radius) continue
-            if (grantPickup(serverLevel, driver, vehicle.bodyId)) {
+            if (grantPickup(serverLevel, driver, vehicle)) {
                 freezeRotation()
                 rechargeTicks = RECHARGE_TICKS_DEFAULT
                 playPickupSound(serverLevel)
@@ -135,32 +138,33 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         entityData.set(FROZEN_ROTATION_TICK, tickCount)
     }
 
-    private fun grantPickup(level: ServerLevel, driver: ServerPlayer, bodyId: Long): Boolean {
-        val placeWeighted = placeWeightedItems(level, bodyId)
-        val stacks = placeWeighted ?: vanillaLootItems(level)
+    private fun grantPickup(level: ServerLevel, driver: ServerPlayer, vehicle: IVehicle): Boolean {
+        val lowFuel = VehicleFuel.fraction(vehicle) <= LOW_FUEL_THRESHOLD
+        val placeWeighted = placeWeightedItems(level, vehicle.bodyId, lowFuel)
+        val stacks = placeWeighted ?: vanillaLootItems(level, lowFuel)
         if (stacks.isEmpty()) return false
         stacks.forEach { stack -> giveOrDrop(driver, RacingRouletteItem.create(stack.copy())) }
         return true
     }
 
-    private fun vanillaLootItems(level: ServerLevel): List<ItemStack> {
+    private fun vanillaLootItems(level: ServerLevel, lowFuel: Boolean): List<ItemStack> {
         val table: LootTable? = level.server.getLootData()
             .getElement(LootDataId(LootDataType.TABLE, DEFAULT_LOOT_TABLE))
         val params = LootParams.Builder(level).create(LootContextParamSets.EMPTY)
         val generated = table?.getRandomItems(params).orEmpty()
-        return if (generated.isEmpty()) fallbackItems(level) else generated
+        return if (generated.isEmpty()) fallbackItems(level, lowFuel) else generated
     }
 
-    private fun placeWeightedItems(level: ServerLevel, bodyId: Long): List<ItemStack>? {
+    private fun placeWeightedItems(level: ServerLevel, bodyId: Long, lowFuel: Boolean): List<ItemStack>? {
         val entries = loadPlaceWeightedEntries(level)
         if (entries.isEmpty()) return null
         val placeFactor = placeFactor(level, bodyId)
-        val totalWeight = entries.sumOf { it.effectiveWeight(placeFactor) }
+        val totalWeight = entries.sumOf { it.effectiveWeight(placeFactor, lowFuel) }
         if (totalWeight <= 0.0) return null
 
         var pick = level.random.nextDouble() * totalWeight
         entries.forEach { entry ->
-            pick -= entry.effectiveWeight(placeFactor)
+            pick -= entry.effectiveWeight(placeFactor, lowFuel)
             if (pick <= 0.0) {
                 return listOf(entry.stack())
             }
@@ -202,7 +206,7 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         }
     }
 
-    private fun fallbackItems(level: ServerLevel): List<ItemStack> {
+    private fun fallbackItems(level: ServerLevel, lowFuel: Boolean): List<ItemStack> {
         val options = listOf(
             SkyridersMod.HONEY_CANISTER.get(),
             SkyridersMod.HONEY_TANK.get(),
@@ -216,7 +220,15 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
             SkyridersMod.GRABBY_HAND.get(),
             SkyridersMod.THUNDERBOLT.get()
         )
-        return listOf(ItemStack(options[level.random.nextInt(options.size)]))
+        val weightedOptions = options.flatMap { item ->
+            val copies = if (lowFuel && ItemStack(item).`is`(VehicleRefuelSources.LOW_FUEL_RESCUE_TAG)) {
+                LOW_FUEL_RESCUE_MULTIPLIER.toInt().coerceAtLeast(1)
+            } else {
+                1
+            }
+            List(copies) { item }
+        }
+        return listOf(ItemStack(weightedOptions[level.random.nextInt(weightedOptions.size)]))
     }
 
     private fun giveOrDrop(driver: ServerPlayer, stack: ItemStack) {
@@ -318,6 +330,8 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
     companion object {
         val DEFAULT_LOOT_TABLE = ResourceLocation(SkyridersMod.MOD_ID, "racing_item_boxes/default")
         val PLACE_WEIGHT_TABLE = ResourceLocation(SkyridersMod.MOD_ID, "racing_item_box_weights/default.json")
+        private const val LOW_FUEL_THRESHOLD = 0.25
+        private const val LOW_FUEL_RESCUE_MULTIPLIER = 6.0
         private const val RECHARGE_TICKS_KEY = "RechargeTicks"
         private const val RECHARGE_TICKS_DEFAULT = 20 * 5
         private const val PICKUP_RADIUS = 0.85
@@ -336,9 +350,14 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         val backMultiplier: Double,
         val count: Int
     ) {
-        fun effectiveWeight(placeFactor: Double): Double {
+        fun effectiveWeight(placeFactor: Double, lowFuel: Boolean): Double {
             val multiplier = frontMultiplier + (backMultiplier - frontMultiplier) * placeFactor
-            return (weight * multiplier).takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+            val rescueMultiplier = if (lowFuel && stack().`is`(VehicleRefuelSources.LOW_FUEL_RESCUE_TAG)) {
+                LOW_FUEL_RESCUE_MULTIPLIER
+            } else {
+                1.0
+            }
+            return (weight * multiplier * rescueMultiplier).takeIf { it.isFinite() && it > 0.0 } ?: 0.0
         }
 
         fun stack(): ItemStack = ItemStack(item, count.coerceAtMost(item.defaultInstance.maxStackSize))
