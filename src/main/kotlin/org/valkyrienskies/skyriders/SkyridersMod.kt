@@ -60,6 +60,7 @@ import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyTankItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
+import org.valkyrienskies.skyriders.content.item.RacingDispenserBehaviors
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
@@ -320,6 +321,7 @@ object SkyridersMod {
     fun init (event: FMLCommonSetupEvent) {
         event.enqueueWork {
             SkyridersNetwork.register()
+            RacingDispenserBehaviors.register()
             vsApi.physTickEvent.on { physTickEvent ->
                 VehicleManager.physTick(physTickEvent.world, physTickEvent.delta)
                 VehicleInteractionHandler.physTick(physTickEvent.world, physTickEvent.delta)
