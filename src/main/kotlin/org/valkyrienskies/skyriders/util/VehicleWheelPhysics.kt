@@ -16,7 +16,9 @@ data class VehicleWheelContact(
     val surfaceFriction: Double,
     val wheelForwardWorld: Vector3d,
     val wheelRightWorld: Vector3d,
-    val wheelVelocityWorld: Vector3d
+    val wheelVelocityWorld: Vector3d,
+    val surfaceVelocityWorld: Vector3d,
+    val relativeWheelVelocityWorld: Vector3d
 )
 
 object VehicleWheelPhysics {
@@ -50,11 +52,15 @@ object VehicleWheelPhysics {
                 surfaceFriction = 1.0,
                 wheelForwardWorld = Vector3d(wheelForwardWorld),
                 wheelRightWorld = Vector3d(wheelRightWorld),
-                wheelVelocityWorld = velocity
+                wheelVelocityWorld = velocity,
+                surfaceVelocityWorld = Vector3d(),
+                relativeWheelVelocityWorld = Vector3d(velocity)
             )
         }
 
         val contactPoint = Vector3d(mountWorld).fma(hit.distance, suspensionDir)
+        val wheelVelocity = VehiclePhysicsMath.velocityAtPoint(body, contactPoint)
+        val surfaceVelocity = VehiclePhysicsMath.surfaceVelocityAtPoint(hit.hitBody, contactPoint)
         val contactNormal = VehiclePhysicsMath.safeNormalize(hit.hitNormal, Vector3d(suspensionDir).negate())
         val suspensionUp = Vector3d(suspensionDir).negate()
         val loaded = hit.distance <= groundedMaxDistance &&
@@ -70,7 +76,9 @@ object VehicleWheelPhysics {
             surfaceFriction = surfaceFrictionScale(hit.staticFrictionCoefficient, hit.dynamicFrictionCoefficient),
             wheelForwardWorld = Vector3d(wheelForwardWorld),
             wheelRightWorld = Vector3d(wheelRightWorld),
-            wheelVelocityWorld = VehiclePhysicsMath.velocityAtPoint(body, contactPoint)
+            wheelVelocityWorld = wheelVelocity,
+            surfaceVelocityWorld = surfaceVelocity,
+            relativeWheelVelocityWorld = Vector3d(wheelVelocity).sub(surfaceVelocity)
         )
     }
 

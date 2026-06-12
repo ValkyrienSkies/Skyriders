@@ -24,6 +24,14 @@ object VehiclePhysicsMath {
         return if (isFinite(velocity)) velocity else Vector3d()
     }
 
+    fun surfaceVelocityAtPoint(hitBody: PhysVsBody?, point: Vector3dc): Vector3d {
+        return if (hitBody == null || hitBody.isStatic) Vector3d() else velocityAtPoint(hitBody, point)
+    }
+
+    fun relativeVelocityAtPoint(body: PhysVsBody, hitBody: PhysVsBody?, point: Vector3dc): Vector3d {
+        return velocityAtPoint(body, point).sub(surfaceVelocityAtPoint(hitBody, point))
+    }
+
     fun safeNormalize(vector: Vector3dc, fallback: Vector3dc): Vector3d {
         if (!isFinite(vector) || vector.lengthSquared() < MIN_DIRECTION_LENGTH_SQUARED) {
             return Vector3d(fallback)

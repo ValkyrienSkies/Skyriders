@@ -244,13 +244,17 @@ object BikePhysicsSolver {
                 surfaceFriction = 1.0,
                 wheelForwardWorld = wheelForward,
                 wheelRightWorld = wheelRight,
-                wheelVelocityWorld = velocityAtWorldPoint(body, wheelMountWorld)
+                wheelVelocityWorld = velocityAtWorldPoint(body, wheelMountWorld),
+                surfaceVelocityWorld = Vector3d(),
+                relativeWheelVelocityWorld = velocityAtWorldPoint(body, wheelMountWorld)
             )
         }
 
         val result = bestHit.result!!
         val hitDistance = result.distance
         val contactPoint = Vector3d(bestHit.mountWorld).fma(hitDistance, castDirection)
+        val wheelVelocity = velocityAtWorldPoint(body, contactPoint)
+        val surfaceVelocity = VehiclePhysicsMath.surfaceVelocityAtPoint(result.hitBody, contactPoint)
         val springLength = hitDistance - config.wheelRadius
         val compressionMeters = config.suspensionRestLength - springLength
         val compression = (compressionMeters / config.suspensionTravel).coerceIn(0.0, 1.0)
@@ -272,7 +276,9 @@ object BikePhysicsSolver {
             ),
             wheelForwardWorld = wheelForward,
             wheelRightWorld = wheelRight,
-            wheelVelocityWorld = velocityAtWorldPoint(body, contactPoint)
+            wheelVelocityWorld = wheelVelocity,
+            surfaceVelocityWorld = surfaceVelocity,
+            relativeWheelVelocityWorld = Vector3d(wheelVelocity).sub(surfaceVelocity)
         )
     }
 
@@ -296,7 +302,7 @@ object BikePhysicsSolver {
         if (compressionMeters <= 0.0) return
 
         val springForceMag = compressionMeters * config.suspensionStrength
-        val suspensionVelocity = contact.wheelVelocityWorld.dot(contact.suspensionDirWorld)
+        val suspensionVelocity = contact.relativeWheelVelocityWorld.dot(contact.suspensionDirWorld)
         val dampingForceMag = -suspensionVelocity * config.suspensionDamping
         val totalForceMag = max(0.0, springForceMag + dampingForceMag)
 
@@ -344,8 +350,8 @@ object BikePhysicsSolver {
     ) {
         if (!contact.grounded) return
 
-        val lateralVel = safeDot(contact.wheelVelocityWorld, contact.wheelRightWorld)
-        val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+        val lateralVel = safeDot(contact.relativeWheelVelocityWorld, contact.wheelRightWorld)
+        val forwardVel = safeDot(contact.relativeWheelVelocityWorld, contact.wheelForwardWorld)
         val safeSpeed = max(abs(forwardVel), 2.0)
         val slip = lateralVel / safeSpeed
         val gripFactor = pacejkaLateralGrip(slip, config)
@@ -434,7 +440,7 @@ object BikePhysicsSolver {
         val stepDt = dt.coerceIn(0.0, 0.1)
         val radius = max(config.wheelRadius, 0.05)
         val maxOmega = max(config.wheelTopSpeed, 1.0) * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
-        val groundSpeed = if (contact.grounded) safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld) else 0.0
+        val groundSpeed = if (contact.grounded) safeDot(contact.relativeWheelVelocityWorld, contact.wheelForwardWorld) else 0.0
         var omega = if (angularVelocity.isFinite()) angularVelocity else groundSpeed / radius
 
         if (driven && throttle != 0.0) {
@@ -471,7 +477,7 @@ object BikePhysicsSolver {
                 tractionScale
             val forceMag = gripFactor * maxLongitudinalForce
             if (driven && throttle != 0.0) {
-                val drivePower = forceMag * safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+                val drivePower = forceMag * safeDot(contact.relativeWheelVelocityWorld, contact.wheelForwardWorld)
                 if (drivePower > 0.0) {
                     state.debugDriveWork += drivePower / max(config.mass, 1.0)
                 }
@@ -547,14 +553,19 @@ object BikePhysicsSolver {
             return (omega * exp(-WHEEL_AIR_DRAG * stepDt)).coerceIn(-maxOmega, maxOmega)
         }
 
-        val forwardVel = safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+        val relative = contact.relativeWheelVelocityWorld
+        val forwardVel = safeDot(relative, contact.wheelForwardWorld)
         val maxBrakeForce = contact.normalForceEstimate *
             config.frictionCoefficient *
             contact.surfaceFriction *
             config.longitudinalGrip *
             config.parkingBrakeStrength
-        val forceMag = (-forwardVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
-        applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forceMag), contact.contactPointWorld)
+        val forwardForceMag = (-forwardVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
+        applyContactForce(body, contact, Vector3d(contact.wheelForwardWorld).mul(forwardForceMag), contact.contactPointWorld)
+
+        val lateralVel = safeDot(relative, contact.wheelRightWorld)
+        val lateralForceMag = (-lateralVel * maxBrakeForce).coerceIn(-maxBrakeForce, maxBrakeForce)
+        applyContactForce(body, contact, Vector3d(contact.wheelRightWorld).mul(lateralForceMag), contact.contactPointWorld)
 
         val rollingOmega = forwardVel / radius
         if (abs(forwardVel) > 0.2) {
@@ -931,7 +942,7 @@ object BikePhysicsSolver {
         val approachDistance = max(0.25, step.approachDistance)
         val targetUpSpeed = (effectiveStepSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
             .coerceIn(0.0, 3.5 + speedLookahead * 4.6)
-        val currentUpSpeed = safeDot(contact.wheelVelocityWorld, terrainUp)
+        val currentUpSpeed = safeDot(contact.relativeWheelVelocityWorld, terrainUp)
         val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
         val velocityLiftForce = config.mass * missingUpSpeed * (18.0 + speedLookahead * 22.0)
         val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.35 + heightAmount * 0.3)

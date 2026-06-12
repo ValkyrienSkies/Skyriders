@@ -536,7 +536,7 @@ object WheeledVehiclePhysicsSolver {
         }
         if (compressed <= 0.0 && droopLoad <= 0.0) return 0.0
         val suspensionUp = VehiclePhysicsMath.safeNormalize(Vector3d(contact.suspensionDirWorld).negate(), WORLD_UP)
-        val springVelocity = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.suspensionDirWorld)
+        val springVelocity = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, contact.suspensionDirWorld)
         val dampingScale = if (compressed > 0.0) 1.0 else 0.35
         val forceMag = (compressed * axle.suspensionStrength + droopLoad + springVelocity * axle.suspensionDamping * dampingScale).coerceAtLeast(0.0)
         val normalForce = forceMag.coerceIn(0.0, MAX_FORCE)
@@ -553,8 +553,8 @@ object WheeledVehiclePhysicsSolver {
     ) {
         val contact = loaded.contact
         if (!contact.grounded || loaded.normalForce <= 0.0) return
-        val lateralSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelRightWorld)
-        val forwardSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, contact.wheelForwardWorld)
+        val lateralSpeed = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, contact.wheelRightWorld)
+        val forwardSpeed = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, contact.wheelForwardWorld)
         val slip = lateralSpeed / max(abs(forwardSpeed), 1.5)
         val shapedSlip = slip / (abs(slip) + config.lateralSlipShape.coerceAtLeast(1.0e-4))
         val driftGripScale = if (!drifting) {
@@ -606,7 +606,7 @@ object WheeledVehiclePhysicsSolver {
             val topSpeed = max(limitedTopSpeed, 1.0)
             val maxOmega = topSpeed * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
             val groundSpeed = if (loaded.contact.grounded) {
-                VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
+                VehiclePhysicsMath.safeDot(loaded.contact.relativeWheelVelocityWorld, loaded.contact.wheelForwardWorld)
             } else {
                 0.0
             }
@@ -661,7 +661,7 @@ object WheeledVehiclePhysicsSolver {
                 val rollingForce = (-groundSpeed * config.rollingResistance * tractionScale / contacts.size).coerceIn(-MAX_FORCE, MAX_FORCE)
                 val driveForceMag = shapedSlip * maxForce
                 if (axle.driven && throttle != 0.0) {
-                    val drivePower = driveForceMag * VehiclePhysicsMath.safeDot(loaded.contact.wheelVelocityWorld, loaded.contact.wheelForwardWorld)
+                    val drivePower = driveForceMag * VehiclePhysicsMath.safeDot(loaded.contact.relativeWheelVelocityWorld, loaded.contact.wheelForwardWorld)
                     if (drivePower > 0.0) {
                         state.debugDriveWork += drivePower / max(config.mass, 1.0)
                     }
@@ -699,15 +699,20 @@ object WheeledVehiclePhysicsSolver {
     ) {
         val grounded = contacts.filter { it.contact.grounded && it.normalForce > 0.0 }
         if (grounded.isEmpty()) return
-        val velocity = body.kinematics.velocity
-        val planar = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, terrainUp), terrainUp)
-        if (!VehiclePhysicsMath.isFinite(planar) || planar.lengthSquared() < 0.025 * 0.025) return
-        val maxBrakeForce = grounded.sumOf { it.normalForce * it.contact.surfaceFriction } *
-            config.tireFrictionCoefficient *
-            config.parkingBrakeStrength
-        val brakeForce = VehiclePhysicsMath.safeNormalize(planar, Vector3d())
-            .mul((-planar.length() * config.mass * config.parkingBrakeStrength).coerceIn(-maxBrakeForce, 0.0))
-        VehiclePhysicsMath.safeApplyWorldForce(body, brakeForce, body.kinematics.position)
+        val forceShareMass = config.mass / grounded.size
+        grounded.forEach { loaded ->
+            val contact = loaded.contact
+            val relative = contact.relativeWheelVelocityWorld
+            val planar = Vector3d(relative).fma(-VehiclePhysicsMath.safeDot(relative, terrainUp), terrainUp)
+            if (!VehiclePhysicsMath.isFinite(planar) || planar.lengthSquared() < 0.025 * 0.025) return@forEach
+            val maxBrakeForce = loaded.normalForce *
+                contact.surfaceFriction *
+                config.tireFrictionCoefficient *
+                config.parkingBrakeStrength
+            val brakeForce = VehiclePhysicsMath.safeNormalize(planar, Vector3d())
+                .mul((-planar.length() * forceShareMass * config.parkingBrakeStrength).coerceIn(-maxBrakeForce, 0.0))
+            VehicleWheelPhysics.applyContactForce(body, contact, brakeForce)
+        }
     }
 
     private fun applySteeringAssist(
@@ -826,7 +831,7 @@ object WheeledVehiclePhysicsSolver {
         val approachDistance = max(0.25, step.approachDistance)
         val targetUpSpeed = (effectiveSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
             .coerceIn(0.0, 2.4 + speedLookahead * 2.8)
-        val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.wheelVelocityWorld, terrainUp)
+        val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, terrainUp)
         val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
         val liftDemand = if (targetUpSpeed > 1.0e-4) {
             (missingUpSpeed / targetUpSpeed).coerceIn(0.0, 1.0)
@@ -1069,8 +1074,8 @@ object WheeledVehiclePhysicsSolver {
             0.0
         } else {
             grounded.sumOf {
-                val lateral = VehiclePhysicsMath.safeDot(it.contact.wheelVelocityWorld, it.contact.wheelRightWorld)
-                val forward = VehiclePhysicsMath.safeDot(it.contact.wheelVelocityWorld, it.contact.wheelForwardWorld)
+                val lateral = VehiclePhysicsMath.safeDot(it.contact.relativeWheelVelocityWorld, it.contact.wheelRightWorld)
+                val forward = VehiclePhysicsMath.safeDot(it.contact.relativeWheelVelocityWorld, it.contact.wheelForwardWorld)
                 lateral / max(abs(forward), 1.5)
             } / grounded.size
         }

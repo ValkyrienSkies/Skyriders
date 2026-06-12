@@ -15,5 +15,7 @@ data class WheelContact(
     val surfaceFriction: Double,
     val wheelForwardWorld: Vector3d,
     val wheelRightWorld: Vector3d,
-    val wheelVelocityWorld: Vector3d
+    val wheelVelocityWorld: Vector3d,
+    val surfaceVelocityWorld: Vector3d,
+    val relativeWheelVelocityWorld: Vector3d
 )
