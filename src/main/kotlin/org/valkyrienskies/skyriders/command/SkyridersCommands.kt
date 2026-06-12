@@ -58,7 +58,13 @@ object SkyridersCommands {
                                                 Vec3Argument.getVec3(ctx, "pos")
                                             )
                                         }
-                                )
+                                ).executes { ctx ->
+                                    summonBike(
+                                        ctx.source,
+                                        StringArgumentType.getString(ctx, "bike"),
+                                        ctx.source.position
+                                    )
+                                }
                         )
                 )
                 .then(
