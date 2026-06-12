@@ -28,8 +28,8 @@ object VehicleOpenModelRenderer {
         packedLight: Int,
         forceRender: Boolean = false
     ): Boolean {
-        if (!forceRender) return false
         val model = getModel(modelLocation) ?: return false
+        if (!forceRender && !model.requiresCustomTransforms) return false
 
         val minecraft = Minecraft.getInstance()
         val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
@@ -112,8 +112,10 @@ object VehicleOpenModelRenderer {
         }
 
         val faces = ArrayList<OpenFace>()
+        var requiresCustomTransforms = false
         json.getAsJsonArray("components")?.forEach { element ->
             val component = element.asJsonObject
+            requiresCustomTransforms = requiresCustomTransforms || component.has("rotated")
             val from = component.getVector3d("from")
             val to = component.getVector3d("to")
             val transform = component.transform()
@@ -130,6 +132,7 @@ object VehicleOpenModelRenderer {
         return OpenModel(
             textureWidth = textureSize?.get(0)?.asDouble ?: 16.0,
             textureHeight = textureSize?.get(1)?.asDouble ?: 16.0,
+            requiresCustomTransforms = requiresCustomTransforms,
             faces = faces
         )
     }
@@ -318,6 +321,7 @@ object VehicleOpenModelRenderer {
     private data class OpenModel(
         val textureWidth: Double,
         val textureHeight: Double,
+        val requiresCustomTransforms: Boolean,
         val faces: List<OpenFace>
     )
 

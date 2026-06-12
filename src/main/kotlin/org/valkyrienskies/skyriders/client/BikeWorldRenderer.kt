@@ -136,10 +136,12 @@ object BikeWorldRenderer {
         } else {
             RenderType.cutout()
         }
-        model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, bodyRenderType) } ?: run {
-            if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight, render.renderOpenModelNoCull)) {
-                poseStack.popPose()
-                return
+        if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight)) {
+            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, bodyRenderType) } ?: run {
+                if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight, forceRender = true)) {
+                    poseStack.popPose()
+                    return
+                }
             }
         }
 
@@ -227,14 +229,16 @@ object BikeWorldRenderer {
         } else {
             RenderType.cutout()
         }
-        model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, partRenderType) } ?: run {
-            VehicleOpenModelRenderer.renderIfNeeded(
-                modelPart.model,
-                poseStack,
-                bufferSource,
-                packedLight,
-                modelPart.renderOpenModelNoCull
-            )
+        if (!VehicleOpenModelRenderer.renderIfNeeded(modelPart.model, poseStack, bufferSource, packedLight)) {
+            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, partRenderType) } ?: run {
+                VehicleOpenModelRenderer.renderIfNeeded(
+                    modelPart.model,
+                    poseStack,
+                    bufferSource,
+                    packedLight,
+                    forceRender = true
+                )
+            }
         }
         poseStack.popPose()
     }
