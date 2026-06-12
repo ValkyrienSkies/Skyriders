@@ -38,7 +38,7 @@ import kotlin.math.sin
 
 object SkyridersModClient {
     private var lastSentInput = VehicleInput.EMPTY
-    private val bikeDismountKey = KeyMapping(
+    val bikeDismountKey = KeyMapping(
         "key.skyriders.bike_dismount",
         InputConstants.Type.KEYSYM,
         GLFW.GLFW_KEY_X,
