@@ -75,6 +75,7 @@ object VehicleJukebox {
 
         val level = player.level() as? ServerLevel ?: return false
         val removed = disc.copyWithCount(1)
+        val removedName = removed.hoverName.string
         val changed = VehicleManager.mutatePartState(level, vehicle.bodyId, PART_ID) { state ->
             state.remove(DISC_KEY)
         }
@@ -84,7 +85,7 @@ object VehicleJukebox {
             player.drop(removed, false)
         }
         player.displayClientMessage(
-            Component.literal("Removed ${removed.hoverName.string} from the truck.").withStyle(ChatFormatting.YELLOW),
+            Component.literal("Removed $removedName from the truck.").withStyle(ChatFormatting.YELLOW),
             true
         )
         return true
