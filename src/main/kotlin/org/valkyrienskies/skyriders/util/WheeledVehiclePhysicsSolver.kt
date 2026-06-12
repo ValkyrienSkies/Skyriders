@@ -261,7 +261,7 @@ object WheeledVehiclePhysicsSolver {
     ): Double {
         val launchScale = gear.launchTorqueScale.coerceIn(0.0, 1.0)
         val speedT = smoothstep(0.0, max(gear.downshiftSpeed, gear.maxSpeed * 0.35), abs(forwardSpeed))
-        return lerp(launchScale, 1.0, speedT).coerceIn(0.0, 1.0)
+        return lerp(launchScale * launchScale, 1.0, speedT).coerceIn(0.0, 1.0)
     }
 
     private fun updateEngineRpm(
@@ -338,7 +338,7 @@ object WheeledVehiclePhysicsSolver {
         state.debugClutchEngagement = clutchTarget
         state.debugEngineStalled = false
 
-        if (shouldStallEngine(config, state.engineRpm, gear, clutchTarget)) {
+        if (shouldStallEngine(config, state.engineRpm, gear, clutchTarget, driveThrottle)) {
             state.engineOn = false
             state.engineStalled = true
             state.engineRpm = 0.0
@@ -351,7 +351,12 @@ object WheeledVehiclePhysicsSolver {
 
         val limiterScale = 1.0 - smoothstep(engine.redlineRpm, engine.revLimiterRpm, state.engineRpm)
         val stallScale = smoothstep(engine.stallRpm * 0.75, engine.idleRpm, state.engineRpm)
-        val torqueScale = sampleEngineTorque(engine, state.engineRpm) * clutchTarget * limiterScale * stallScale
+        val gearLoadScale = when {
+            gear > 0 && gearConfig != null -> launchScale
+            gear < 0 -> 0.85
+            else -> 0.0
+        }
+        val torqueScale = sampleEngineTorque(engine, state.engineRpm) * clutchTarget * limiterScale * stallScale * gearLoadScale
         val engineBrakeScale = if (gear != 0 && throttle < 0.05 && abs(forwardSpeed) > 0.35) {
             engine.engineBrakeTorqueScale * clutchTarget * smoothstep(0.35, 4.0, abs(forwardSpeed))
         } else {
@@ -422,9 +427,11 @@ object WheeledVehiclePhysicsSolver {
         config: WheeledVehiclePhysicsConfig,
         engineRpm: Double,
         gear: Int,
-        clutchEngagement: Double
+        clutchEngagement: Double,
+        driveThrottle: Double
     ): Boolean {
         if (!config.transmission.manualClutch || gear == 0 || clutchEngagement < 0.68) return false
+        if (abs(driveThrottle) < 0.05) return false
         return engineRpm < config.engine.stallRpm
     }
 

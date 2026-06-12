@@ -1006,7 +1006,7 @@ object KartPhysicsSolver {
     private fun kartGearLaunchTorqueFactor(gear: VehicleTransmissionGearConfig, forwardSpeed: Double): Double {
         val launchScale = gear.launchTorqueScale.coerceIn(0.0, 1.0)
         val speedT = smoothstep(0.0, max(gear.downshiftSpeed, gear.maxSpeed * 0.35), abs(forwardSpeed))
-        return lerp(launchScale, 1.0, speedT).coerceIn(0.0, 1.0)
+        return lerp(launchScale * launchScale, 1.0, speedT).coerceIn(0.0, 1.0)
     }
 
     private fun estimateKartEngineRpm(forwardSpeed: Double, throttle: Double, topSpeed: Double, gear: Int): Double {
