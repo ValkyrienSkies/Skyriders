@@ -188,8 +188,8 @@ object SkyridersNetwork {
         CHANNEL.sendToServer(VehicleControlActionPacket(action))
     }
 
-    fun sendBikeUse() {
-        CHANNEL.sendToServer(BikeUsePacket())
+    fun sendBikeUse(shiftDown: Boolean = false) {
+        CHANNEL.sendToServer(BikeUsePacket(shiftDown))
     }
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
@@ -618,22 +618,23 @@ object SkyridersNetwork {
         }
     }
 
-    class BikeUsePacket {
+    data class BikeUsePacket(val shiftDown: Boolean = false) {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
-                BikeInteractionHandler.handleUse(player)
+                BikeInteractionHandler.handleUse(player, shiftDown)
             }
             context.packetHandled = true
         }
 
         companion object {
             fun encode(packet: BikeUsePacket, buf: FriendlyByteBuf) {
+                buf.writeBoolean(packet.shiftDown)
             }
 
             fun decode(buf: FriendlyByteBuf): BikeUsePacket {
-                return BikeUsePacket()
+                return BikeUsePacket(buf.readBoolean())
             }
 
             fun handle(packet: BikeUsePacket, contextSupplier: Supplier<NetworkEvent.Context>) {

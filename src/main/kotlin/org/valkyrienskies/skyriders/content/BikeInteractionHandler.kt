@@ -43,23 +43,28 @@ object BikeInteractionHandler {
     private val pendingReleases = ConcurrentHashMap<BodyId, ReleasePose>()
     private val pendingTosses = ConcurrentHashMap<BodyId, PendingToss>()
 
-    fun handleUse(player: ServerPlayer) {
+    fun handleUse(player: ServerPlayer, shiftDownOverride: Boolean? = null) {
         val level = player.level() as? ServerLevel ?: return
         val existingHoist = hoistedByPlayer[player.uuid]
+        val shiftDown = shiftDownOverride ?: player.isShiftKeyDown
+
+        if (shiftDown && removeMountedJukeboxDisc(player, level)) {
+            return
+        }
 
         if (toggleMountedSeatDoor(player, level)) {
             return
         }
 
         if (existingHoist != null) {
-            if (player.isShiftKeyDown) {
+            if (shiftDown) {
                 releaseHoistedBike(player, existingHoist)
             }
             return
         }
 
         val target = findBikeInLook(player, USE_RANGE) ?: return
-        dispatchInteraction(player, target)
+        dispatchInteraction(player, target, shiftDown)
     }
 
     private fun toggleMountedSeatDoor(player: ServerPlayer, level: ServerLevel): Boolean {
@@ -173,7 +178,7 @@ object BikeInteractionHandler {
         )
     }
 
-    private fun dispatchInteraction(player: ServerPlayer, target: VehicleInteractionHit): Boolean {
+    private fun dispatchInteraction(player: ServerPlayer, target: VehicleInteractionHit, shiftDown: Boolean): Boolean {
         val level = player.level() as? ServerLevel ?: return false
         val actions = target.actions
 
@@ -181,7 +186,11 @@ object BikeInteractionHandler {
             return true
         }
 
-        if (player.isShiftKeyDown && VehicleInteractionActions.PICK_UP in actions) {
+        if (VehicleJukebox.tryInsertHeldDisc(player, target.vehicle)) {
+            return true
+        }
+
+        if (shiftDown && VehicleInteractionActions.PICK_UP in actions) {
             startHoisting(player, target.vehicle, target.zone)
             return true
         }
@@ -200,6 +209,12 @@ object BikeInteractionHandler {
         }
 
         return false
+    }
+
+    private fun removeMountedJukeboxDisc(player: ServerPlayer, level: ServerLevel): Boolean {
+        val seat = player.vehicle as? BikeSeatEntity ?: return false
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, seat.bodyId) ?: return false
+        return VehicleJukebox.tryRemoveDisc(player, vehicle)
     }
 
     private fun isSeatOccupied(level: ServerLevel, bodyId: BodyId, seatId: String, seatWorld: Vector3dc): Boolean {

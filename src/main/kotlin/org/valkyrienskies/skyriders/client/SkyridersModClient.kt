@@ -170,6 +170,7 @@ object SkyridersModClient {
             val minecraft = Minecraft.getInstance()
             ClientVehicleSyncHandler.tick()
             VehicleClientEffects.tick()
+            VehicleJukeboxClientSounds.tick()
             RaceCompassClientState.tick()
             RaceHudClientState.tick()
             RaceMusicClientState.tick()
@@ -226,9 +227,10 @@ object SkyridersModClient {
             val minecraft = Minecraft.getInstance()
             val player = minecraft.player ?: return
             val level = minecraft.level ?: return
+            val shiftDown = minecraft.options.keyShift.isDown || player.isShiftKeyDown
             if (player.vehicle is BikeSeatEntity) {
-                if (!player.mainHandItem.isEmpty || !player.offhandItem.isEmpty) return
-                SkyridersNetwork.sendBikeUse()
+                if (!shiftDown && (!player.mainHandItem.isEmpty || !player.offhandItem.isEmpty)) return
+                SkyridersNetwork.sendBikeUse(shiftDown)
                 event.isCanceled = true
                 event.setSwingHand(false)
                 return
@@ -239,7 +241,7 @@ object SkyridersModClient {
             val hitBike = VehicleInteractionHandler.findVehicleOnRay(level, eye, end) != null
             if (!hitBike && !BikeClientHoistState.hoisting) return
 
-            SkyridersNetwork.sendBikeUse()
+            SkyridersNetwork.sendBikeUse(shiftDown)
             event.isCanceled = true
             event.setSwingHand(false)
         }
@@ -250,6 +252,7 @@ object SkyridersModClient {
             BikeClientHoistState.hoisting = false
             RaceHudClientState.clear()
             RaceMusicClientState.stop()
+            VehicleJukeboxClientSounds.clear()
         }
 
         private fun tickRaceDangerRadiusPreview(minecraft: Minecraft) {

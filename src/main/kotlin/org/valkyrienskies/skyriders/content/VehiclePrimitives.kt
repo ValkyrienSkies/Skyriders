@@ -341,6 +341,7 @@ object VehiclePartTypes {
     val DOOR = ResourceLocation(SkyridersMod.MOD_ID, "door")
     val FUEL_CAP = ResourceLocation(SkyridersMod.MOD_ID, "fuel_cap")
     val STORAGE = ResourceLocation(SkyridersMod.MOD_ID, "storage")
+    val JUKEBOX = ResourceLocation(SkyridersMod.MOD_ID, "jukebox")
 }
 
 data class VehicleSeatDefinition(

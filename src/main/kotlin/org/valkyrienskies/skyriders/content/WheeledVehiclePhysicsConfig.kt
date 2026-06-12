@@ -307,7 +307,7 @@ data class WheeledVehiclePhysicsConfig(
             stepAssistStrength = 10500.0,
             transmission = VehicleTransmissionConfig(
                 automatic = false,
-                manualClutch = false,
+                manualClutch = true,
                 finalDriveRatio = 4.1,
                 reverseGearRatio = 3.4,
                 forwardGears = listOf(

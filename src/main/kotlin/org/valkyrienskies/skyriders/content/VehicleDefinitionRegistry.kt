@@ -528,7 +528,8 @@ object WheeledVehicleDefinitions {
                 VehiclePartDefinition(
                     id = "truck_bed",
                     type = VehiclePartTypes.STORAGE
-                )
+                ),
+                VehicleJukebox.partDefinition()
             )
         )
     }
