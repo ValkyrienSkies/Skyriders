@@ -9,6 +9,7 @@
   ],
   "client": [
     "client.MixinCamera",
+    "client.MixinClientPacketListener",
     "client.MixinEntityRenderDispatcher",
     "client.MixinGameRenderer"
   ],
