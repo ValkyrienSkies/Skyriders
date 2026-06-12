@@ -17,7 +17,8 @@ object RaceCompassClientState {
     }
 
     fun angle(entity: Entity?, seed: Int): Float {
-        val level = Minecraft.getInstance().level ?: return spin(seed)
+        val minecraft = Minecraft.getInstance()
+        val level = minecraft.level ?: return spin(seed)
         val currentTarget = target
         if (entity == null || currentTarget == null || level.gameTime - lastUpdateTick > 40L) {
             return spin(seed)
@@ -26,8 +27,9 @@ object RaceCompassClientState {
         val dz = currentTarget.z - entity.z
         if (dx * dx + dz * dz < 1.0E-4) return 0.0f
         val targetAngle = atan2(dz, dx) / (Math.PI * 2.0)
-        val entityYaw = Mth.positiveModulo(entity.yRot.toDouble() / 360.0, 1.0)
-        return Mth.positiveModulo((0.5 - (entityYaw - targetAngle)).toFloat(), 1.0f)
+        val visualYaw = minecraft.cameraEntity?.yRot ?: entity.yRot
+        val entityYaw = Mth.positiveModulo(visualYaw.toDouble() / 360.0, 1.0)
+        return Mth.positiveModulo((targetAngle - entityYaw).toFloat(), 1.0f)
     }
 
     fun tick() {
