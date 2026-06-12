@@ -74,9 +74,11 @@ object VehicleImpactDamageHandler {
         val massScale = sqrt(body.mass / 300.0).coerceIn(0.65, 2.3)
         val footprint = max(0.1, body.collisionBoxSize.x * body.collisionBoxSize.z)
         val sizeScale = sqrt(footprint / 1.6).coerceIn(0.75, 1.9)
+        val impactScale = body.impactDamageScale.takeIf { it.isFinite() && it > 0.0 } ?: 1.0
+        val maxDamage = body.impactDamageCap.takeIf { it.isFinite() && it > 0.0 } ?: MAX_DAMAGE
         return (speedOverThreshold * DAMAGE_PER_SPEED_OVER_THRESHOLD * massScale * sizeScale *
-            VehicleImpairmentEffects.impactDamageMultiplier(driver))
-            .coerceIn(0.0, MAX_DAMAGE)
+            impactScale * VehicleImpairmentEffects.impactDamageMultiplier(driver))
+            .coerceIn(0.0, maxDamage)
     }
 
     private fun canDamage(target: LivingEntity): Boolean {
@@ -106,8 +108,14 @@ object VehicleImpactDamageHandler {
     }
 
     private fun transformedBodyBox(body: VehicleBodyDefinition, transform: Matrix4dc): AABB {
-        val half = Vector3d(body.collisionBoxSize).mul(0.5)
-        val offset = body.collisionBoxOffset
+        return body.resolvedCollisionBoxes()
+            .map { transformedCollisionBox(it, transform) }
+            .reduce(::union)
+    }
+
+    private fun transformedCollisionBox(box: VehicleCollisionBoxDefinition, transform: Matrix4dc): AABB {
+        val half = Vector3d(box.size).mul(0.5)
+        val offset = box.offset
         var minX = Double.POSITIVE_INFINITY
         var minY = Double.POSITIVE_INFINITY
         var minZ = Double.POSITIVE_INFINITY

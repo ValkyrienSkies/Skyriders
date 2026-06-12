@@ -61,7 +61,34 @@ data class VehicleBodyDefinition(
     val collisionBoxSize: Vector3d,
     val collisionBoxOffset: Vector3d,
     val mass: Double,
-    val centerOfMassOffset: Vector3d = Vector3d()
+    val centerOfMassOffset: Vector3d = Vector3d(),
+    val collisionBoxes: List<VehicleCollisionBoxDefinition> = emptyList(),
+    val impactDamageScale: Double = 1.0,
+    val impactDamageCap: Double = 20.0
+) {
+    fun resolvedCollisionBoxes(): List<VehicleCollisionBoxDefinition> {
+        return collisionBoxes
+            .filter { it.size.isPositiveFinite() && it.offset.isFinite() }
+            .ifEmpty {
+                listOf(
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(collisionBoxSize),
+                        offset = Vector3d(collisionBoxOffset)
+                    )
+                )
+            }
+            .map { box ->
+                VehicleCollisionBoxDefinition(
+                    size = Vector3d(box.size),
+                    offset = Vector3d(box.offset)
+                )
+            }
+    }
+}
+
+data class VehicleCollisionBoxDefinition(
+    val size: Vector3d,
+    val offset: Vector3d
 )
 
 data class VehicleRenderDefinition(
@@ -81,6 +108,7 @@ data class VehicleRenderDefinition(
     val exhaustLocalPos: Vector3d = Vector3d(),
     val tireParticleLocalYOffset: Double = 0.0,
     val wheelParts: List<VehicleWheelRenderDefinition> = emptyList(),
+    val modelParts: List<VehicleModelPartRenderDefinition> = emptyList(),
     val exhaustPoints: List<VehicleEffectPointDefinition> = emptyList(),
     val tireParticlePoints: List<VehicleEffectPointDefinition> = emptyList()
 ) {
@@ -157,6 +185,7 @@ data class VehicleSoundDefinition(
     val engineStart: ResourceLocation? = null,
     val engineStartFail: ResourceLocation? = null,
     val engineStop: ResourceLocation? = null,
+    val horn: ResourceLocation? = null,
     val gearShift: ResourceLocation? = null,
     val handbrakeEngage: ResourceLocation? = null,
     val handbrakeDisengage: ResourceLocation? = null,
@@ -177,6 +206,7 @@ data class VehicleSoundDefinition(
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
             engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
             engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop"),
+            horn = ResourceLocation(SkyridersMod.MOD_ID, "horn"),
             idleVolume = 0.2,
             speedVolume = 0.2,
             throttleVolume = 0.2,
@@ -192,6 +222,7 @@ data class VehicleSoundDefinition(
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "engine_start"),
             engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
             engineStop = ResourceLocation(SkyridersMod.MOD_ID, "engine_stop"),
+            horn = ResourceLocation(SkyridersMod.MOD_ID, "horn"),
             gearShift = ResourceLocation(SkyridersMod.MOD_ID, "gearshift"),
             handbrakeEngage = ResourceLocation(SkyridersMod.MOD_ID, "handbrake_engage"),
             handbrakeDisengage = ResourceLocation(SkyridersMod.MOD_ID, "handbrake_disengage"),
@@ -229,6 +260,16 @@ data class VehicleInteractionZone(
     val sounds: Map<ResourceLocation, VehicleInteractionSoundDefinition> = emptyMap()
 )
 
+data class VehicleModelPartRenderDefinition(
+    val id: String,
+    val model: ResourceLocation,
+    val pivot: Vector3d = Vector3d(),
+    val visualOffset: Vector3d = Vector3d(),
+    val closedRotationDegrees: Vector3d = Vector3d(),
+    val openRotationDegrees: Vector3d = Vector3d(),
+    val partStateId: String? = null
+)
+
 data class VehicleInteractionSoundDefinition(
     val sound: ResourceLocation,
     val volume: Float = 0.6f,
@@ -251,6 +292,7 @@ object VehicleControlActions {
     val TOGGLE_PARKING_BRAKE = ResourceLocation(SkyridersMod.MOD_ID, "toggle_parking_brake")
     val GEAR_UP = ResourceLocation(SkyridersMod.MOD_ID, "gear_up")
     val GEAR_DOWN = ResourceLocation(SkyridersMod.MOD_ID, "gear_down")
+    val HORN = ResourceLocation(SkyridersMod.MOD_ID, "horn")
 }
 
 data class VehiclePartDefinition(
@@ -285,7 +327,8 @@ data class VehicleSeatDefinition(
     val id: String,
     val localPos: Vector3d,
     val role: VehicleSeatRole,
-    val interactionZone: String
+    val interactionZone: String,
+    val requiredOpenPartId: String? = null
 )
 
 enum class VehicleSeatRole {
@@ -494,6 +537,14 @@ fun fuelCapPartDefinition(): VehiclePartDefinition = VehiclePartDefinition(
     interactionActions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE)
 )
 
+private fun Vector3d.isFinite(): Boolean {
+    return x.isFinite() && y.isFinite() && z.isFinite()
+}
+
+private fun Vector3d.isPositiveFinite(): Boolean {
+    return isFinite() && x > 0.0 && y > 0.0 && z > 0.0
+}
+
 fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
     id = id,
     displayName = displayName,
@@ -556,6 +607,7 @@ fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = Veh
     engineStart = engineStart,
     engineStartFail = ResourceLocation(SkyridersMod.MOD_ID, "engine_start_fail"),
     engineStop = engineStop,
+    horn = horn,
     idleVolume = idleVolume,
     speedVolume = speedVolume,
     throttleVolume = throttleVolume,

@@ -29,6 +29,16 @@
     ],
     "subtitle": "skyriders.subtitle.bike_engine_stop"
   },
+  "bike_horn": {
+    "sounds": [
+      {
+        "name": "skyriders:bike_horn",
+        "type": "file",
+        "attenuation_distance": 64
+      }
+    ],
+    "subtitle": "skyriders.subtitle.bike_horn"
+  },
   "boost": {
     "sounds": [
       {
@@ -89,6 +99,56 @@
     ],
     "subtitle": "skyriders.subtitle.engine_stop"
   },
+  "horn": {
+    "sounds": [
+      {
+        "name": "skyriders:generic/horn",
+        "type": "file",
+        "attenuation_distance": 64
+      }
+    ],
+    "subtitle": "skyriders.subtitle.horn"
+  },
+  "truck_engine": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_engine",
+        "type": "file",
+        "attenuation_distance": 40
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_engine"
+  },
+  "truck_engine_start": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_engine_start",
+        "type": "file",
+        "attenuation_distance": 40
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_engine_start"
+  },
+  "truck_engine_stop": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_engine_stop",
+        "type": "file",
+        "attenuation_distance": 40
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_engine_stop"
+  },
+  "truck_horn": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_horn",
+        "type": "file",
+        "attenuation_distance": 80
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_horn"
+  },
   "gearshift": {
     "sounds": [
       {
@@ -128,6 +188,26 @@
       }
     ],
     "subtitle": "skyriders.subtitle.handbrake_disengage"
+  },
+  "truck_door_open": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_door_open",
+        "type": "file",
+        "attenuation_distance": 24
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_door_open"
+  },
+  "truck_door_close": {
+    "sounds": [
+      {
+        "name": "skyriders:vehicles/truck_door_close",
+        "type": "file",
+        "attenuation_distance": 24
+      }
+    ],
+    "subtitle": "skyriders.subtitle.truck_door_close"
   },
   "engine_start_fail": {
     "sounds": [

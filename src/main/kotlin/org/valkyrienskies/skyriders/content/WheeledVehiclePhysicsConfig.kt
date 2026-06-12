@@ -237,6 +237,107 @@ data class WheeledVehiclePhysicsConfig(
                 shiftCooldownSeconds = 0.32
             )
         )
+
+        val TRUCK = WheeledVehiclePhysicsConfig(
+            mass = 2450.0,
+            collisionBoxSize = Vector3d(2.45, 1.55, 5.65),
+            collisionBoxOffset = Vector3d(0.0, 0.64, 0.0),
+            axles = listOf(
+                WheelAxleConfig(
+                    id = "front",
+                    localZ = 1.95,
+                    halfTrackWidth = 1.02,
+                    localY = -0.34,
+                    wheelRadius = 0.47,
+                    wheelWidth = 0.32,
+                    driven = true,
+                    driveBias = 0.38,
+                    steerable = true,
+                    steerScale = 1.0,
+                    brakeBias = 0.6,
+                    suspensionRestLength = 0.48,
+                    suspensionTravel = 0.56,
+                    suspensionStrength = 102000.0,
+                    suspensionDamping = 11800.0,
+                    lateralGrip = 1.04,
+                    longitudinalGrip = 1.02,
+                    stepAssist = true
+                ),
+                WheelAxleConfig(
+                    id = "rear",
+                    localZ = -1.85,
+                    halfTrackWidth = 1.02,
+                    localY = -0.34,
+                    wheelRadius = 0.47,
+                    wheelWidth = 0.32,
+                    driven = true,
+                    driveBias = 0.62,
+                    steerable = false,
+                    brakeBias = 0.4,
+                    suspensionRestLength = 0.5,
+                    suspensionTravel = 0.58,
+                    suspensionStrength = 110000.0,
+                    suspensionDamping = 12600.0,
+                    lateralGrip = 1.0,
+                    longitudinalGrip = 1.12,
+                    stepAssist = true
+                )
+            ),
+            wheelSweepTime = 0.08,
+            wheelTopSpeed = 21.5,
+            maxSteerLowSpeedRad = Math.toRadians(28.0),
+            maxSteerHighSpeedRad = Math.toRadians(9.0),
+            steeringHighSpeedStart = 6.0,
+            steeringFullSpeed = 20.0,
+            steerSmoothingTime = 0.18,
+            tireFrictionCoefficient = 1.32,
+            lateralSlipShape = 0.27,
+            longitudinalSlipShape = 0.23,
+            motorResponse = 10.0,
+            brakeResponse = 25.0,
+            rollingResistance = 54.0,
+            uprightStrength = 34000.0,
+            uprightDamping = 6100.0,
+            yawAssist = 950.0,
+            yawAssistMinSpeed = 1.0,
+            yawAssistMaxSpeed = 16.0,
+            groundNormalSmoothingTime = 0.18,
+            parkingBrakeStrength = 6.0,
+            maxStepHeight = 1.1,
+            stepAssistStrength = 10500.0,
+            transmission = VehicleTransmissionConfig(
+                automatic = false,
+                manualClutch = false,
+                finalDriveRatio = 4.1,
+                reverseGearRatio = 3.4,
+                forwardGears = listOf(
+                    VehicleTransmissionGearConfig(maxSpeed = 5.5, torqueMultiplier = 2.1, launchTorqueScale = 1.0, gearRatio = 3.5),
+                    VehicleTransmissionGearConfig(maxSpeed = 10.5, torqueMultiplier = 1.45, launchTorqueScale = 0.7, gearRatio = 2.25),
+                    VehicleTransmissionGearConfig(maxSpeed = 15.5, torqueMultiplier = 0.95, launchTorqueScale = 0.34, gearRatio = 1.45),
+                    VehicleTransmissionGearConfig(maxSpeed = 21.5, torqueMultiplier = 0.62, launchTorqueScale = 0.14, gearRatio = 1.0)
+                ),
+                reverseTopSpeed = 5.0,
+                reverseTorqueMultiplier = 0.82,
+                shiftCooldownSeconds = 0.38
+            ),
+            engine = VehicleEngineConfig(
+                idleRpm = 700.0,
+                stallRpm = 420.0,
+                redlineRpm = 5200.0,
+                revLimiterRpm = 5400.0,
+                freeRevResponse = 5.5,
+                coupledRevResponse = 8.5,
+                clutchStallProtection = 0.55,
+                engineBrakeTorqueScale = 0.34,
+                torqueCurve = listOf(
+                    VehicleEngineTorquePoint(700.0, 0.82),
+                    VehicleEngineTorquePoint(1400.0, 1.08),
+                    VehicleEngineTorquePoint(2600.0, 1.0),
+                    VehicleEngineTorquePoint(4200.0, 0.72),
+                    VehicleEngineTorquePoint(5400.0, 0.38)
+                )
+            )
+        )
     }
 }
 

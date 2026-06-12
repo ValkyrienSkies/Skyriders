@@ -6,8 +6,10 @@ import net.minecraft.world.level.Level
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
+import net.minecraft.sounds.SoundSource
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import net.minecraftforge.registries.ForgeRegistries
 import org.joml.Matrix3d
 import org.joml.Quaterniond
 import org.joml.Vector3d
@@ -21,6 +23,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.mod.common.vsCore
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import org.valkyrienskies.skyriders.content.vehicles.wheeledRuntimeStateFromTag
@@ -35,9 +38,11 @@ import java.util.concurrent.ConcurrentHashMap
 object VehicleManager {
     private const val VEHICLES_KEY = "vehicles"
     private const val LEGACY_BIKES_KEY = "bikes"
+    private const val HORN_COOLDOWN_TICKS = 10L
     private val serverVehiclesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>>()
     private val clientVehiclesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, VehicleInput>>()
+    private val lastHornTickByVehicle = ConcurrentHashMap<Pair<DimensionId, BodyId>, Long>()
 
     val registeredVehicleIds: Set<ResourceLocation>
         get() = VehicleDefinitions.ids
@@ -136,12 +141,12 @@ object VehicleManager {
                     positionInModel = Vector3d()
                 ),
                 collisionShape = vsCore.newCompoundBodyShape(
-                    listOf(
+                    bodyDef.resolvedCollisionBoxes().map { box ->
                         vsCore.newCompoundBodyShapeChild(
-                            shape = vsCore.newBoxBodyShape(bodyDef.collisionBoxSize),
-                            position = bodyDef.collisionBoxOffset
+                            shape = vsCore.newBoxBodyShape(box.size),
+                            position = box.offset
                         )
-                    )
+                    }
                 ),
                 staticFrictionCoefficient = 0.25,
                 dynamicFrictionCoefficient = 0.25,
@@ -307,7 +312,10 @@ object VehicleManager {
     }
 
     fun applyControlAction(level: ServerLevel, bodyId: BodyId, action: ResourceLocation): Boolean {
-        val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return false
+        val vehicle = getVehicle(level.dimensionId, bodyId) ?: return false
+        if (action == VehicleControlActions.HORN) {
+            return playHorn(level, vehicle)
+        }
         var changed = false
         when (vehicle) {
             is KartVehicle -> {
@@ -364,6 +372,33 @@ object VehicleManager {
             BikeLifecycle.syncLevel(level)
         }
         return changed
+    }
+
+    private fun playHorn(level: ServerLevel, vehicle: IVehicle): Boolean {
+        val key = level.dimensionId to vehicle.bodyId
+        val now = level.gameTime
+        val last = lastHornTickByVehicle[key]
+        if (last != null && now - last < HORN_COOLDOWN_TICKS) return false
+
+        val soundId = vehicle.vehicleDefinition.sounds.horn ?: ResourceLocation(SkyridersMod.MOD_ID, "horn")
+        val sound = ForgeRegistries.SOUND_EVENTS.getValue(soundId) ?: return false
+        val position = try {
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: return false
+        } catch (_: IllegalStateException) {
+            return false
+        }
+        level.playSound(
+            null,
+            position.x,
+            position.y,
+            position.z,
+            sound,
+            SoundSource.NEUTRAL,
+            1.0f,
+            1.0f
+        )
+        lastHornTickByVehicle[key] = now
+        return true
     }
 
     fun mutatePartState(

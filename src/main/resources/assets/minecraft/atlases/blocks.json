@@ -19,6 +19,10 @@
     {
       "type": "single",
       "resource": "skyriders:vehicles/atv"
+    },
+    {
+      "type": "single",
+      "resource": "skyriders:vehicles/truck"
     }
   ]
 }

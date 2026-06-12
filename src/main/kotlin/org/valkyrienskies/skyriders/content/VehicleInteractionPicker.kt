@@ -82,20 +82,31 @@ object VehicleInteractionPicker {
         if (hits.isEmpty()) return null
         val vehicleDistanceSqr = hits.minOf(VehicleRayHit::distanceSqr)
         val best = hits.minWithOrNull(
-            compareByDescending<VehicleRayHit> { interactionPriority(it.zone) }
+            compareByDescending<VehicleRayHit> { interactionPriority(it.vehicle, it.zone) }
                 .thenBy { it.distanceSqr }
         ) ?: return null
         return best.copy(vehicleDistanceSqr = vehicleDistanceSqr)
     }
 
-    private fun interactionPriority(zone: VehicleInteractionZone): Int {
+    private fun interactionPriority(vehicle: IVehicle, zone: VehicleInteractionZone): Int {
         return when {
+            VehicleInteractionActions.OPEN_DOOR in zone.actions && !isPartOpen(vehicle, zone.partId) -> 35
             VehicleInteractionActions.MOUNT in zone.actions -> 30
             zone.partId != null -> 25
             VehicleInteractionActions.ENGINE_TOGGLE in zone.actions -> 20
             VehicleInteractionActions.PICK_UP in zone.actions -> 10
             else -> 0
         }
+    }
+
+    private fun isPartOpen(vehicle: IVehicle, partId: String?): Boolean {
+        if (partId == null) return false
+        vehicle.vehicleState.partStates[partId]?.data?.let { return it.getBoolean("open") }
+        return vehicle.vehicleDefinition.parts
+            .firstOrNull { it.id == partId }
+            ?.defaultState
+            ?.getBoolean("open")
+            ?: false
     }
 
     private fun fallbackBodyZone(definition: VehicleDefinition): VehicleInteractionZone {

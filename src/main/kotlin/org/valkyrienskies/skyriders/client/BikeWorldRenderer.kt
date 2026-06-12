@@ -23,6 +23,7 @@ import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleModelPartRenderDefinition
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleRefuelSources
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
@@ -134,6 +135,19 @@ object BikeWorldRenderer {
             }
         }
 
+        render.modelParts.forEach { modelPart ->
+            val partModel = minecraft.modelManager.getModel(modelPart.model)
+                .takeUnless { it === missingModel }
+            renderModelPart(
+                vehicle = vehicle,
+                poseStack = poseStack,
+                bufferSource = bufferSource,
+                modelPart = modelPart,
+                model = partModel,
+                packedLight = packedLight
+            )
+        }
+
         render.resolvedWheelParts().forEach { wheelPart ->
             val wheelModel = minecraft.modelManager.getModel(wheelPart.model)
                 .takeUnless { it === missingModel }
@@ -168,6 +182,41 @@ object BikeWorldRenderer {
             )
         }
 
+        poseStack.popPose()
+    }
+
+    private fun renderModelPart(
+        vehicle: IVehicle,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        modelPart: VehicleModelPartRenderDefinition,
+        model: BakedModel?,
+        packedLight: Int
+    ) {
+        val openAmount = modelPart.partStateId
+            ?.let { vehicle.vehicleState.partStates[it]?.data?.getBoolean("open") }
+            ?.let { if (it) 1.0 else 0.0 }
+            ?: 0.0
+        val rotation = Vector3d(modelPart.closedRotationDegrees).lerp(modelPart.openRotationDegrees, openAmount)
+
+        poseStack.pushPose()
+        if (modelPart.visualOffset.isFinite()) {
+            poseStack.translate(modelPart.visualOffset.x, modelPart.visualOffset.y, modelPart.visualOffset.z)
+        }
+        poseStack.translate(modelPart.pivot.x, modelPart.pivot.y, modelPart.pivot.z)
+        if (rotation.x.isFinite() && rotation.x != 0.0) {
+            poseStack.mulPose(Axis.XP.rotationDegrees(rotation.x.toFloat()))
+        }
+        if (rotation.y.isFinite() && rotation.y != 0.0) {
+            poseStack.mulPose(Axis.YP.rotationDegrees(rotation.y.toFloat()))
+        }
+        if (rotation.z.isFinite() && rotation.z != 0.0) {
+            poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.z.toFloat()))
+        }
+        poseStack.translate(-modelPart.pivot.x, -modelPart.pivot.y, -modelPart.pivot.z)
+        if (!VehicleOpenModelRenderer.renderIfNeeded(modelPart.model, poseStack, bufferSource, packedLight)) {
+            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
+        }
         poseStack.popPose()
     }
 

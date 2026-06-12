@@ -86,6 +86,7 @@ data class BikeSoundDefinition(
     val engineLoop: ResourceLocation? = null,
     val engineStart: ResourceLocation? = null,
     val engineStop: ResourceLocation? = null,
+    val horn: ResourceLocation? = null,
     val idleVolume: Double = 0.18,
     val speedVolume: Double = 0.18,
     val throttleVolume: Double = 0.16,
@@ -101,6 +102,7 @@ data class BikeSoundDefinition(
             engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine"),
             engineStart = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_start"),
             engineStop = ResourceLocation(SkyridersMod.MOD_ID, "bike_engine_stop"),
+            horn = ResourceLocation(SkyridersMod.MOD_ID, "bike_horn"),
             idleVolume = 0.22,
             speedVolume = 0.22,
             throttleVolume = 0.18

@@ -307,7 +307,9 @@ object WheeledVehicleDefinitions {
         fuelCapCenter = Vector3d(-0.92, 0.55, -1.16)
     )
 
-    private val definitionsById = listOf(ATV, CAR).associateBy(VehicleDefinition::id)
+    val PICKUP_TRUCK = pickupTruckDefinition()
+
+    private val definitionsById = listOf(ATV, CAR, PICKUP_TRUCK).associateBy(VehicleDefinition::id)
 
     val ids: Set<ResourceLocation>
         get() = definitionsById.keys
@@ -374,6 +376,133 @@ object WheeledVehicleDefinitions {
         behavior = WheeledVehicleBehaviorDefinition(physics),
         parts = listOf(fuelCapPartDefinition())
     )
+
+    private fun pickupTruckDefinition(): VehicleDefinition {
+        val physics = WheeledVehiclePhysicsConfig.TRUCK
+        val leftDoor = "left_door"
+        val rightDoor = "right_door"
+        val leftSeat = "left_seat"
+        val rightSeat = "right_seat"
+        return VehicleDefinition(
+            id = ResourceLocation(SkyridersMod.MOD_ID, "pickup_truck"),
+            displayName = "Pickup Truck",
+            body = VehicleBodyDefinition(
+                collisionBoxSize = Vector3d(physics.collisionBoxSize),
+                collisionBoxOffset = Vector3d(physics.collisionBoxOffset),
+                mass = physics.mass,
+                centerOfMassOffset = Vector3d(0.0, -0.24, -0.1),
+                collisionBoxes = listOf(
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.35, 0.82, 5.55),
+                        offset = Vector3d(0.0, 0.38, 0.0)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.18, 1.02, 2.15),
+                        offset = Vector3d(0.0, 1.04, 0.72)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.08, 0.74, 2.2),
+                        offset = Vector3d(0.0, 0.92, -1.58)
+                    )
+                ),
+                impactDamageScale = 1.65,
+                impactDamageCap = 38.0
+            ),
+            render = truckRender(),
+            sounds = VehicleSoundDefinition.GENERIC_ENGINE.copy(
+                engineLoop = ResourceLocation(SkyridersMod.MOD_ID, "truck_engine"),
+                engineStart = ResourceLocation(SkyridersMod.MOD_ID, "truck_engine_start"),
+                engineStop = ResourceLocation(SkyridersMod.MOD_ID, "truck_engine_stop"),
+                horn = ResourceLocation(SkyridersMod.MOD_ID, "truck_horn"),
+                idlePitch = 0.64,
+                speedPitch = 0.28,
+                throttlePitch = 0.22,
+                minPitch = 0.58,
+                maxPitch = 1.12,
+                referenceSpeed = 18.0
+            ),
+            seats = listOf(
+                VehicleSeatDefinition(
+                    id = "driver",
+                    localPos = Vector3d(-0.46, 0.3, 0.55),
+                    role = VehicleSeatRole.DRIVER,
+                    interactionZone = leftSeat,
+                    requiredOpenPartId = leftDoor
+                ),
+                VehicleSeatDefinition(
+                    id = "passenger",
+                    localPos = Vector3d(0.46, 0.3, 0.55),
+                    role = VehicleSeatRole.PASSENGER,
+                    interactionZone = rightSeat,
+                    requiredOpenPartId = rightDoor
+                )
+            ),
+            interactions = VehicleInteractionDefinition(
+                zones = listOf(
+                    VehicleInteractionZone(
+                        id = leftDoor,
+                        center = Vector3d(-1.18, 0.92, 0.72),
+                        size = Vector3d(0.36, 1.18, 1.24),
+                        actions = setOf(VehicleInteractionActions.OPEN_DOOR),
+                        partId = leftDoor,
+                        sounds = truckDoorSounds()
+                    ),
+                    VehicleInteractionZone(
+                        id = rightDoor,
+                        center = Vector3d(1.18, 0.92, 0.72),
+                        size = Vector3d(0.36, 1.18, 1.24),
+                        actions = setOf(VehicleInteractionActions.OPEN_DOOR),
+                        partId = rightDoor,
+                        sounds = truckDoorSounds()
+                    ),
+                    VehicleInteractionZone(
+                        id = leftSeat,
+                        center = Vector3d(-0.46, 0.82, 0.55),
+                        size = Vector3d(0.72, 0.72, 0.88),
+                        actions = setOf(VehicleInteractionActions.MOUNT)
+                    ),
+                    VehicleInteractionZone(
+                        id = rightSeat,
+                        center = Vector3d(0.46, 0.82, 0.55),
+                        size = Vector3d(0.72, 0.72, 0.88),
+                        actions = setOf(VehicleInteractionActions.MOUNT)
+                    ),
+                    VehicleInteractionZone(
+                        id = "truck_bed",
+                        center = Vector3d(0.0, 0.92, -1.62),
+                        size = Vector3d(1.94, 0.86, 1.82),
+                        actions = setOf(VehicleInteractionActions.STORAGE),
+                        partId = "truck_bed"
+                    ),
+                    VehicleInteractionZone(
+                        id = VehicleInteractionDefinition.FUEL_CAP,
+                        center = Vector3d(-1.14, 0.76, -1.98),
+                        size = Vector3d(0.36, 0.36, 0.36),
+                        actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
+                        partId = VehicleInteractionDefinition.FUEL_CAP
+                    )
+                )
+            ),
+            behavior = WheeledVehicleBehaviorDefinition(physics),
+            fuel = VehicleFuelDefinition(
+                capacity = 185.0,
+                idleUsePerSecond = 0.024,
+                throttleUsePerSecond = 0.098,
+                motionWorkUsePerSpeedPerSecond = 0.003,
+                driveWorkUsePerWorkSecond = 0.00115,
+                stepAssistUsePerWorkSecond = 0.014
+            ),
+            parts = listOf(
+                fuelCapPartDefinition(),
+                doorPartDefinition(leftDoor),
+                doorPartDefinition(rightDoor),
+                VehiclePartDefinition(
+                    id = "truck_bed",
+                    type = VehiclePartTypes.STORAGE
+                )
+            )
+        )
+    }
 
     private fun atvRender(): VehicleRenderDefinition {
         return VehicleRenderDefinition(
@@ -483,6 +612,99 @@ object WheeledVehicleDefinitions {
                 VehicleEffectPointDefinition("front_right_tire", Vector3d(0.74, -0.57, 1.25)),
                 VehicleEffectPointDefinition("rear_left_tire", Vector3d(-0.74, -0.57, -1.25)),
                 VehicleEffectPointDefinition("rear_right_tire", Vector3d(0.74, -0.57, -1.25))
+            )
+        )
+    }
+
+    private fun truckRender(): VehicleRenderDefinition {
+        val base = "vehicles/truck"
+        return VehicleRenderDefinition(
+            model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_body"),
+            texture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/bergentruckung.png"),
+            seatTexture = ResourceLocation(SkyridersMod.MOD_ID, "textures/vehicles/bergentruckung.png"),
+            showWheels = true,
+            modelYawRad = Math.PI,
+            modelScale = 1.28,
+            modelOffset = Vector3d(-0.64, -0.4, -0.64),
+            wheelSpinVisualScale = 0.46,
+            wheelSpinSmoothingTime = 0.12,
+            wheelParts = listOf(
+                VehicleWheelRenderDefinition(
+                    id = "front_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_flw"),
+                    pivot = Vector3d(0.5, 0.836053125, 0.5),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_blw"),
+                    pivot = Vector3d(0.5, 0.836053125, -1.75),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "rear_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_brw"),
+                    pivot = Vector3d(0.5, 0.836053125, -1.75),
+                    steerSource = VehicleWheelSteerSource.NONE,
+                    spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "steering_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_steer"),
+                    pivot = Vector3d(0.09375, 1.078125, -0.1906),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.NONE
+                )
+            ),
+            modelParts = listOf(
+                VehicleModelPartRenderDefinition(
+                    id = "left_door",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_ldoor"),
+                    pivot = Vector3d(-0.458915625, 1.156365625, 0.30245),
+                    openRotationDegrees = Vector3d(0.0, -68.0, 0.0),
+                    partStateId = "left_door"
+                ),
+                VehicleModelPartRenderDefinition(
+                    id = "right_door",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_rdoor"),
+                    pivot = Vector3d(1.458915625, 1.156365625, 0.30245),
+                    openRotationDegrees = Vector3d(0.0, 68.0, 0.0),
+                    partStateId = "right_door"
+                )
+            ),
+            exhaustPoints = listOf(
+                VehicleEffectPointDefinition("left_rear_exhaust", Vector3d(-0.76, 0.22, -2.46)),
+                VehicleEffectPointDefinition("right_rear_exhaust", Vector3d(0.76, 0.22, -2.46))
+            ),
+            tireParticlePoints = listOf(
+                VehicleEffectPointDefinition("front_left_tire", Vector3d(-1.02, -0.7, 1.95)),
+                VehicleEffectPointDefinition("front_right_tire", Vector3d(1.02, -0.7, 1.95)),
+                VehicleEffectPointDefinition("rear_left_tire", Vector3d(-1.02, -0.7, -1.85)),
+                VehicleEffectPointDefinition("rear_right_tire", Vector3d(1.02, -0.7, -1.85))
+            )
+        )
+    }
+
+    private fun doorPartDefinition(id: String): VehiclePartDefinition = VehiclePartDefinition(
+        id = id,
+        type = VehiclePartTypes.DOOR,
+        defaultState = net.minecraft.nbt.CompoundTag().apply { putBoolean("open", false) },
+        interactionActions = setOf(VehicleInteractionActions.OPEN_DOOR)
+    )
+
+    private fun truckDoorSounds(): Map<ResourceLocation, VehicleInteractionSoundDefinition> {
+        return mapOf(
+            VehicleInteractionActions.OPEN to VehicleInteractionSoundDefinition(
+                sound = ResourceLocation(SkyridersMod.MOD_ID, "truck_door_open"),
+                volume = 0.72f,
+                pitch = 1.0f
+            ),
+            VehicleInteractionActions.CLOSE to VehicleInteractionSoundDefinition(
+                sound = ResourceLocation(SkyridersMod.MOD_ID, "truck_door_close"),
+                volume = 0.72f,
+                pitch = 1.0f
             )
         )
     }

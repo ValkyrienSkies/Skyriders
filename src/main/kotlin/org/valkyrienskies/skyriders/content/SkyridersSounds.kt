@@ -23,6 +23,9 @@ object SkyridersSounds {
     val BIKE_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_engine_stop") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_engine_stop"))
     }
+    val BIKE_HORN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("bike_horn") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "bike_horn"))
+    }
 
     val KART_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("kart_engine") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "karts/kart_engine"))
@@ -42,6 +45,21 @@ object SkyridersSounds {
     val GENERIC_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_stop") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_stop"))
     }
+    val GENERIC_HORN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("horn") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "horn"))
+    }
+    val TRUCK_ENGINE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_engine") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_engine"))
+    }
+    val TRUCK_ENGINE_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_engine_start") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_engine_start"))
+    }
+    val TRUCK_ENGINE_STOP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_engine_stop") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_engine_stop"))
+    }
+    val TRUCK_HORN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_horn") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_horn"))
+    }
 
     //group mechanical
     val GEARSHIFT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("gearshift") {
@@ -52,6 +70,12 @@ object SkyridersSounds {
     }
     val HANDBRAKE_DISENGAGE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("handbrake_disengage") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "handbrake_disengage"))
+    }
+    val TRUCK_DOOR_OPEN_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_door_open") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_door_open"))
+    }
+    val TRUCK_DOOR_CLOSE_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("truck_door_close") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_door_close"))
     }
 
     //group racing

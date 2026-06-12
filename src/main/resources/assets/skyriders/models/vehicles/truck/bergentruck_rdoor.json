@@ -2,6 +2,9 @@
 	"credit": "Made with Blockbench",
 	"loader": "framework:open_model",
 	"texture_size": [256, 256],
+	"textures": {
+		"bergentruckung": "skyriders:vehicles/bergentruckung"
+	},
 	"components": [
 		{
 			"from": [20.9675, 23.25369, 1.72869],

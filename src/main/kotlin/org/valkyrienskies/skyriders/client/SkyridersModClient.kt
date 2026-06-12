@@ -80,6 +80,12 @@ object SkyridersModClient {
         GLFW.GLFW_KEY_C,
         "key.categories.skyriders"
     )
+    private val vehicleHornKey = KeyMapping(
+        "key.skyriders.vehicle_horn",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_H,
+        "key.categories.skyriders"
+    )
 
     @JvmStatic
     fun clientInit(event: FMLClientSetupEvent) {
@@ -118,6 +124,7 @@ object SkyridersModClient {
         event.register(vehicleGearUpKey)
         event.register(vehicleGearDownKey)
         event.register(vehicleClutchKey)
+        event.register(vehicleHornKey)
     }
 
     @JvmStatic
@@ -137,7 +144,8 @@ object SkyridersModClient {
             .flatMap { definition ->
                 listOfNotNull(
                     definition.render.model
-                ) + definition.render.resolvedWheelParts().map { it.model }
+                ) + definition.render.resolvedWheelParts().map { it.model } +
+                    definition.render.modelParts.map { it.model }
             }
             .distinct()
             .forEach(event::register)
@@ -183,6 +191,9 @@ object SkyridersModClient {
             }
             while (vehicleGearDownKey.consumeClick()) {
                 SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_DOWN)
+            }
+            while (vehicleHornKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.HORN)
             }
 
             val options = minecraft.options

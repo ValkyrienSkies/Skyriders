@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
@@ -96,8 +97,25 @@ object BikeInteractionHandler {
 
         val seatDefinition = vehicle.vehicleDefinition.seats.firstOrNull { it.interactionZone == interactionZoneId }
             ?: vehicle.vehicleDefinition.seats.firstOrNull { it.id == VehicleInteractionDefinition.SEAT }
+        val requiredOpenPartId = seatDefinition?.requiredOpenPartId
+        if (requiredOpenPartId != null && !isPartOpen(vehicle, requiredOpenPartId)) {
+            if (notifyPlayer) {
+                player.sendSystemMessage(Component.literal("Open the door first."))
+            } else {
+                player.displayClientMessage(Component.literal("Open the door first."), true)
+            }
+            return false
+        }
         val seatLocalPos = seatDefinition?.localPos ?: Vector3d(0.0, 0.35, 0.0)
         val seatWorld = transform.toWorld.transformPosition(Vector3d(seatLocalPos))
+        if (seatDefinition != null && isSeatOccupied(level, vehicle.bodyId, seatDefinition.id, seatWorld)) {
+            if (notifyPlayer) {
+                player.sendSystemMessage(Component.literal("That seat is occupied."))
+            } else {
+                player.displayClientMessage(Component.literal("That seat is occupied."), true)
+            }
+            return false
+        }
         val forward = transform.rotation.transform(Vector3d(0.0, 0.0, 1.0))
         val yaw = Math.toDegrees(atan2(-forward.x, forward.z)).toFloat()
         val seat = SkyridersMod.BIKE_SEAT_ENTITY.get().create(level)
@@ -168,6 +186,24 @@ object BikeInteractionHandler {
         }
 
         return false
+    }
+
+    private fun isSeatOccupied(level: ServerLevel, bodyId: BodyId, seatId: String, seatWorld: Vector3dc): Boolean {
+        val query = AABB.ofSize(Vec3(seatWorld.x(), seatWorld.y(), seatWorld.z()), 3.0, 3.0, 3.0)
+        return level.getEntitiesOfClass(BikeSeatEntity::class.java, query) { seat ->
+            seat != null && seat.bodyId == bodyId && seat.seatId == seatId && seat.passengers.isNotEmpty()
+        }.isNotEmpty()
+    }
+
+    private fun isPartOpen(vehicle: IVehicle, partId: String): Boolean {
+        vehicle.vehicleState.partStates[partId]?.data?.let { state ->
+            return state.getBoolean("open")
+        }
+        return vehicle.vehicleDefinition.parts
+            .firstOrNull { it.id == partId }
+            ?.defaultState
+            ?.getBoolean("open")
+            ?: false
     }
 
     private fun applyHeldRaceFlag(player: ServerPlayer, level: ServerLevel, vehicle: IVehicle): Boolean {
