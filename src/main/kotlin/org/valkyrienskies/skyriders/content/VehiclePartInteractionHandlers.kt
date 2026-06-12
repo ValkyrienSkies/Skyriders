@@ -86,6 +86,7 @@ object VehiclePartInteractionHandlers {
             player.displayClientMessage(Component.literal("${vehicle.vehicleDefinition.displayName} tank is already full"), true)
             return true
         }
+        VehicleRefuelSources.consumeHeldRefuelSource(player)
         player.displayClientMessage(Component.literal("Refueled ${vehicle.vehicleDefinition.displayName}"), true)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)

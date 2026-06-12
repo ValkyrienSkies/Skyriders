@@ -1,0 +1,31 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "WTW",
+    "CSE",
+    "WMW"
+  ],
+  "key": {
+    "C": {
+      "item": "minecraft:chest"
+    },
+    "E": {
+      "item": "skyriders:engine"
+    },
+    "M": {
+      "item": "minecraft:minecart"
+    },
+    "S": {
+      "item": "skyriders:suspension"
+    },
+    "T": {
+      "item": "skyriders:transmission"
+    },
+    "W": {
+      "item": "skyriders:truck_wheel"
+    }
+  },
+  "result": {
+    "item": "skyriders:pickup_truck"
+  }
+}

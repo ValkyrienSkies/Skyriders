@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "skyriders:creative_jerry_can"
+    "skyriders:creative_jerry_can",
+    "minecraft:honey_bottle"
   ]
 }

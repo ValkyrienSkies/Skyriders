@@ -2,6 +2,7 @@ package org.valkyrienskies.skyriders
 
 import net.minecraft.core.registries.Registries
 import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.MobCategory
@@ -60,6 +61,7 @@ import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyTankItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
+import org.valkyrienskies.skyriders.content.item.OpenModelComponentItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.RacingDispenserBehaviors
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
@@ -212,6 +214,42 @@ object SkyridersMod {
     val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
         RaceCompassItem(Item.Properties().stacksTo(1))
     }
+    val BIKE_WHEEL: RegistryObject<Item> = ITEMS.register("bike_wheel") {
+        OpenModelComponentItem(
+            Item.Properties().stacksTo(64),
+            ResourceLocation(MOD_ID, "bikes/dirt_bike/dirt_bike_bwheel"),
+            previewScale = 1.05f
+        )
+    }
+    val TRUCK_WHEEL: RegistryObject<Item> = ITEMS.register("truck_wheel") {
+        OpenModelComponentItem(
+            Item.Properties().stacksTo(64),
+            ResourceLocation(MOD_ID, "vehicles/truck/bergentruck_brw"),
+            previewScale = 0.55f,
+            noCull = true
+        )
+    }
+    val ENGINE_COMPONENT: RegistryObject<Item> = ITEMS.register("engine_component") {
+        Item(Item.Properties().stacksTo(64))
+    }
+    val ENGINE: RegistryObject<Item> = ITEMS.register("engine") {
+        Item(Item.Properties().stacksTo(16))
+    }
+    val BIKE_ENGINE: RegistryObject<Item> = ITEMS.register("bike_engine") {
+        Item(Item.Properties().stacksTo(16))
+    }
+    val SPRING: RegistryObject<Item> = ITEMS.register("spring") {
+        Item(Item.Properties().stacksTo(64))
+    }
+    val GEAR: RegistryObject<Item> = ITEMS.register("gear") {
+        Item(Item.Properties().stacksTo(64))
+    }
+    val TRANSMISSION: RegistryObject<Item> = ITEMS.register("transmission") {
+        Item(Item.Properties().stacksTo(16))
+    }
+    val SUSPENSION: RegistryObject<Item> = ITEMS.register("suspension") {
+        Item(Item.Properties().stacksTo(16))
+    }
     val DIRT_BIKE_ITEM: RegistryObject<Item> = ITEMS.register(BikeDefinitions.DIRT_BIKE.id.path) {
         VehicleSpawnItem(Item.Properties().stacksTo(16), BikeDefinitions.DIRT_BIKE.id)
     }
@@ -256,6 +294,15 @@ object SkyridersMod {
                 output.accept(ITEM_BOX.get())
                 output.accept(RACING_ROULETTE.get())
                 output.accept(RACE_COMPASS.get())
+                output.accept(BIKE_WHEEL.get())
+                output.accept(TRUCK_WHEEL.get())
+                output.accept(ENGINE_COMPONENT.get())
+                output.accept(ENGINE.get())
+                output.accept(BIKE_ENGINE.get())
+                output.accept(SPRING.get())
+                output.accept(GEAR.get())
+                output.accept(TRANSMISSION.get())
+                output.accept(SUSPENSION.get())
                 output.accept(DIRT_BIKE_ITEM.get())
                 output.accept(SPEEDSTER_ITEM.get())
                 output.accept(ATV_ITEM.get())

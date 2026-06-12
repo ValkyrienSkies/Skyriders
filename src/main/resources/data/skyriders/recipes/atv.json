@@ -1,0 +1,31 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "WLW",
+    "TSE",
+    "WIW"
+  ],
+  "key": {
+    "E": {
+      "item": "skyriders:engine"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "L": {
+      "item": "minecraft:leather"
+    },
+    "S": {
+      "item": "skyriders:suspension"
+    },
+    "T": {
+      "item": "skyriders:transmission"
+    },
+    "W": {
+      "item": "skyriders:bike_wheel"
+    }
+  },
+  "result": {
+    "item": "skyriders:atv"
+  }
+}
