@@ -393,12 +393,12 @@ object WheeledVehicleDefinitions {
                 centerOfMassOffset = Vector3d(0.0, -0.24, -0.1),
                 collisionBoxes = listOf(
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.54, 0.62, 2.25),
-                        offset = Vector3d(0.0, -0.38, 0.65)
+                        size = Vector3d(2.54, 0.38, 2.25),
+                        offset = Vector3d(0.0, -0.26, 0.65)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.34, 0.24, 2.5),
-                        offset = Vector3d(0.0, -0.54, -1.56)
+                        size = Vector3d(2.34, 0.12, 2.5),
+                        offset = Vector3d(0.0, -0.48, -1.56)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.32, 0.82, 1.25),
@@ -655,6 +655,7 @@ object WheeledVehicleDefinitions {
             modelYawRad = Math.PI,
             modelScale = 1.28,
             modelOffset = Vector3d(-0.64, -1.08, -0.64),
+            renderOpenModelNoCull = true,
             wheelSpinVisualScale = 0.46,
             wheelSpinSmoothingTime = 0.12,
             wheelParts = listOf(
@@ -706,14 +707,16 @@ object WheeledVehicleDefinitions {
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_ldoor"),
                     pivot = Vector3d(-0.458915625, 1.156365625, -0.130723125),
                     openRotationDegrees = Vector3d(0.0, -68.0, 0.0),
-                    partStateId = "left_door"
+                    partStateId = "left_door",
+                    renderOpenModelNoCull = true
                 ),
                 VehicleModelPartRenderDefinition(
                     id = "right_door",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_rdoor"),
                     pivot = Vector3d(1.458915625, 1.156365625, -0.130723125),
                     openRotationDegrees = Vector3d(0.0, 68.0, 0.0),
-                    partStateId = "right_door"
+                    partStateId = "right_door",
+                    renderOpenModelNoCull = true
                 )
             ),
             exhaustPoints = listOf(

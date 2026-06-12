@@ -113,6 +113,7 @@ data class VehicleRenderDefinition(
     val modelYawRad: Double = Math.PI,
     val modelOffset: Vector3d = Vector3d(),
     val modelScale: Double = 1.0,
+    val renderOpenModelNoCull: Boolean = false,
     val wheelSpinVisualScale: Double = 1.0,
     val wheelSpinSmoothingTime: Double = 0.08,
     val exhaustLocalPos: Vector3d = Vector3d(),
@@ -285,7 +286,8 @@ data class VehicleModelPartRenderDefinition(
     val visualOffset: Vector3d = Vector3d(),
     val closedRotationDegrees: Vector3d = Vector3d(),
     val openRotationDegrees: Vector3d = Vector3d(),
-    val partStateId: String? = null
+    val partStateId: String? = null,
+    val renderOpenModelNoCull: Boolean = false
 )
 
 data class VehicleInteractionSoundDefinition(

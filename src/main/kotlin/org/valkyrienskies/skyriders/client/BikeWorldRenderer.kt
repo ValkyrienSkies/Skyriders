@@ -131,7 +131,7 @@ object BikeWorldRenderer {
         poseStack.translate(render.modelOffset.x, render.modelOffset.y, render.modelOffset.z)
         poseStack.scale(render.modelScale.toFloat(), render.modelScale.toFloat(), render.modelScale.toFloat())
 
-        if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight)) {
+        if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight, render.renderOpenModelNoCull)) {
             model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) } ?: run {
                 poseStack.popPose()
                 return
@@ -217,7 +217,14 @@ object BikeWorldRenderer {
             poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.z.toFloat()))
         }
         poseStack.translate(-modelPart.pivot.x, -modelPart.pivot.y, -modelPart.pivot.z)
-        if (!VehicleOpenModelRenderer.renderIfNeeded(modelPart.model, poseStack, bufferSource, packedLight)) {
+        if (!VehicleOpenModelRenderer.renderIfNeeded(
+                modelPart.model,
+                poseStack,
+                bufferSource,
+                packedLight,
+                modelPart.renderOpenModelNoCull
+            )
+        ) {
             model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
         }
         poseStack.popPose()

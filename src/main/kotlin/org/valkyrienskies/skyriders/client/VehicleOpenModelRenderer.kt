@@ -25,8 +25,10 @@ object VehicleOpenModelRenderer {
         modelLocation: ResourceLocation,
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
-        packedLight: Int
+        packedLight: Int,
+        forceRender: Boolean = false
     ): Boolean {
+        if (!forceRender) return false
         val model = getModel(modelLocation) ?: return false
 
         val minecraft = Minecraft.getInstance()
@@ -47,20 +49,6 @@ object VehicleOpenModelRenderer {
                     .overlayCoords(OverlayTexture.NO_OVERLAY)
                     .uv2(packedLight)
                     .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
-                    .endVertex()
-            }
-            val backNormal = Vector3f(face.normal).negate()
-            val backShade = faceShade(backNormal)
-            val backColor = (backShade * 255.0f).toInt().coerceIn(0, 255)
-            for (i in 3 downTo 0) {
-                val vertex = face.vertices[i]
-                val uv = face.uvs[i]
-                consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
-                    .color(backColor, backColor, backColor, 255)
-                    .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
-                    .overlayCoords(OverlayTexture.NO_OVERLAY)
-                    .uv2(packedLight)
-                    .normal(pose.normal(), backNormal.x(), backNormal.y(), backNormal.z())
                     .endVertex()
             }
         }
@@ -90,20 +78,6 @@ object VehicleOpenModelRenderer {
                     .overlayCoords(OverlayTexture.NO_OVERLAY)
                     .uv2(packedLight)
                     .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
-                    .endVertex()
-            }
-            val backNormal = Vector3f(face.normal).negate()
-            val backShade = faceShade(backNormal)
-            val backColor = (backShade * 255.0f).toInt().coerceIn(0, 255)
-            for (i in 3 downTo 0) {
-                val vertex = face.vertices[i]
-                val uv = face.uvs[i]
-                consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
-                    .color(backColor, backColor, backColor, 255)
-                    .uv((uv.x() / model.textureWidth).toFloat(), (uv.y() / model.textureHeight).toFloat())
-                    .overlayCoords(OverlayTexture.NO_OVERLAY)
-                    .uv2(packedLight)
-                    .normal(pose.normal(), backNormal.x(), backNormal.y(), backNormal.z())
                     .endVertex()
             }
         }
