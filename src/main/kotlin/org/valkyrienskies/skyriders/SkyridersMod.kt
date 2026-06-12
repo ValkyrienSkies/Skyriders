@@ -221,7 +221,7 @@ object SkyridersMod {
         StormchasingDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     }
 
-    val FTV_DISC: RegistryObject<Item> = ITEMS.register("fasterthanvalkyrie_disc") {
+    val FTV_DISC: RegistryObject<Item> = ITEMS.register("fasterthanavalkyrie_disc") {
         FasterThanValkyrieDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     }
 

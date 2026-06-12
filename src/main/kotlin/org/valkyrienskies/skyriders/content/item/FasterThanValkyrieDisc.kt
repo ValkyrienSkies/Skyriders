@@ -29,6 +29,6 @@ class FasterThanValkyrieDisc : RecordItem {
     }
 
     override fun getDescriptionId(): String {
-        return "item.${SkyridersMod.MOD_ID}.fasterthanvalkyrie_disc"
+        return "item.${SkyridersMod.MOD_ID}.fasterthanavalkyrie_disc"
     }
 }
