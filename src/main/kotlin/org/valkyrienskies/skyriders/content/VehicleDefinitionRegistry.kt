@@ -393,8 +393,8 @@ object WheeledVehicleDefinitions {
                 centerOfMassOffset = Vector3d(0.0, -0.24, -0.1),
                 collisionBoxes = listOf(
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.54, 0.62, 2.95),
-                        offset = Vector3d(0.0, -0.38, 1.08)
+                        size = Vector3d(2.54, 0.62, 2.25),
+                        offset = Vector3d(0.0, -0.38, 0.65)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.34, 0.24, 2.5),
@@ -414,8 +414,8 @@ object WheeledVehicleDefinitions {
                         rotationDegrees = Vector3d(42.5, 0.0, 0.0)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.34, 0.72, 1.82),
-                        offset = Vector3d(0.0, 0.18, 1.8)
+                        size = Vector3d(2.34, 0.72, 1.34),
+                        offset = Vector3d(0.0, 0.18, 1.38)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(0.18, 0.42, 2.34),

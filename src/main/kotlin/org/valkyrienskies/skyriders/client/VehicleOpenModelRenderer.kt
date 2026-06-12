@@ -28,7 +28,6 @@ object VehicleOpenModelRenderer {
         packedLight: Int
     ): Boolean {
         val model = getModel(modelLocation) ?: return false
-        if (!model.hasRotatedComponents) return false
 
         val minecraft = Minecraft.getInstance()
         val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
@@ -139,15 +138,11 @@ object VehicleOpenModelRenderer {
         }
 
         val faces = ArrayList<OpenFace>()
-        var hasRotatedComponents = false
         json.getAsJsonArray("components")?.forEach { element ->
             val component = element.asJsonObject
             val from = component.getVector3d("from")
             val to = component.getVector3d("to")
             val transform = component.transform()
-            if (transform.usesRotatedField) {
-                hasRotatedComponents = true
-            }
             val componentFaces = component.getAsJsonObject("faces") ?: return@forEach
             faceNames.forEach { faceName ->
                 val face = componentFaces.getAsJsonObject(faceName) ?: return@forEach
@@ -161,7 +156,6 @@ object VehicleOpenModelRenderer {
         return OpenModel(
             textureWidth = textureSize?.get(0)?.asDouble ?: 16.0,
             textureHeight = textureSize?.get(1)?.asDouble ?: 16.0,
-            hasRotatedComponents = hasRotatedComponents,
             faces = faces
         )
     }
@@ -234,7 +228,7 @@ object VehicleOpenModelRenderer {
         if (rotated != null) {
             val rotation = getVector3d("rotated")
             val origin = getAsJsonObject("rotation")?.getVector3d("origin") ?: Vector3d()
-            return ComponentTransform.Euler(origin, rotation, usesRotatedField = true)
+            return ComponentTransform.Euler(origin, rotation)
         }
 
         val rotation = getAsJsonObject("rotation") ?: return ComponentTransform.None
@@ -243,9 +237,9 @@ object VehicleOpenModelRenderer {
 
         val origin = rotation.getVector3d("origin")
         return when (rotation.getString("axis")) {
-            "x" -> ComponentTransform.Euler(origin, Vector3d(angle, 0.0, 0.0), usesRotatedField = false)
-            "y" -> ComponentTransform.Euler(origin, Vector3d(0.0, angle, 0.0), usesRotatedField = false)
-            "z" -> ComponentTransform.Euler(origin, Vector3d(0.0, 0.0, angle), usesRotatedField = false)
+            "x" -> ComponentTransform.Euler(origin, Vector3d(angle, 0.0, 0.0))
+            "y" -> ComponentTransform.Euler(origin, Vector3d(0.0, angle, 0.0))
+            "z" -> ComponentTransform.Euler(origin, Vector3d(0.0, 0.0, angle))
             else -> ComponentTransform.None
         }
     }
@@ -350,7 +344,6 @@ object VehicleOpenModelRenderer {
     private data class OpenModel(
         val textureWidth: Double,
         val textureHeight: Double,
-        val hasRotatedComponents: Boolean,
         val faces: List<OpenFace>
     )
 
@@ -369,16 +362,11 @@ object VehicleOpenModelRenderer {
     )
 
     private sealed interface ComponentTransform {
-        val usesRotatedField: Boolean
-
-        data object None : ComponentTransform {
-            override val usesRotatedField: Boolean = false
-        }
+        data object None : ComponentTransform
 
         data class Euler(
             val origin: Vector3d,
-            val degrees: Vector3d,
-            override val usesRotatedField: Boolean
+            val degrees: Vector3d
         ) : ComponentTransform
     }
 }
