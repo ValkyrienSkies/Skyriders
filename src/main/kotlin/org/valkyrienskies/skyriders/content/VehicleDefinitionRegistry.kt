@@ -393,8 +393,12 @@ object WheeledVehicleDefinitions {
                 centerOfMassOffset = Vector3d(0.0, -0.24, -0.1),
                 collisionBoxes = listOf(
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.54, 0.62, 5.62),
-                        offset = Vector3d(0.0, -0.38, 0.0)
+                        size = Vector3d(2.54, 0.62, 2.95),
+                        offset = Vector3d(0.0, -0.38, 1.08)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.34, 0.24, 2.5),
+                        offset = Vector3d(0.0, -0.54, -1.56)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.32, 0.82, 1.25),
@@ -414,20 +418,20 @@ object WheeledVehicleDefinitions {
                         offset = Vector3d(0.0, 0.18, 1.8)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(0.18, 0.5, 2.34),
-                        offset = Vector3d(1.18, -0.05, -1.58)
+                        size = Vector3d(0.18, 0.42, 2.34),
+                        offset = Vector3d(1.18, -0.22, -1.58)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(0.18, 0.5, 2.34),
-                        offset = Vector3d(-1.18, -0.05, -1.58)
+                        size = Vector3d(0.18, 0.42, 2.34),
+                        offset = Vector3d(-1.18, -0.22, -1.58)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.42, 0.5, 0.18),
-                        offset = Vector3d(0.0, -0.05, -2.72)
+                        size = Vector3d(2.42, 0.42, 0.18),
+                        offset = Vector3d(0.0, -0.22, -2.72)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.24, 0.52, 0.18),
-                        offset = Vector3d(0.0, -0.04, -0.48)
+                        size = Vector3d(2.24, 0.44, 0.18),
+                        offset = Vector3d(0.0, -0.2, -0.48)
                     )
                 ),
                 impactDamageScale = 1.65,
