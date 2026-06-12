@@ -47,6 +47,10 @@ object BikeInteractionHandler {
         val level = player.level() as? ServerLevel ?: return
         val existingHoist = hoistedByPlayer[player.uuid]
 
+        if (toggleMountedSeatDoor(player, level)) {
+            return
+        }
+
         if (existingHoist != null) {
             if (player.isShiftKeyDown) {
                 releaseHoistedBike(player, existingHoist)
@@ -56,6 +60,16 @@ object BikeInteractionHandler {
 
         val target = findBikeInLook(player, USE_RANGE) ?: return
         dispatchInteraction(player, target)
+    }
+
+    private fun toggleMountedSeatDoor(player: ServerPlayer, level: ServerLevel): Boolean {
+        val seat = player.vehicle as? BikeSeatEntity ?: return false
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, seat.bodyId) ?: return false
+        val seatDefinition = vehicle.vehicleDefinition.seats.firstOrNull { it.id == seat.seatId } ?: return false
+        val requiredOpenPartId = seatDefinition.requiredOpenPartId ?: return false
+        val doorZone = vehicle.vehicleDefinition.interactions.zones.firstOrNull { it.partId == requiredOpenPartId }
+            ?: return false
+        return VehiclePartInteractionHandlers.handle(player, vehicle, doorZone)
     }
 
     fun mountBike(

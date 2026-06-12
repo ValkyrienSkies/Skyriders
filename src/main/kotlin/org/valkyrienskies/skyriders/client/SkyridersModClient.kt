@@ -226,7 +226,13 @@ object SkyridersModClient {
             val minecraft = Minecraft.getInstance()
             val player = minecraft.player ?: return
             val level = minecraft.level ?: return
-            if (player.vehicle is BikeSeatEntity) return
+            if (player.vehicle is BikeSeatEntity) {
+                if (!player.mainHandItem.isEmpty || !player.offhandItem.isEmpty) return
+                SkyridersNetwork.sendBikeUse()
+                event.isCanceled = true
+                event.setSwingHand(false)
+                return
+            }
 
             val eye = player.getEyePosition(1.0f)
             val end = eye.add(player.lookAngle.scale(5.0))
