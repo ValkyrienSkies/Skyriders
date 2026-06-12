@@ -67,6 +67,10 @@ import org.valkyrienskies.skyriders.content.item.RoyalJellyCanisterItem
 import org.valkyrienskies.skyriders.content.item.StormchasingDisc
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
+import org.valkyrienskies.skyriders.content.item.VehicleSpawnItem
+import org.valkyrienskies.skyriders.content.BikeDefinitions
+import org.valkyrienskies.skyriders.content.KartDefinitions
+import org.valkyrienskies.skyriders.content.WheeledVehicleDefinitions
 import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
 import org.valkyrienskies.skyriders.content.racing.RaceDangerBlock
 import org.valkyrienskies.skyriders.content.racing.RaceDangerBlockEntity
@@ -208,6 +212,18 @@ object SkyridersMod {
     val RACE_COMPASS: RegistryObject<Item> = ITEMS.register("race_compass") {
         RaceCompassItem(Item.Properties().stacksTo(1))
     }
+    val DIRT_BIKE_ITEM: RegistryObject<Item> = ITEMS.register(BikeDefinitions.DIRT_BIKE.id.path) {
+        VehicleSpawnItem(Item.Properties().stacksTo(16), BikeDefinitions.DIRT_BIKE.id)
+    }
+    val SPEEDSTER_ITEM: RegistryObject<Item> = ITEMS.register(KartDefinitions.SPEEDSTER.id.path) {
+        VehicleSpawnItem(Item.Properties().stacksTo(16), KartDefinitions.SPEEDSTER.id)
+    }
+    val ATV_ITEM: RegistryObject<Item> = ITEMS.register(WheeledVehicleDefinitions.ATV.id.path) {
+        VehicleSpawnItem(Item.Properties().stacksTo(16), WheeledVehicleDefinitions.ATV.id)
+    }
+    val PICKUP_TRUCK_ITEM: RegistryObject<Item> = ITEMS.register(WheeledVehicleDefinitions.PICKUP_TRUCK.id.path) {
+        VehicleSpawnItem(Item.Properties().stacksTo(16), WheeledVehicleDefinitions.PICKUP_TRUCK.id)
+    }
     val RACE_FLAG_COLORING_RECIPE_SERIALIZER: RegistryObject<RecipeSerializer<RaceFlagColoringRecipe>> =
         RECIPE_SERIALIZERS.register("crafting_special_race_flag_coloring") {
             SimpleCraftingRecipeSerializer(::RaceFlagColoringRecipe)
@@ -240,6 +256,10 @@ object SkyridersMod {
                 output.accept(ITEM_BOX.get())
                 output.accept(RACING_ROULETTE.get())
                 output.accept(RACE_COMPASS.get())
+                output.accept(DIRT_BIKE_ITEM.get())
+                output.accept(SPEEDSTER_ITEM.get())
+                output.accept(ATV_ITEM.get())
+                output.accept(PICKUP_TRUCK_ITEM.get())
                 output.accept(HONEY_CANISTER.get())
                 output.accept(ROYAL_JELLY_CANISTER.get())
                 output.accept(HONEY_TANK.get())
