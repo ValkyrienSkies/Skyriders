@@ -241,7 +241,7 @@ data class WheeledVehiclePhysicsConfig(
         val TRUCK = WheeledVehiclePhysicsConfig(
             mass = 2450.0,
             collisionBoxSize = Vector3d(2.45, 1.55, 5.65),
-            collisionBoxOffset = Vector3d(0.0, 0.64, 0.0),
+            collisionBoxOffset = Vector3d(0.0, 0.48, 0.0),
             axles = listOf(
                 WheelAxleConfig(
                     id = "front",
@@ -255,8 +255,8 @@ data class WheeledVehiclePhysicsConfig(
                     steerable = true,
                     steerScale = 1.0,
                     brakeBias = 0.6,
-                    suspensionRestLength = 0.48,
-                    suspensionTravel = 0.56,
+                    suspensionRestLength = 0.6,
+                    suspensionTravel = 0.64,
                     suspensionStrength = 102000.0,
                     suspensionDamping = 11800.0,
                     lateralGrip = 1.04,
@@ -274,8 +274,8 @@ data class WheeledVehiclePhysicsConfig(
                     driveBias = 0.62,
                     steerable = false,
                     brakeBias = 0.4,
-                    suspensionRestLength = 0.5,
-                    suspensionTravel = 0.58,
+                    suspensionRestLength = 0.62,
+                    suspensionTravel = 0.66,
                     suspensionStrength = 110000.0,
                     suspensionDamping = 12600.0,
                     lateralGrip = 1.0,

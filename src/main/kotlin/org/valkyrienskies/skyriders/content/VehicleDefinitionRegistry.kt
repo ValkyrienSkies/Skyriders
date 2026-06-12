@@ -394,15 +394,15 @@ object WheeledVehicleDefinitions {
                 collisionBoxes = listOf(
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.35, 0.82, 5.55),
-                        offset = Vector3d(0.0, 0.38, 0.0)
+                        offset = Vector3d(0.0, 0.22, 0.0)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.18, 1.02, 2.15),
-                        offset = Vector3d(0.0, 1.04, 0.72)
+                        offset = Vector3d(0.0, 0.88, 0.72)
                     ),
                     VehicleCollisionBoxDefinition(
                         size = Vector3d(2.08, 0.74, 2.2),
-                        offset = Vector3d(0.0, 0.92, -1.58)
+                        offset = Vector3d(0.0, 0.76, -1.58)
                     )
                 ),
                 impactDamageScale = 1.65,
@@ -424,14 +424,14 @@ object WheeledVehicleDefinitions {
             seats = listOf(
                 VehicleSeatDefinition(
                     id = "driver",
-                    localPos = Vector3d(-0.46, 0.3, 0.55),
+                    localPos = Vector3d(0.46, -0.38, 0.55),
                     role = VehicleSeatRole.DRIVER,
                     interactionZone = leftSeat,
                     requiredOpenPartId = leftDoor
                 ),
                 VehicleSeatDefinition(
                     id = "passenger",
-                    localPos = Vector3d(0.46, 0.3, 0.55),
+                    localPos = Vector3d(-0.46, -0.38, 0.55),
                     role = VehicleSeatRole.PASSENGER,
                     interactionZone = rightSeat,
                     requiredOpenPartId = rightDoor
@@ -441,7 +441,7 @@ object WheeledVehicleDefinitions {
                 zones = listOf(
                     VehicleInteractionZone(
                         id = leftDoor,
-                        center = Vector3d(-1.18, 0.92, 0.72),
+                        center = Vector3d(1.18, 0.92, 0.72),
                         size = Vector3d(0.36, 1.18, 1.24),
                         actions = setOf(VehicleInteractionActions.OPEN_DOOR),
                         partId = leftDoor,
@@ -449,7 +449,7 @@ object WheeledVehicleDefinitions {
                     ),
                     VehicleInteractionZone(
                         id = rightDoor,
-                        center = Vector3d(1.18, 0.92, 0.72),
+                        center = Vector3d(-1.18, 0.92, 0.72),
                         size = Vector3d(0.36, 1.18, 1.24),
                         actions = setOf(VehicleInteractionActions.OPEN_DOOR),
                         partId = rightDoor,
@@ -457,13 +457,13 @@ object WheeledVehicleDefinitions {
                     ),
                     VehicleInteractionZone(
                         id = leftSeat,
-                        center = Vector3d(-0.46, 0.82, 0.55),
+                        center = Vector3d(0.46, 0.58, 0.55),
                         size = Vector3d(0.72, 0.72, 0.88),
                         actions = setOf(VehicleInteractionActions.MOUNT)
                     ),
                     VehicleInteractionZone(
                         id = rightSeat,
-                        center = Vector3d(0.46, 0.82, 0.55),
+                        center = Vector3d(-0.46, 0.58, 0.55),
                         size = Vector3d(0.72, 0.72, 0.88),
                         actions = setOf(VehicleInteractionActions.MOUNT)
                     ),
@@ -625,28 +625,36 @@ object WheeledVehicleDefinitions {
             showWheels = true,
             modelYawRad = Math.PI,
             modelScale = 1.28,
-            modelOffset = Vector3d(-0.64, -0.4, -0.64),
+            modelOffset = Vector3d(-0.64, -1.08, -0.64),
             wheelSpinVisualScale = 0.46,
             wheelSpinSmoothingTime = 0.12,
             wheelParts = listOf(
                 VehicleWheelRenderDefinition(
+                    id = "front_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_flw"),
+                    pivot = Vector3d(1.34375, 0.328125, 1.4969),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
                     id = "front_right_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_flw"),
-                    pivot = Vector3d(0.5, 0.836053125, 0.5),
+                    pivot = Vector3d(1.34375, 0.328125, 1.4969),
+                    visualOffset = Vector3d(-1.6875, 0.0, 0.0),
                     steerSource = VehicleWheelSteerSource.FRONT,
                     spinSource = VehicleWheelSpinSource.FRONT
                 ),
                 VehicleWheelRenderDefinition(
                     id = "rear_left_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_blw"),
-                    pivot = Vector3d(0.5, 0.836053125, -1.75),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_brw"),
+                    pivot = Vector3d(1.34375, 0.328125, -0.7531),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),
                 VehicleWheelRenderDefinition(
                     id = "rear_right_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_brw"),
-                    pivot = Vector3d(0.5, 0.836053125, -1.75),
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_blw"),
+                    pivot = Vector3d(-0.34375, 0.328125, -0.7531),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),

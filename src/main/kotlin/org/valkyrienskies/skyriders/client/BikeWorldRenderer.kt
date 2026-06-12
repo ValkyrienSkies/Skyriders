@@ -144,6 +144,7 @@ object BikeWorldRenderer {
                 bufferSource = bufferSource,
                 modelPart = modelPart,
                 model = partModel,
+                visualState = visualState,
                 packedLight = packedLight
             )
         }
@@ -191,12 +192,10 @@ object BikeWorldRenderer {
         bufferSource: MultiBufferSource,
         modelPart: VehicleModelPartRenderDefinition,
         model: BakedModel?,
+        visualState: RenderVisualState,
         packedLight: Int
     ) {
-        val openAmount = modelPart.partStateId
-            ?.let { vehicle.vehicleState.partStates[it]?.data?.getBoolean("open") }
-            ?.let { if (it) 1.0 else 0.0 }
-            ?: 0.0
+        val openAmount = modelPartOpenAmount(vehicle, modelPart, visualState)
         val rotation = Vector3d(modelPart.closedRotationDegrees).lerp(modelPart.openRotationDegrees, openAmount)
 
         poseStack.pushPose()
@@ -218,6 +217,24 @@ object BikeWorldRenderer {
             model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
         }
         poseStack.popPose()
+    }
+
+    private fun modelPartOpenAmount(
+        vehicle: IVehicle,
+        modelPart: VehicleModelPartRenderDefinition,
+        visualState: RenderVisualState
+    ): Double {
+        val target = modelPart.partStateId
+            ?.let { vehicle.vehicleState.partStates[it]?.data?.getBoolean("open") }
+            ?.let { if (it) 1.0 else 0.0 }
+            ?: 0.0
+        val key = modelPart.partStateId ?: modelPart.id
+        val current = visualState.modelPartOpenAmounts.getOrPut(key) { target }
+        val alpha = 1.0 - exp(-visualState.lastDeltaSeconds / MODEL_PART_OPEN_SMOOTHING_SECONDS)
+        val next = current + (target - current) * alpha
+        val snapped = if (kotlin.math.abs(next - target) < 0.001) target else next
+        visualState.modelPartOpenAmounts[key] = snapped
+        return snapped
     }
 
     private fun renderRaceFlagMarker(
@@ -314,7 +331,8 @@ object BikeWorldRenderer {
                 targetFrontWheelSuspensionOffset = suspensionOffset.front,
                 targetRearWheelSuspensionOffset = suspensionOffset.rear,
                 frontWheelSuspensionOffset = suspensionOffset.front,
-                rearWheelSuspensionOffset = suspensionOffset.rear
+                rearWheelSuspensionOffset = suspensionOffset.rear,
+                lastDeltaSeconds = 0.0
             )
         }
 
@@ -339,6 +357,7 @@ object BikeWorldRenderer {
 
         val dt = ((now - state.lastRenderNanos) / 1.0e9).coerceIn(0.0, 0.1)
         state.lastRenderNanos = now
+        state.lastDeltaSeconds = dt
         val smoothingTime = render.wheelSpinSmoothingTime.takeIf { it.isFinite() && it > 1.0e-4 } ?: 0.08
         val alpha = 1.0 - exp(-dt / smoothingTime)
         state.frontWheelSpin += (state.targetFrontWheelSpin - state.frontWheelSpin) * alpha
@@ -440,6 +459,7 @@ object BikeWorldRenderer {
     )
 
     private const val FLAG_MODEL_YAW_CORRECTION_DEGREES = 180.0f
+    private const val MODEL_PART_OPEN_SMOOTHING_SECONDS = 0.18
 
     private data class RenderVisualState(
         var lastRenderNanos: Long,
@@ -452,6 +472,8 @@ object BikeWorldRenderer {
         var targetFrontWheelSuspensionOffset: Double,
         var targetRearWheelSuspensionOffset: Double,
         var frontWheelSuspensionOffset: Double,
-        var rearWheelSuspensionOffset: Double
+        var rearWheelSuspensionOffset: Double,
+        var lastDeltaSeconds: Double,
+        val modelPartOpenAmounts: MutableMap<String, Double> = HashMap()
     )
 }
