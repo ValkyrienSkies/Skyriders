@@ -4,6 +4,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
 import org.joml.Matrix4dc
+import org.joml.Quaterniond
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.mod.api.shipWorld
@@ -116,6 +117,7 @@ object VehicleImpactDamageHandler {
     private fun transformedCollisionBox(box: VehicleCollisionBoxDefinition, transform: Matrix4dc): AABB {
         val half = Vector3d(box.size).mul(0.5)
         val offset = box.offset
+        val rotation = box.rotationQuaternion()
         var minX = Double.POSITIVE_INFINITY
         var minY = Double.POSITIVE_INFINITY
         var minZ = Double.POSITIVE_INFINITY
@@ -126,7 +128,7 @@ object VehicleImpactDamageHandler {
         for (x in doubleArrayOf(offset.x - half.x, offset.x + half.x)) {
             for (y in doubleArrayOf(offset.y - half.y, offset.y + half.y)) {
                 for (z in doubleArrayOf(offset.z - half.z, offset.z + half.z)) {
-                    val point = transform.transformPosition(Vector3d(x, y, z))
+                    val point = transform.transformPosition(rotateAroundOffset(Vector3d(x, y, z), offset, rotation))
                     minX = min(minX, point.x)
                     minY = min(minY, point.y)
                     minZ = min(minZ, point.z)
@@ -138,6 +140,10 @@ object VehicleImpactDamageHandler {
         }
 
         return AABB(minX, minY, minZ, maxX, maxY, maxZ)
+    }
+
+    private fun rotateAroundOffset(point: Vector3d, offset: Vector3dc, rotation: Quaterniond): Vector3d {
+        return rotation.transform(point.sub(offset)).add(offset)
     }
 
     private fun union(a: AABB, b: AABB): AABB {

@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.level.Level
+import org.joml.Quaterniond
 import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
@@ -69,6 +70,7 @@ data class VehicleBodyDefinition(
     fun resolvedCollisionBoxes(): List<VehicleCollisionBoxDefinition> {
         return collisionBoxes
             .filter { it.size.isPositiveFinite() && it.offset.isFinite() }
+            .filter { it.rotationDegrees.isFinite() }
             .ifEmpty {
                 listOf(
                     VehicleCollisionBoxDefinition(
@@ -80,7 +82,8 @@ data class VehicleBodyDefinition(
             .map { box ->
                 VehicleCollisionBoxDefinition(
                     size = Vector3d(box.size),
-                    offset = Vector3d(box.offset)
+                    offset = Vector3d(box.offset),
+                    rotationDegrees = Vector3d(box.rotationDegrees)
                 )
             }
     }
@@ -88,8 +91,15 @@ data class VehicleBodyDefinition(
 
 data class VehicleCollisionBoxDefinition(
     val size: Vector3d,
-    val offset: Vector3d
-)
+    val offset: Vector3d,
+    val rotationDegrees: Vector3d = Vector3d()
+) {
+    fun rotationQuaternion(): Quaterniond = Quaterniond().rotateXYZ(
+        Math.toRadians(rotationDegrees.x),
+        Math.toRadians(rotationDegrees.y),
+        Math.toRadians(rotationDegrees.z)
+    )
+}
 
 data class VehicleRenderDefinition(
     val model: ResourceLocation,

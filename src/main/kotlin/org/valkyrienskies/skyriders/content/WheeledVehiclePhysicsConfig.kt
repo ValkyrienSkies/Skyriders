@@ -240,8 +240,8 @@ data class WheeledVehiclePhysicsConfig(
 
         val TRUCK = WheeledVehiclePhysicsConfig(
             mass = 2450.0,
-            collisionBoxSize = Vector3d(2.45, 1.55, 5.65),
-            collisionBoxOffset = Vector3d(0.0, 0.48, 0.0),
+            collisionBoxSize = Vector3d(2.72, 1.85, 5.8),
+            collisionBoxOffset = Vector3d(0.0, 0.24, 0.0),
             axles = listOf(
                 WheelAxleConfig(
                     id = "front",

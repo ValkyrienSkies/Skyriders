@@ -144,7 +144,8 @@ object VehicleManager {
                     bodyDef.resolvedCollisionBoxes().map { box ->
                         vsCore.newCompoundBodyShapeChild(
                             shape = vsCore.newBoxBodyShape(box.size),
-                            position = box.offset
+                            position = box.offset,
+                            rotation = box.rotationQuaternion()
                         )
                     }
                 ),

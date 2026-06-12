@@ -16,6 +16,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 object VehicleOpenModelRenderer {
+    val BLOCK_ATLAS_NO_CULL_RENDER_TYPE: RenderType = RenderType.entityCutoutNoCull(InventoryMenu.BLOCK_ATLAS)
+
     private val models = HashMap<ResourceLocation, OpenModel?>()
     private val faceNames = listOf("north", "east", "south", "west", "up", "down")
 
@@ -30,7 +32,7 @@ object VehicleOpenModelRenderer {
 
         val minecraft = Minecraft.getInstance()
         val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
-        val consumer = bufferSource.getBuffer(RenderType.cutout())
+        val consumer = bufferSource.getBuffer(BLOCK_ATLAS_NO_CULL_RENDER_TYPE)
         val pose = poseStack.last()
 
         model.faces.forEach { face ->
@@ -48,6 +50,20 @@ object VehicleOpenModelRenderer {
                     .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
                     .endVertex()
             }
+            val backNormal = Vector3f(face.normal).negate()
+            val backShade = faceShade(backNormal)
+            val backColor = (backShade * 255.0f).toInt().coerceIn(0, 255)
+            for (i in 3 downTo 0) {
+                val vertex = face.vertices[i]
+                val uv = face.uvs[i]
+                consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
+                    .color(backColor, backColor, backColor, 255)
+                    .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
+                    .overlayCoords(OverlayTexture.NO_OVERLAY)
+                    .uv2(packedLight)
+                    .normal(pose.normal(), backNormal.x(), backNormal.y(), backNormal.z())
+                    .endVertex()
+            }
         }
         return true
     }
@@ -61,7 +77,7 @@ object VehicleOpenModelRenderer {
     ): Boolean {
         val model = getModel(modelLocation) ?: return false
 
-        val consumer = bufferSource.getBuffer(RenderType.entityCutout(textureLocation))
+        val consumer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(textureLocation))
         val pose = poseStack.last()
         model.faces.forEach { face ->
             val shade = faceShade(face.normal)
@@ -75,6 +91,20 @@ object VehicleOpenModelRenderer {
                     .overlayCoords(OverlayTexture.NO_OVERLAY)
                     .uv2(packedLight)
                     .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
+                    .endVertex()
+            }
+            val backNormal = Vector3f(face.normal).negate()
+            val backShade = faceShade(backNormal)
+            val backColor = (backShade * 255.0f).toInt().coerceIn(0, 255)
+            for (i in 3 downTo 0) {
+                val vertex = face.vertices[i]
+                val uv = face.uvs[i]
+                consumer.vertex(pose.pose(), vertex.x() / 16.0f, vertex.y() / 16.0f, vertex.z() / 16.0f)
+                    .color(backColor, backColor, backColor, 255)
+                    .uv((uv.x() / model.textureWidth).toFloat(), (uv.y() / model.textureHeight).toFloat())
+                    .overlayCoords(OverlayTexture.NO_OVERLAY)
+                    .uv2(packedLight)
+                    .normal(pose.normal(), backNormal.x(), backNormal.y(), backNormal.z())
                     .endVertex()
             }
         }

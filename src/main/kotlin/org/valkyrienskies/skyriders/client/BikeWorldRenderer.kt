@@ -83,6 +83,7 @@ object BikeWorldRenderer {
                 cameraZ = cameraPosition.z
             )
         }
+        bufferSource.endBatch(VehicleOpenModelRenderer.BLOCK_ATLAS_NO_CULL_RENDER_TYPE)
         bufferSource.endBatch(RenderType.cutout())
         bufferSource.endBatch(RenderType.lines())
     }

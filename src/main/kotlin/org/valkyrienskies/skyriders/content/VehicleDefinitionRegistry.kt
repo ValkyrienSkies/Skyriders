@@ -393,16 +393,41 @@ object WheeledVehicleDefinitions {
                 centerOfMassOffset = Vector3d(0.0, -0.24, -0.1),
                 collisionBoxes = listOf(
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.35, 0.82, 5.55),
-                        offset = Vector3d(0.0, 0.22, 0.0)
+                        size = Vector3d(2.54, 0.62, 5.62),
+                        offset = Vector3d(0.0, -0.38, 0.0)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.18, 1.02, 2.15),
-                        offset = Vector3d(0.0, 0.88, 0.72)
+                        size = Vector3d(2.32, 0.82, 1.25),
+                        offset = Vector3d(0.0, 0.36, 0.25)
                     ),
                     VehicleCollisionBoxDefinition(
-                        size = Vector3d(2.08, 0.74, 2.2),
-                        offset = Vector3d(0.0, 0.76, -1.58)
+                        size = Vector3d(2.22, 0.24, 1.2),
+                        offset = Vector3d(0.0, 1.04, 0.08)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.18, 0.16, 1.02),
+                        offset = Vector3d(0.0, 0.82, 0.86),
+                        rotationDegrees = Vector3d(42.5, 0.0, 0.0)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.34, 0.72, 1.82),
+                        offset = Vector3d(0.0, 0.18, 1.8)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(0.18, 0.5, 2.34),
+                        offset = Vector3d(1.18, -0.05, -1.58)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(0.18, 0.5, 2.34),
+                        offset = Vector3d(-1.18, -0.05, -1.58)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.42, 0.5, 0.18),
+                        offset = Vector3d(0.0, -0.05, -2.72)
+                    ),
+                    VehicleCollisionBoxDefinition(
+                        size = Vector3d(2.24, 0.52, 0.18),
+                        offset = Vector3d(0.0, -0.04, -0.48)
                     )
                 ),
                 impactDamageScale = 1.65,
