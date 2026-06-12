@@ -32,6 +32,8 @@ object BikePhysicsSolver {
     private const val WHEEL_GROUND_DRAG = 0.04
     private const val WHEEL_INERTIA_MASS_SCALE = 0.018
     private const val MAX_WHEEL_TOP_SPEED_MULTIPLIER = 4.0
+    private const val LONGITUDINAL_SLIP_REFERENCE_SPEED = 1.5
+    private const val LOCKED_BRAKE_SLIP_REFERENCE_SPEED = 0.25
     private const val LOW_SPEED_BRAKE_ASSIST_SPEED = 1.25
     private const val LOW_SPEED_BRAKE_SNAP_SPEED = 0.12
     private const val LOW_SPEED_BRAKE_DEAD_SPEED = 0.015
@@ -407,7 +409,8 @@ object BikePhysicsSolver {
             config = config,
             state = state,
             dt = dt,
-            tractionScale = tractionScale
+            tractionScale = tractionScale,
+            useLockedBrakeSlipReference = !drifting
         )
         state.rearWheelAngularVelocity = applyWheelLongitudinalPhysics(
             body = body,
@@ -420,7 +423,8 @@ object BikePhysicsSolver {
             config = config,
             state = state,
             dt = dt,
-            tractionScale = tractionScale
+            tractionScale = tractionScale,
+            useLockedBrakeSlipReference = !drifting
         )
     }
 
@@ -435,7 +439,8 @@ object BikePhysicsSolver {
         config: BikePhysicsConfig,
         state: BikeRuntimeState,
         dt: Double,
-        tractionScale: Double
+        tractionScale: Double,
+        useLockedBrakeSlipReference: Boolean
     ): Double {
         val stepDt = dt.coerceIn(0.0, 0.1)
         val radius = max(config.wheelRadius, 0.05)
@@ -461,7 +466,13 @@ object BikePhysicsSolver {
         if (contact.grounded && forceScale > 0.0 && contact.normalForceEstimate > 0.0) {
             val surfaceSpeed = omega * radius
             val slipVelocity = surfaceSpeed - groundSpeed
-            val slipRatio = slipVelocity / max(abs(groundSpeed), 1.5)
+            val slipReferenceSpeed = longitudinalSlipReferenceSpeed(
+                surfaceSpeed = surfaceSpeed,
+                groundSpeed = groundSpeed,
+                brake = brake,
+                useLockedBrakeSlipReference = useLockedBrakeSlipReference
+            )
+            val slipRatio = slipVelocity / slipReferenceSpeed
             val gripFactor = pacejkaLongitudinalGrip(slipRatio, config)
             val brakeForceScale = if (brake > 0.0) {
                 lerp(1.0, config.brakeStrength, brake)
@@ -507,6 +518,21 @@ object BikePhysicsSolver {
         }
 
         return omega.coerceIn(-maxOmega, maxOmega)
+    }
+
+    private fun longitudinalSlipReferenceSpeed(
+        surfaceSpeed: Double,
+        groundSpeed: Double,
+        brake: Double,
+        useLockedBrakeSlipReference: Boolean
+    ): Double {
+        val wheelRoadSpeed = max(abs(surfaceSpeed), abs(groundSpeed))
+        val minimumReference = if (useLockedBrakeSlipReference && brake > 0.05) {
+            LOCKED_BRAKE_SLIP_REFERENCE_SPEED
+        } else {
+            LONGITUDINAL_SLIP_REFERENCE_SPEED
+        }
+        return max(wheelRoadSpeed, minimumReference)
     }
 
     private fun applyLowSpeedBrakeAssist(
