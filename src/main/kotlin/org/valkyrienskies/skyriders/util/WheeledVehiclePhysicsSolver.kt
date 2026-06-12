@@ -314,8 +314,11 @@ object WheeledVehiclePhysicsSolver {
         } else {
             automaticClutchTarget
         }
-        val clutchResponse = if (config.transmission.manualClutch) 4.6 else engine.coupledRevResponse
-        val clutchTarget = lerpByResponse(state.clutchEngagement, rawClutchTarget, clutchResponse, stepDt).coerceIn(0.0, 1.0)
+        val clutchTarget = if (config.transmission.manualClutch) {
+            rawClutchTarget
+        } else {
+            lerpByResponse(state.clutchEngagement, rawClutchTarget, engine.coupledRevResponse, stepDt)
+        }.coerceIn(0.0, 1.0)
 
         val loadedTargetRpm = if (config.transmission.manualClutch) coupledRpm else max(coupledRpm, engine.stallRpm)
         val targetRpm = if (clutchTarget > 0.0) {

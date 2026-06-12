@@ -383,6 +383,8 @@ object WheeledVehicleDefinitions {
         val rightDoor = "right_door"
         val leftSeat = "left_seat"
         val rightSeat = "right_seat"
+        val leftBedSeat = "left_bed_seat"
+        val rightBedSeat = "right_bed_seat"
         return VehicleDefinition(
             id = ResourceLocation(SkyridersMod.MOD_ID, "pickup_truck"),
             displayName = "Pickup Truck",
@@ -464,6 +466,18 @@ object WheeledVehicleDefinitions {
                     role = VehicleSeatRole.PASSENGER,
                     interactionZone = rightSeat,
                     requiredOpenPartId = rightDoor
+                ),
+                VehicleSeatDefinition(
+                    id = "left_bed_passenger",
+                    localPos = Vector3d(0.58, -0.28, -1.72),
+                    role = VehicleSeatRole.PASSENGER,
+                    interactionZone = leftBedSeat
+                ),
+                VehicleSeatDefinition(
+                    id = "right_bed_passenger",
+                    localPos = Vector3d(-0.58, -0.28, -1.72),
+                    role = VehicleSeatRole.PASSENGER,
+                    interactionZone = rightBedSeat
                 )
             ),
             interactions = VehicleInteractionDefinition(
@@ -494,6 +508,18 @@ object WheeledVehicleDefinitions {
                         id = rightSeat,
                         center = Vector3d(-0.46, 0.46, 0.18),
                         size = Vector3d(0.72, 0.72, 0.88),
+                        actions = setOf(VehicleInteractionActions.MOUNT)
+                    ),
+                    VehicleInteractionZone(
+                        id = leftBedSeat,
+                        center = Vector3d(0.58, 0.68, -1.72),
+                        size = Vector3d(0.72, 0.82, 0.92),
+                        actions = setOf(VehicleInteractionActions.MOUNT)
+                    ),
+                    VehicleInteractionZone(
+                        id = rightBedSeat,
+                        center = Vector3d(-0.58, 0.68, -1.72),
+                        size = Vector3d(0.72, 0.82, 0.92),
                         actions = setOf(VehicleInteractionActions.MOUNT)
                     ),
                     VehicleInteractionZone(

@@ -39,6 +39,7 @@ object VehicleManager {
     private const val VEHICLES_KEY = "vehicles"
     private const val LEGACY_BIKES_KEY = "bikes"
     private const val HORN_COOLDOWN_TICKS = 10L
+    private const val MANUAL_SHIFT_CLUTCH_THRESHOLD = 0.75
     private val serverVehiclesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>>()
     private val clientVehiclesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, VehicleInput>>()
@@ -351,7 +352,9 @@ object VehicleManager {
                         changed = true
                     }
                     VehicleControlActions.GEAR_UP -> {
-                        if (!behavior.physics.transmission.automatic) {
+                        if (!behavior.physics.transmission.automatic &&
+                            canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
+                        ) {
                             val maxGear = behavior.physics.transmission.forwardGears.size
                             vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear + 1).coerceAtMost(maxGear)
                             vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
@@ -359,7 +362,9 @@ object VehicleManager {
                         }
                     }
                     VehicleControlActions.GEAR_DOWN -> {
-                        if (!behavior.physics.transmission.automatic) {
+                        if (!behavior.physics.transmission.automatic &&
+                            canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
+                        ) {
                             vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear - 1).coerceAtLeast(-1)
                             vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
                             changed = true
@@ -375,6 +380,15 @@ object VehicleManager {
             BikeLifecycle.syncLevel(level)
         }
         return changed
+    }
+
+    private fun canShiftManualTransmission(
+        level: ServerLevel,
+        bodyId: BodyId,
+        transmission: VehicleTransmissionConfig
+    ): Boolean {
+        if (!transmission.manualClutch) return true
+        return getInput(level.dimensionId, bodyId).clutch >= MANUAL_SHIFT_CLUTCH_THRESHOLD
     }
 
     private fun playHorn(level: ServerLevel, vehicle: IVehicle): Boolean {

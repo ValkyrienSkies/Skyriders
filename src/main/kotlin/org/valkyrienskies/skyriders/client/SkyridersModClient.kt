@@ -178,25 +178,6 @@ object SkyridersModClient {
             tickRaceDangerRadiusPreview(minecraft)
             if (player.vehicle !is BikeSeatEntity) return
 
-            while (bikeDismountKey.consumeClick()) {
-                SkyridersNetwork.sendBikeDismount()
-            }
-            while (bikeEngineToggleKey.consumeClick()) {
-                SkyridersNetwork.sendBikeEngineToggle()
-            }
-            while (vehicleParkingBrakeToggleKey.consumeClick()) {
-                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.TOGGLE_PARKING_BRAKE)
-            }
-            while (vehicleGearUpKey.consumeClick()) {
-                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_UP)
-            }
-            while (vehicleGearDownKey.consumeClick()) {
-                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_DOWN)
-            }
-            while (vehicleHornKey.consumeClick()) {
-                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.HORN)
-            }
-
             val options = minecraft.options
             val forward = options.keyUp.isDown
             val backward = options.keyDown.isDown
@@ -217,6 +198,25 @@ object SkyridersModClient {
             if (input != lastSentInput) {
                 SkyridersNetwork.sendVehicleInput(input)
                 lastSentInput = input
+            }
+
+            while (bikeDismountKey.consumeClick()) {
+                SkyridersNetwork.sendBikeDismount()
+            }
+            while (bikeEngineToggleKey.consumeClick()) {
+                SkyridersNetwork.sendBikeEngineToggle()
+            }
+            while (vehicleParkingBrakeToggleKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.TOGGLE_PARKING_BRAKE)
+            }
+            while (vehicleGearUpKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_UP)
+            }
+            while (vehicleGearDownKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.GEAR_DOWN)
+            }
+            while (vehicleHornKey.consumeClick()) {
+                SkyridersNetwork.sendVehicleControlAction(VehicleControlActions.HORN)
             }
         }
 

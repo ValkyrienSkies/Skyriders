@@ -77,11 +77,11 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         val shipWorld = serverLevel.shipWorld ?: return
         val center = Vector3d(x, y + PICKUP_Y_OFFSET, z)
         for (vehicle in VehicleManager.getVehicles(serverLevel)) {
-            val driver = driverForBody(serverLevel, vehicle.bodyId) ?: continue
+            val rider = riderForBody(serverLevel, vehicle.bodyId) ?: continue
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: continue
             val radius = PICKUP_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
             if (body.kinematics.position.distanceSquared(center) > radius * radius) continue
-            if (grantPickup(serverLevel, driver, vehicle)) {
+            if (grantPickup(serverLevel, rider, vehicle)) {
                 freezeRotation()
                 rechargeTicks = RECHARGE_TICKS_DEFAULT
                 playPickupSound(serverLevel)
@@ -317,11 +317,13 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
     private fun serverLevel(): ServerLevel = level() as ServerLevel
 
-    private fun driverForBody(level: ServerLevel, bodyId: Long): ServerPlayer? {
-        return level.players().firstOrNull { player ->
-            val seat = player.vehicle as? BikeSeatEntity ?: return@firstOrNull false
-            seat.bodyId == bodyId && seat.isDriverSeat()
+    private fun riderForBody(level: ServerLevel, bodyId: Long): ServerPlayer? {
+        val riders = level.players().filter { player ->
+            val seat = player.vehicle as? BikeSeatEntity ?: return@filter false
+            seat.bodyId == bodyId
         }
+        return riders.firstOrNull { player -> (player.vehicle as? BikeSeatEntity)?.isDriverSeat() == true }
+            ?: riders.firstOrNull()
     }
 
     private fun vehicleApproxRadius(size: Vector3d): Double {

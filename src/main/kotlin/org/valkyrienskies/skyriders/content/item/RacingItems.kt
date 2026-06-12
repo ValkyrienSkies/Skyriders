@@ -468,7 +468,7 @@ abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
         }
 
         val serverLevel = level as? ServerLevel ?: return InteractionResultHolder.fail(stack)
-        val vehicle = playerDriverVehicle(player) ?: return InteractionResultHolder.fail(stack)
+        val vehicle = playerMountedVehicle(player) ?: return InteractionResultHolder.fail(stack)
         if (!useOnVehicle(serverLevel, player, vehicle, stack)) {
             return InteractionResultHolder.fail(stack)
         }
@@ -496,9 +496,8 @@ abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
         )
     }
 
-    protected fun playerDriverVehicle(player: Player): IVehicle? {
+    protected fun playerMountedVehicle(player: Player): IVehicle? {
         val seat = player.vehicle as? BikeSeatEntity ?: return null
-        if (!seat.isDriverSeat()) return null
         return VehicleManager.getVehicle(player.level().dimensionId, seat.bodyId)
     }
 }
