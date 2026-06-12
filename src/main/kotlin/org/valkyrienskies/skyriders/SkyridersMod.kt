@@ -54,6 +54,7 @@ import org.valkyrienskies.skyriders.content.item.BergenDisc
 import org.valkyrienskies.skyriders.content.item.CreativeJerryCanItem
 import org.valkyrienskies.skyriders.content.item.ExtendingArmItem
 import org.valkyrienskies.skyriders.content.item.FakeItemBoxItem
+import org.valkyrienskies.skyriders.content.item.FasterThanValkyrieDisc
 import org.valkyrienskies.skyriders.content.item.GlassoItem
 import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
@@ -63,6 +64,7 @@ import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.RacingDispenserBehaviors
 import org.valkyrienskies.skyriders.content.item.RacingRouletteItem
 import org.valkyrienskies.skyriders.content.item.RoyalJellyCanisterItem
+import org.valkyrienskies.skyriders.content.item.StormchasingDisc
 import org.valkyrienskies.skyriders.content.item.SugarRocketItem
 import org.valkyrienskies.skyriders.content.item.ThunderboltItem
 import org.valkyrienskies.skyriders.content.racing.RaceCompassItem
@@ -215,6 +217,14 @@ object SkyridersMod {
         BergenDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     }
 
+    val STORMCHASING_DISC: RegistryObject<Item> = ITEMS.register("stormchasing_disc") {
+        StormchasingDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
+    }
+
+    val FTV_DISC: RegistryObject<Item> = ITEMS.register("fasterthanvalkyrie_disc") {
+        FasterThanValkyrieDisc(Item.Properties().stacksTo(1).rarity(Rarity.RARE))
+    }
+
     val SKYRIDERS_TAB: RegistryObject<CreativeModeTab> = CREATIVE_TABS.register("skyriders") {
         CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.skyriders"))
@@ -242,6 +252,8 @@ object SkyridersMod {
                 output.accept(BOXING_GLOVE.get())
                 output.accept(GRABBY_HAND.get())
                 output.accept(THUNDERBOLT.get())
+                output.accept(STORMCHASING_DISC.get())
+                output.accept(FTV_DISC.get())
             }
             .build()
     }

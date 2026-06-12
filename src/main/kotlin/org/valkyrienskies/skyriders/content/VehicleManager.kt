@@ -270,7 +270,9 @@ object VehicleManager {
         val vehicle = getVehicle(level.dimensionId, bodyId) ?: return null
         val body = level.shipWorld?.allBodies?.getById(bodyId) as? ServerBaseVsBody
             ?: throw IllegalStateException("Vehicle $bodyId is bound to a missing VS body.")
+        body.isStatic = true
         body.setPosition(position)
+        body.isStatic = false
         clearInput(level.dimensionId, bodyId)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
