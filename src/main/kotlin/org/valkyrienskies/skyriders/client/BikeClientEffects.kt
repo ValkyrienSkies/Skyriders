@@ -46,7 +46,7 @@ object BikeClientEffects {
         return if (telemetry.expireTick >= level.gameTime) telemetry.packet else null
     }
 
-    fun updateVehicleTelemetry(packet: SkyridersNetwork.VehicleDebugPacket) {
+    fun updateVehicleTelemetry(packet: SkyridersNetwork.VehicleTelemetryPacket) {
         vehicleTelemetryByBodyId[packet.bodyId] = TimedVehicleTelemetry(
             packet = packet,
             expireTick = Minecraft.getInstance().level?.gameTime?.plus(8L) ?: 0L
@@ -88,7 +88,7 @@ object BikeClientEffects {
         }
     }
 
-    private fun spawnBikeEffects(level: ClientLevel, bike: IBike, telemetry: SkyridersNetwork.VehicleDebugPacket?) {
+    private fun spawnBikeEffects(level: ClientLevel, bike: IBike, telemetry: SkyridersNetwork.VehicleTelemetryPacket?) {
         val transform = try {
             bike.getRenderTransform() ?: return
         } catch (_: IllegalStateException) {
@@ -139,7 +139,7 @@ object BikeClientEffects {
     private fun spawnGenericVehicleEffects(
         level: ClientLevel,
         vehicle: IVehicle,
-        telemetry: SkyridersNetwork.VehicleDebugPacket?
+        telemetry: SkyridersNetwork.VehicleTelemetryPacket?
     ) {
         val transform = try {
             vehicle.getRenderTransform() ?: return
@@ -230,7 +230,7 @@ object BikeClientEffects {
         )
     }
 
-    private fun exhaustParticle(telemetry: SkyridersNetwork.VehicleDebugPacket?): ParticleOptions {
+    private fun exhaustParticle(telemetry: SkyridersNetwork.VehicleTelemetryPacket?): ParticleOptions {
         if (telemetry?.drifting != true) return ParticleTypes.SMOKE
         return when {
             telemetry.driftBoostLevel >= 3 -> ParticleTypes.DRAGON_BREATH
@@ -240,7 +240,7 @@ object BikeClientEffects {
         }
     }
 
-    private fun vehicleExhaustParticle(telemetry: SkyridersNetwork.VehicleDebugPacket?): ParticleOptions {
+    private fun vehicleExhaustParticle(telemetry: SkyridersNetwork.VehicleTelemetryPacket?): ParticleOptions {
         if (telemetry?.drifting != true) return ParticleTypes.SMOKE
         return when {
             telemetry.driftBoostLevel >= 3 -> ParticleTypes.DRAGON_BREATH
@@ -256,7 +256,7 @@ object BikeClientEffects {
         return (0.1 + speed / 48.0).coerceIn(0.1, 0.45)
     }
 
-    private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.VehicleDebugPacket?): Double {
+    private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.VehicleTelemetryPacket?): Double {
         val speedChance = (0.12 + speed / 42.0).coerceIn(0.12, 0.55)
         return if (telemetry?.drifting == true) 0.85 else speedChance
     }
@@ -264,7 +264,7 @@ object BikeClientEffects {
     private fun tickEngineSound(
         minecraft: Minecraft,
         vehicle: IVehicle,
-        vehicleTelemetry: SkyridersNetwork.VehicleDebugPacket?
+        vehicleTelemetry: SkyridersNetwork.VehicleTelemetryPacket?
     ) {
         playEngineTransitionSound(minecraft, vehicle)
 
@@ -329,7 +329,7 @@ object BikeClientEffects {
     private fun playVehicleControlTransitionSounds(
         minecraft: Minecraft,
         vehicle: IVehicle,
-        telemetry: SkyridersNetwork.VehicleDebugPacket?
+        telemetry: SkyridersNetwork.VehicleTelemetryPacket?
     ) {
         telemetry ?: return
         if (!telemetry.hasTransmission) return
@@ -428,7 +428,7 @@ object BikeClientEffects {
     )
 
     private data class TimedVehicleTelemetry(
-        val packet: SkyridersNetwork.VehicleDebugPacket,
+        val packet: SkyridersNetwork.VehicleTelemetryPacket,
         val expireTick: Long
     )
 

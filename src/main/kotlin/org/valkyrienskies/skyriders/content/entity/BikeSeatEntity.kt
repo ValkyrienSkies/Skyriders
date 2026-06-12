@@ -62,7 +62,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         }
         rotatePassengersByBikeYawDelta(previousYaw)
         updateBikeInputFromPassenger()
-        sendBikeDebugToPassenger()
+        sendVehicleTelemetryToPassenger()
     }
 
     override fun getControllingPassenger(): LivingEntity? {
@@ -166,12 +166,14 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
         }
     }
 
-    private fun sendBikeDebugToPassenger() {
+    private fun sendVehicleTelemetryToPassenger() {
         if (level().isClientSide) return
         if (!isDriverSeat()) return
+        if (level().gameTime % TELEMETRY_SYNC_INTERVAL_TICKS != 0L) return
 
         val player = controllingPassenger as? ServerPlayer ?: return
         val vehicle = VehicleManager.getVehicle(level().dimensionId, bodyId) ?: return
+        SkyridersNetwork.sendVehicleTelemetry(player, vehicle)
         SkyridersNetwork.sendVehicleDebug(player, vehicle)
     }
 
@@ -195,6 +197,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     }
 
     companion object {
+        private const val TELEMETRY_SYNC_INTERVAL_TICKS = 4L
         private const val BODY_ID_TAG = "BodyId"
         private const val SEAT_ID_TAG = "SeatId"
         private const val DEFAULT_SEAT_ID = VehicleInteractionDefinition.SEAT

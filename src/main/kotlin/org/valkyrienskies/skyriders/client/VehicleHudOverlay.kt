@@ -148,19 +148,17 @@ object VehicleHudOverlay {
     private var previousFuelForwardSpeed: Double? = null
     private val visualMeterValues = HashMap<String, Double>()
 
-    fun updateVehicle(packet: SkyridersNetwork.VehicleDebugPacket) {
+    fun updateVehicle(packet: SkyridersNetwork.VehicleTelemetryPacket) {
         snapshot = VehicleHudSnapshot(
             bodyId = packet.bodyId,
             maxSpeed = packet.maxSpeed,
             speed = packet.speed,
             forwardSpeed = packet.forwardSpeed,
             steer = packet.steer,
-            steerAngleRad = packet.steerAngleRad,
             engineOn = packet.engineOn,
             transmissionGear = packet.transmissionGear,
             parkingBrakeEngaged = packet.parkingBrakeEngaged || packet.drifting,
             engineRpm = packet.engineRpm,
-            clutchEngagement = packet.clutchEngagement,
             engineStalled = packet.engineStalled,
             fuel = packet.fuel.coerceIn(0.0, 1.0),
             hasRevs = packet.hasTransmission,
@@ -482,13 +480,11 @@ object VehicleHudOverlay {
         val speed: Double,
         val forwardSpeed: Double,
         val steer: Double,
-        val steerAngleRad: Double,
         val engineOn: Boolean,
         val transmissionGear: Int,
         val parkingBrakeEngaged: Boolean,
         val engineRpm: Double,
         val jumpCharge: Double = 0.0,
-        val clutchEngagement: Double,
         val engineStalled: Boolean,
         val fuel: Double,
         val hasRevs: Boolean = true,
