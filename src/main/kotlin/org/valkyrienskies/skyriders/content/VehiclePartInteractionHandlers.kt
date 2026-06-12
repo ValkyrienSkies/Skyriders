@@ -79,14 +79,17 @@ object VehiclePartInteractionHandlers {
     private fun refuelWithJerryCan(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone): Boolean {
         if (zone.partId != VehicleInteractionDefinition.FUEL_CAP) return false
         val level = player.level() as? ServerLevel ?: return false
-        if (!VehicleRefuelSources.hasActiveRefuelSource(player, vehicle, zone)) return false
+        val added = VehicleRefuelSources.refuelFromHeldItem(player, vehicle)
+            ?: if (VehicleRefuelSources.hasExternalRefuelSource(player, vehicle, zone)) {
+                VehicleFuel.refill(vehicle)
+            } else {
+                return false
+            }
 
-        val added = VehicleFuel.refill(vehicle)
         if (added <= 0.0) {
             player.displayClientMessage(Component.literal("${vehicle.vehicleDefinition.displayName} tank is already full"), true)
             return true
         }
-        VehicleRefuelSources.consumeHeldRefuelSource(player)
         player.displayClientMessage(Component.literal("Refueled ${vehicle.vehicleDefinition.displayName}"), true)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)

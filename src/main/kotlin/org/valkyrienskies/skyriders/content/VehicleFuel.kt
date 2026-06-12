@@ -44,6 +44,19 @@ object VehicleFuel {
         return (capacity - before).coerceAtLeast(0.0)
     }
 
+    fun refillAmount(vehicle: IVehicle, amount: Double): Double {
+        val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+        val capacity = capacity(vehicle.vehicleDefinition)
+        if (capacity <= 0.0) return 0.0
+        val before = amount(vehicle)
+        setAmount(vehicle, before + safeAmount)
+        val added = (amount(vehicle) - before).coerceAtLeast(0.0)
+        if (added > EPSILON) {
+            clearFuelStall(vehicle)
+        }
+        return added
+    }
+
     fun refillFraction(vehicle: IVehicle, fraction: Double): Double {
         val capacity = capacity(vehicle.vehicleDefinition)
         val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0

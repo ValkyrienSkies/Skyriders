@@ -16,6 +16,7 @@ fun interface ExternalVehicleRefuelSource {
 }
 
 object VehicleRefuelSources {
+    private val HONEY_BOTTLE_FUEL_AMOUNT = VehicleFuelDefinition().capacity * 0.25
     val JERRY_CAN_TAG: TagKey<Item> = TagKey.create(
         Registries.ITEM,
         ResourceLocation(SkyridersMod.MOD_ID, "jerry_can")
@@ -30,9 +31,26 @@ object VehicleRefuelSources {
         return isJerryCan(player.mainHandItem) || isJerryCan(player.offhandItem)
     }
 
+    fun refuelFromHeldItem(player: Player, vehicle: IVehicle): Double? {
+        val hand = InteractionHand.entries.firstOrNull { hand -> isJerryCan(player.getItemInHand(hand)) } ?: return null
+        val stack = player.getItemInHand(hand)
+        val added = if (stack.`is`(Items.HONEY_BOTTLE)) {
+            VehicleFuel.refillAmount(vehicle, HONEY_BOTTLE_FUEL_AMOUNT)
+        } else {
+            VehicleFuel.refill(vehicle)
+        }
+        if (added > 0.0) {
+            consumeHeldRefuelSource(player, hand, stack)
+        }
+        return added
+    }
+
     fun consumeHeldRefuelSource(player: Player): Boolean {
         val hand = InteractionHand.entries.firstOrNull { hand -> isJerryCan(player.getItemInHand(hand)) } ?: return false
-        val stack = player.getItemInHand(hand)
+        return consumeHeldRefuelSource(player, hand, player.getItemInHand(hand))
+    }
+
+    private fun consumeHeldRefuelSource(player: Player, hand: InteractionHand, stack: ItemStack): Boolean {
         if (stack.item == SkyridersMod.CREATIVE_JERRY_CAN.get()) return true
         if (player.abilities.instabuild) return true
 
@@ -47,6 +65,10 @@ object VehicleRefuelSources {
 
     fun hasActiveRefuelSource(player: Player, vehicle: IVehicle? = null, zone: VehicleInteractionZone? = null): Boolean {
         return canRefuelFromHeldItem(player) || hasExternalRefuelSource(player, vehicle, zone)
+    }
+
+    fun hasExternalRefuelSource(player: Player, vehicle: IVehicle?, zone: VehicleInteractionZone?): Boolean {
+        return externalSources.any { it.canRefuel(player, vehicle, zone) }
     }
 
     fun registerExternalSource(source: ExternalVehicleRefuelSource) {
@@ -70,7 +92,4 @@ object VehicleRefuelSources {
         }
     }
 
-    private fun hasExternalRefuelSource(player: Player, vehicle: IVehicle?, zone: VehicleInteractionZone?): Boolean {
-        return externalSources.any { it.canRefuel(player, vehicle, zone) }
-    }
 }
