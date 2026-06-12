@@ -492,6 +492,8 @@ object VehicleManager {
     fun applyVisualWheelState(
         level: Level,
         bodyId: BodyId,
+        engineOn: Boolean,
+        visualLeanRad: Double,
         frontSteerRad: Double,
         frontWheelSpin: Double,
         rearWheelSpin: Double,
@@ -502,6 +504,11 @@ object VehicleManager {
     ) {
         when (val vehicle = getVehicle(level, bodyId)) {
             is IBike -> {
+                vehicle.state.engineOn = engineOn
+                if (visualLeanRad.isFinite()) {
+                    vehicle.state.visualLeanRad = visualLeanRad
+                }
+                vehicle.state.visualSteerRad = frontSteerRad
                 vehicle.state.frontWheelSpin = frontWheelSpin
                 vehicle.state.rearWheelSpin = rearWheelSpin
                 vehicle.state.frontWheelAngularVelocity = frontWheelAngularVelocity
@@ -510,6 +517,7 @@ object VehicleManager {
                 vehicle.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
             is KartVehicle -> {
+                vehicle.kartState.engineOn = engineOn
                 vehicle.kartState.debugSteerRad = frontSteerRad
                 vehicle.kartState.smoothedSteerRad = frontSteerRad
                 vehicle.kartState.frontWheelSpin = frontWheelSpin
@@ -520,6 +528,7 @@ object VehicleManager {
                 vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
             }
             is WheeledVehicle -> {
+                vehicle.wheeledState.engineOn = engineOn
                 vehicle.wheeledState.debugSteerRad = frontSteerRad
                 vehicle.wheeledState.smoothedSteerRad = frontSteerRad
                 vehicle.wheeledState.frontWheelSpin = frontWheelSpin

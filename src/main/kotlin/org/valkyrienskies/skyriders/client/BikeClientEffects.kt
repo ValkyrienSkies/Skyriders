@@ -75,9 +75,8 @@ object BikeClientEffects {
             }
         }
         vehicles.forEach { vehicle ->
-            val bikeTelemetry = telemetryByBodyId[vehicle.bodyId]?.packet
             val vehicleTelemetry = vehicleTelemetryByBodyId[vehicle.bodyId]?.packet
-            tickEngineSound(minecraft, vehicle, bikeTelemetry, vehicleTelemetry)
+            tickEngineSound(minecraft, vehicle, vehicleTelemetry)
             playVehicleControlTransitionSounds(minecraft, vehicle, vehicleTelemetry)
             if (vehicle !is IBike) {
                 spawnGenericVehicleEffects(level, vehicle, vehicleTelemetry)
@@ -85,11 +84,11 @@ object BikeClientEffects {
         }
 
         bikes.forEach { bike ->
-            spawnBikeEffects(level, bike, telemetryByBodyId[bike.bodyId]?.packet)
+            spawnBikeEffects(level, bike, vehicleTelemetryByBodyId[bike.bodyId]?.packet)
         }
     }
 
-    private fun spawnBikeEffects(level: ClientLevel, bike: IBike, telemetry: SkyridersNetwork.BikeDebugPacket?) {
+    private fun spawnBikeEffects(level: ClientLevel, bike: IBike, telemetry: SkyridersNetwork.VehicleDebugPacket?) {
         val transform = try {
             bike.getRenderTransform() ?: return
         } catch (_: IllegalStateException) {
@@ -121,8 +120,8 @@ object BikeClientEffects {
         }
 
         val drifting = telemetry?.drifting == true
-        val frontGrounded = telemetry?.frontGrounded ?: (speed > 4.0)
-        val rearGrounded = telemetry?.rearGrounded ?: (speed > 4.0)
+        val frontGrounded = telemetry?.groundedCount?.let { it > 0 } ?: (speed > 4.0)
+        val rearGrounded = telemetry?.groundedCount?.let { it > 1 } ?: (speed > 4.0)
         val frontFallback = wheelGroundParticleLocalPos(bike, true)
         val rearFallback = wheelGroundParticleLocalPos(bike, false)
         render.resolvedTireParticlePoints(frontFallback, rearFallback).forEach { point ->
@@ -231,7 +230,7 @@ object BikeClientEffects {
         )
     }
 
-    private fun exhaustParticle(telemetry: SkyridersNetwork.BikeDebugPacket?): ParticleOptions {
+    private fun exhaustParticle(telemetry: SkyridersNetwork.VehicleDebugPacket?): ParticleOptions {
         if (telemetry?.drifting != true) return ParticleTypes.SMOKE
         return when {
             telemetry.driftBoostLevel >= 3 -> ParticleTypes.DRAGON_BREATH
@@ -257,7 +256,7 @@ object BikeClientEffects {
         return (0.1 + speed / 48.0).coerceIn(0.1, 0.45)
     }
 
-    private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.BikeDebugPacket?): Double {
+    private fun exhaustChance(speed: Double, telemetry: SkyridersNetwork.VehicleDebugPacket?): Double {
         val speedChance = (0.12 + speed / 42.0).coerceIn(0.12, 0.55)
         return if (telemetry?.drifting == true) 0.85 else speedChance
     }
@@ -265,13 +264,12 @@ object BikeClientEffects {
     private fun tickEngineSound(
         minecraft: Minecraft,
         vehicle: IVehicle,
-        bikeTelemetry: SkyridersNetwork.BikeDebugPacket?,
         vehicleTelemetry: SkyridersNetwork.VehicleDebugPacket?
     ) {
         playEngineTransitionSound(minecraft, vehicle)
 
         val soundDefinition = vehicle.vehicleDefinition.sounds
-        val soundId = if (vehicleTelemetry?.drifting == true || bikeTelemetry?.drifting == true) soundDefinition.driftLoop else soundDefinition.engineLoop
+        val soundId = if (vehicleTelemetry?.drifting == true) soundDefinition.driftLoop else soundDefinition.engineLoop
         if (soundId == null || !vehicle.vehicleState.engineOn) {
             engineSoundsByBodyId.remove(vehicle.bodyId)?.stopNow()
             return
@@ -281,7 +279,7 @@ object BikeClientEffects {
         } catch (_: IllegalStateException) {
             0.0
         }
-        val throttle = abs(bikeTelemetry?.throttle ?: vehicleTelemetry?.throttle ?: 0.0)
+        val throttle = abs(vehicleTelemetry?.throttle ?: 0.0)
         val engineRpm = vehicleTelemetry?.engineRpm?.takeIf { vehicleTelemetry.hasTransmission && it > 0.0 }
         val existingSound = engineSoundsByBodyId[vehicle.bodyId]
         val sound = if (existingSound?.soundId == soundId) {

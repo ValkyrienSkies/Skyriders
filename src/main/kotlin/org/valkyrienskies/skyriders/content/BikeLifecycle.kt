@@ -87,16 +87,10 @@ object BikeLifecycle {
     }
 
     private fun syncVisualState(level: ServerLevel) {
-        val bikes = BikeManager.getBikes(level.dimensionId)
-        val vehicles = VehicleManager.getVehicles(level.dimensionId).filterNot { it is IBike }
-        if (bikes.isEmpty() && vehicles.isEmpty()) return
+        val vehicles = VehicleManager.getVehicles(level.dimensionId)
+        if (vehicles.isEmpty()) return
         level.players().forEach { player ->
-            if (bikes.isNotEmpty()) {
-                SkyridersNetwork.sendBikeVisualState(player, bikes)
-            }
-            if (vehicles.isNotEmpty()) {
-                SkyridersNetwork.sendVehicleVisualState(player, vehicles)
-            }
+            SkyridersNetwork.sendVehicleVisualState(player, vehicles)
         }
     }
 }

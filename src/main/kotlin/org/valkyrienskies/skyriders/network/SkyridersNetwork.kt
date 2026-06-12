@@ -44,6 +44,8 @@ import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 
 object SkyridersNetwork {
     private const val PROTOCOL_VERSION = "1"
+    private const val VEHICLE_VISUAL_ENGINE_ON_FLAG = 1
+    private const val VEHICLE_VISUAL_LEAN_FLAG = 1 shl 1
     private var nextPacketId = 0
 
     private val CHANNEL: SimpleChannel = NetworkRegistry.ChannelBuilder
@@ -417,10 +419,26 @@ object SkyridersNetwork {
     fun sendVehicleVisualState(player: ServerPlayer, vehicles: List<org.valkyrienskies.skyriders.content.IVehicle>) {
         val states = vehicles.mapNotNull { vehicle ->
             when (vehicle) {
+                is IBike -> {
+                    val state = vehicle.state
+                    VehicleVisualState(
+                        bodyId = vehicle.bodyId,
+                        engineOn = state.engineOn,
+                        visualLeanRad = state.visualLeanRad,
+                        frontSteerRad = state.visualSteerRad,
+                        frontWheelSpin = state.frontWheelSpin,
+                        rearWheelSpin = state.rearWheelSpin,
+                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                    )
+                }
                 is KartVehicle -> {
                     val state = vehicle.kartState
                     VehicleVisualState(
                         bodyId = vehicle.bodyId,
+                        engineOn = state.engineOn,
                         frontSteerRad = state.debugSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
                         rearWheelSpin = state.rearWheelSpin,
@@ -434,6 +452,7 @@ object SkyridersNetwork {
                     val state = vehicle.wheeledState
                     VehicleVisualState(
                         bodyId = vehicle.bodyId,
+                        engineOn = state.engineOn,
                         frontSteerRad = state.debugSteerRad,
                         frontWheelSpin = state.frontWheelSpin,
                         rearWheelSpin = state.rearWheelSpin,
@@ -919,6 +938,8 @@ object SkyridersNetwork {
                         VehicleManager.applyVisualWheelState(
                             level = level,
                             bodyId = bodyId,
+                            engineOn = engineOn,
+                            visualLeanRad = Double.NaN,
                             frontSteerRad = steerAngleRad,
                             frontWheelSpin = frontWheelSpin,
                             rearWheelSpin = rearWheelSpin,
@@ -1072,6 +1093,13 @@ object SkyridersNetwork {
             buf.writeVarInt(states.size)
             states.forEach { state ->
                 buf.writeLong(state.bodyId)
+                val flags =
+                    (if (state.engineOn) VEHICLE_VISUAL_ENGINE_ON_FLAG else 0) or
+                        (if (state.visualLeanRad.isFinite()) VEHICLE_VISUAL_LEAN_FLAG else 0)
+                buf.writeByte(flags)
+                if (state.visualLeanRad.isFinite()) {
+                    buf.writeDouble(state.visualLeanRad)
+                }
                 buf.writeDouble(state.frontSteerRad)
                 buf.writeDouble(state.frontWheelSpin)
                 buf.writeDouble(state.rearWheelSpin)
@@ -1092,6 +1120,8 @@ object SkyridersNetwork {
                             VehicleManager.applyVisualWheelState(
                                 level = level,
                                 bodyId = state.bodyId,
+                                engineOn = state.engineOn,
+                                visualLeanRad = state.visualLeanRad,
                                 frontSteerRad = state.frontSteerRad,
                                 frontWheelSpin = state.frontWheelSpin,
                                 rearWheelSpin = state.rearWheelSpin,
@@ -1115,8 +1145,17 @@ object SkyridersNetwork {
             fun decode(buf: FriendlyByteBuf): VehicleVisualStatePacket {
                 val count = buf.readVarInt()
                 val states = (0 until count).map {
+                    val bodyId = buf.readLong()
+                    val flags = buf.readByte().toInt() and 0xFF
+                    val visualLeanRad = if ((flags and VEHICLE_VISUAL_LEAN_FLAG) != 0) {
+                        buf.readDouble()
+                    } else {
+                        Double.NaN
+                    }
                     VehicleVisualState(
-                        bodyId = buf.readLong(),
+                        bodyId = bodyId,
+                        engineOn = (flags and VEHICLE_VISUAL_ENGINE_ON_FLAG) != 0,
+                        visualLeanRad = visualLeanRad,
                         frontSteerRad = buf.readDouble(),
                         frontWheelSpin = buf.readDouble(),
                         rearWheelSpin = buf.readDouble(),
@@ -1137,6 +1176,8 @@ object SkyridersNetwork {
 
     data class VehicleVisualState(
         val bodyId: Long,
+        val engineOn: Boolean = false,
+        val visualLeanRad: Double = Double.NaN,
         val frontSteerRad: Double,
         val frontWheelSpin: Double,
         val rearWheelSpin: Double,
