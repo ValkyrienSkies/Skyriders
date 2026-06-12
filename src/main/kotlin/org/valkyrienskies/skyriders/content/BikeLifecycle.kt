@@ -6,11 +6,16 @@ import net.minecraftforge.event.TickEvent
 import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
+import org.joml.Vector3d
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.racing.RaceManager
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 
 object BikeLifecycle {
+    private const val VISUAL_SYNC_RADIUS = 128.0
+    private const val VISUAL_SYNC_RADIUS_SQUARED = VISUAL_SYNC_RADIUS * VISUAL_SYNC_RADIUS
+    private const val VISUAL_SYNC_INTERVAL_TICKS = 2L
     private val pendingRestoreLevels = mutableSetOf<ServerLevel>()
 
     @SubscribeEvent
@@ -55,7 +60,9 @@ object BikeLifecycle {
             BoostPadHandler.gameTick(level, vehicles)
             VehicleImpactDamageHandler.tick(level, vehicles)
             RaceManager.tickLevel(level)
-            syncVisualState(level)
+            if (level.gameTime % VISUAL_SYNC_INTERVAL_TICKS == 0L) {
+                syncVisualState(level)
+            }
         }
     }
 
@@ -90,7 +97,28 @@ object BikeLifecycle {
         val vehicles = VehicleManager.getVehicles(level.dimensionId)
         if (vehicles.isEmpty()) return
         level.players().forEach { player ->
-            SkyridersNetwork.sendVehicleVisualState(player, vehicles)
+            val riddenBodyId = (player.vehicle as? BikeSeatEntity)?.bodyId
+            val relevantVehicles = vehicles.filter { vehicle ->
+                vehicle.bodyId == riddenBodyId || isVehicleNearPlayer(vehicle, player)
+            }
+            if (relevantVehicles.isNotEmpty()) {
+                SkyridersNetwork.sendVehicleVisualState(player, relevantVehicles)
+            }
         }
+    }
+
+    private fun isVehicleNearPlayer(vehicle: IVehicle, player: ServerPlayer): Boolean {
+        val transform = try {
+            vehicle.getRenderTransform()
+        } catch (_: IllegalStateException) {
+            null
+        } ?: return false
+        val position = transform.toWorld.transformPosition(Vector3d())
+        if (!position.isFinite()) return false
+        return player.distanceToSqr(position.x, position.y, position.z) <= VISUAL_SYNC_RADIUS_SQUARED
+    }
+
+    private fun Vector3d.isFinite(): Boolean {
+        return x.isFinite() && y.isFinite() && z.isFinite()
     }
 }

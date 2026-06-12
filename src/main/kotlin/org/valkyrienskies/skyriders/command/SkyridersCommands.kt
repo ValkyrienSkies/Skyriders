@@ -27,6 +27,7 @@ import org.valkyrienskies.skyriders.content.BikeInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.racing.RaceManager
+import org.valkyrienskies.skyriders.network.SkyridersNetworkStats
 import org.joml.Vector3d
 
 object SkyridersCommands {
@@ -129,6 +130,10 @@ object SkyridersCommands {
                                         }
                                 )
                         )
+                )
+                .then(
+                    literal("netstats")
+                        .executes { ctx -> showNetworkStats(ctx.source) }
                 )
                 .then(
                     literal("race")
@@ -380,6 +385,34 @@ object SkyridersCommands {
         return 1
     }
 
+    private fun showNetworkStats(source: CommandSourceStack): Int {
+        val snapshot = SkyridersNetworkStats.snapshot()
+        if (snapshot.rows.isEmpty()) {
+            source.sendSuccess({ Component.literal("No Skyriders packet stats recorded yet.") }, false)
+            return 1
+        }
+
+        val message = Component.literal(
+            "Skyriders network stats, ${formatNumber(snapshot.elapsedSeconds)}s: " +
+                "${snapshot.totalPackets} packets, ${formatBytes(snapshot.totalEstimatedBytes)} estimated"
+        )
+        snapshot.rows.take(12).forEach { row ->
+            message.append(
+                Component.literal(
+                    "\n${row.packetType}: " +
+                        "${row.packets} packets (${formatNumber(row.packetsPerSecond(snapshot.elapsedSeconds))}/s), " +
+                        "${formatBytes(row.estimatedBytes)} (${formatBytesPerSecond(row.bytesPerSecond(snapshot.elapsedSeconds))}), " +
+                        "items=${row.items}"
+                )
+            )
+        }
+        if (snapshot.rows.size > 12) {
+            message.append(Component.literal("\n... ${snapshot.rows.size - 12} more packet types"))
+        }
+        source.sendSuccess({ message }, false)
+        return snapshot.rows.size
+    }
+
     private fun endRace(source: CommandSourceStack, colorInput: String): Int {
         val level = source.level as? ServerLevel
             ?: run {
@@ -489,6 +522,24 @@ object SkyridersCommands {
             "start/finish"
         } else {
             "checkpoint index $checkpointIndex"
+        }
+    }
+
+    private fun formatNumber(value: Double): String = "%.1f".format(value)
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes >= 1024L * 1024L -> "${formatNumber(bytes / (1024.0 * 1024.0))} MiB"
+            bytes >= 1024L -> "${formatNumber(bytes / 1024.0)} KiB"
+            else -> "$bytes B"
+        }
+    }
+
+    private fun formatBytesPerSecond(bytesPerSecond: Double): String {
+        return when {
+            bytesPerSecond >= 1024.0 * 1024.0 -> "${formatNumber(bytesPerSecond / (1024.0 * 1024.0))} MiB/s"
+            bytesPerSecond >= 1024.0 -> "${formatNumber(bytesPerSecond / 1024.0)} KiB/s"
+            else -> "${formatNumber(bytesPerSecond)} B/s"
         }
     }
 

@@ -195,10 +195,12 @@ object SkyridersNetwork {
     }
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
+        SkyridersNetworkStats.record("S2C.BikeSync", estimateBikeSyncBytes(records), records.size)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
     }
 
     fun sendVehicleSync(player: ServerPlayer, records: List<VehicleSaveRecord>) {
+        SkyridersNetworkStats.record("S2C.VehicleSync", estimateVehicleSyncBytes(records), records.size)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, VehicleSyncPacket(records))
     }
 
@@ -206,6 +208,7 @@ object SkyridersNetwork {
         val state = bike.state
         val bikeId = bike.id
         val bikeName = bike.definition.displayName
+        SkyridersNetworkStats.record("S2C.BikeDebug", estimateBikeDebugBytes(bikeId, bikeName))
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             BikeDebugPacket(
@@ -355,45 +358,48 @@ object SkyridersNetwork {
         }
         val hasJump = vehicle.vehicleDefinition.behavior is BikeVehicleBehaviorDefinition
 
+        val packet = VehicleDebugPacket(
+            bodyId = vehicle.bodyId,
+            vehicleId = vehicle.id,
+            vehicleName = vehicle.vehicleDefinition.displayName,
+            maxSpeed = maxSpeed,
+            speed = speed,
+            engineOn = vehicle.vehicleState.engineOn,
+            fuel = VehicleFuel.fraction(vehicle),
+            throttle = input.throttle,
+            steer = input.steer,
+            groundedCount = groundedCount,
+            hasJump = hasJump,
+            jumpCharge = jumpCharge,
+            drifting = drifting,
+            driftBoostCharge = driftBoostCharge,
+            driftBoostLevel = driftBoostLevel,
+            lateralSlip = lateralSlip,
+            forwardSpeed = forwardSpeed,
+            steerAngleRad = steerAngleRad,
+            driftBoostTimeRemaining = driftBoostTimeRemaining,
+            frontWheelSpin = frontWheelSpin,
+            rearWheelSpin = rearWheelSpin,
+            frontWheelAngularVelocity = frontWheelAngularVelocity,
+            rearWheelAngularVelocity = rearWheelAngularVelocity,
+            frontWheelSuspensionOffset = frontWheelSuspensionOffset,
+            rearWheelSuspensionOffset = rearWheelSuspensionOffset,
+            hasTransmission = hasTransmission,
+            transmissionGear = transmissionGear,
+            parkingBrakeEngaged = parkingBrakeEngaged,
+            engineRpm = engineRpm,
+            clutchEngagement = clutchEngagement,
+            engineStalled = engineStalled
+        )
+        SkyridersNetworkStats.record("S2C.VehicleDebug", estimateVehicleDebugBytes(packet))
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
-            VehicleDebugPacket(
-                bodyId = vehicle.bodyId,
-                vehicleId = vehicle.id,
-                vehicleName = vehicle.vehicleDefinition.displayName,
-                maxSpeed = maxSpeed,
-                speed = speed,
-                engineOn = vehicle.vehicleState.engineOn,
-                fuel = VehicleFuel.fraction(vehicle),
-                throttle = input.throttle,
-                steer = input.steer,
-                groundedCount = groundedCount,
-                hasJump = hasJump,
-                jumpCharge = jumpCharge,
-                drifting = drifting,
-                driftBoostCharge = driftBoostCharge,
-                driftBoostLevel = driftBoostLevel,
-                lateralSlip = lateralSlip,
-                forwardSpeed = forwardSpeed,
-                steerAngleRad = steerAngleRad,
-                driftBoostTimeRemaining = driftBoostTimeRemaining,
-                frontWheelSpin = frontWheelSpin,
-                rearWheelSpin = rearWheelSpin,
-                frontWheelAngularVelocity = frontWheelAngularVelocity,
-                rearWheelAngularVelocity = rearWheelAngularVelocity,
-                frontWheelSuspensionOffset = frontWheelSuspensionOffset,
-                rearWheelSuspensionOffset = rearWheelSuspensionOffset,
-                hasTransmission = hasTransmission,
-                transmissionGear = transmissionGear,
-                parkingBrakeEngaged = parkingBrakeEngaged,
-                engineRpm = engineRpm,
-                clutchEngagement = clutchEngagement,
-                engineStalled = engineStalled
-            )
+            packet
         )
     }
 
     fun sendBikeVisualState(player: ServerPlayer, bikes: List<IBike>) {
+        SkyridersNetworkStats.record("S2C.BikeVisualState", estimateBikeVisualStateBytes(bikes), bikes.size)
         CHANNEL.send(
             PacketDistributor.PLAYER.with { player },
             BikeVisualStatePacket(
@@ -466,22 +472,27 @@ object SkyridersNetwork {
             }
         }
         if (states.isEmpty()) return
+        SkyridersNetworkStats.record("S2C.VehicleVisualState", estimateVehicleVisualStateBytes(states), states.size)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, VehicleVisualStatePacket(states))
     }
 
     fun sendBikeHoistState(player: ServerPlayer, hoisting: Boolean, bodyId: Long = -1L) {
+        SkyridersNetworkStats.record("S2C.BikeHoistState", 9)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeHoistStatePacket(hoisting, bodyId))
     }
 
     fun sendRaceCompassTarget(player: ServerPlayer, target: Vec3?) {
+        SkyridersNetworkStats.record("S2C.RaceCompassTarget", if (target != null) 25 else 1)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceCompassTargetPacket(target != null, target ?: Vec3.ZERO))
     }
 
     fun sendRaceMusicStart(player: ServerPlayer, track: ResourceLocation) {
+        SkyridersNetworkStats.record("S2C.RaceMusic", 1 + estimateResourceLocationBytes(track))
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(true, track))
     }
 
     fun sendRaceMusicStop(player: ServerPlayer) {
+        SkyridersNetworkStats.record("S2C.RaceMusic", 1)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
     }
 
@@ -494,14 +505,17 @@ object SkyridersNetwork {
         totalLaps: Int,
         lapElapsedTicks: Long
     ) {
+        SkyridersNetworkStats.record("S2C.RaceHud", 33)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(true, bodyId, place, total, lap, totalLaps, lapElapsedTicks))
     }
 
     fun sendRaceHudClear(player: ServerPlayer) {
+        SkyridersNetworkStats.record("S2C.RaceHud", 1)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(false, -1L, 0, 0, 0, 0, 0L))
     }
 
     fun sendRocketExplosionSound(player: ServerPlayer, position: Vec3, volume: Float, pitch: Float) {
+        SkyridersNetworkStats.record("S2C.RocketExplosionSound", 32)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RocketExplosionSoundPacket(position, volume, pitch))
     }
 
@@ -517,6 +531,7 @@ object SkyridersNetwork {
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.VehicleInput", 56)
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
@@ -554,6 +569,7 @@ object SkyridersNetwork {
 
     class BikeDismountPacket {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.BikeDismount", 0)
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
@@ -582,6 +598,7 @@ object SkyridersNetwork {
 
     class BikeEngineTogglePacket {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.BikeEngineToggle", 0)
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
@@ -612,6 +629,7 @@ object SkyridersNetwork {
         }
 
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.VehicleControlAction", estimateResourceLocationBytes(action))
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
@@ -639,6 +657,7 @@ object SkyridersNetwork {
 
     data class BikeUsePacket(val shiftDown: Boolean = false) {
         fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.BikeUse", 1)
             val context = contextSupplier.get()
             context.enqueueWork {
                 val player = context.sender ?: return@enqueueWork
@@ -1350,6 +1369,51 @@ object SkyridersNetwork {
             fun handle(packet: RocketExplosionSoundPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
+        }
+    }
+
+    private fun estimateResourceLocationBytes(id: ResourceLocation): Int {
+        return 1 + id.namespace.length + id.path.length
+    }
+
+    private fun estimateBikeSyncBytes(records: List<BikeSaveRecord>): Int {
+        return 1 + records.sumOf { record ->
+            8 + 1 + record.bikeType.length + 1 + 5 * 8
+        }
+    }
+
+    private fun estimateVehicleSyncBytes(records: List<VehicleSaveRecord>): Int {
+        return 1 + records.sumOf { record ->
+            48 +
+                record.vehicleType.length +
+                record.behaviorTag.allKeys.size * 24 +
+                record.partStates.entries.sumOf { (id, state) -> id.length + state.data.allKeys.size * 24 }
+        }
+    }
+
+    private fun estimateBikeDebugBytes(bikeId: String, bikeName: String): Int {
+        return 8 + bikeId.length + bikeName.length + 5 * 8 + 4 + 4
+    }
+
+    private fun estimateVehicleDebugBytes(packet: VehicleDebugPacket): Int {
+        return 8 +
+            packet.vehicleId.length +
+            packet.vehicleName.length +
+            17 * 8 +
+            4 * 4 +
+            6
+    }
+
+    private fun estimateBikeVisualStateBytes(bikes: List<IBike>): Int {
+        return 1 + bikes.size * (8 + 1 + 8 * 8)
+    }
+
+    private fun estimateVehicleVisualStateBytes(states: List<VehicleVisualState>): Int {
+        return 1 + states.sumOf { state ->
+            8 +
+                1 +
+                (if (state.visualLeanRad.isFinite()) 8 else 0) +
+                7 * 8
         }
     }
 
