@@ -160,7 +160,9 @@ data class VehicleWheelRenderDefinition(
     val pivot: Vector3d,
     val visualOffset: Vector3d = Vector3d(),
     val steerSource: VehicleWheelSteerSource = VehicleWheelSteerSource.NONE,
-    val spinSource: VehicleWheelSpinSource = VehicleWheelSpinSource.NONE
+    val spinSource: VehicleWheelSpinSource = VehicleWheelSpinSource.NONE,
+    val steerAxis: VehicleVisualRotationAxis = VehicleVisualRotationAxis.Y,
+    val steerVisualScale: Double = 1.0
 )
 
 enum class VehicleWheelSteerSource {
@@ -172,6 +174,12 @@ enum class VehicleWheelSpinSource {
     NONE,
     FRONT,
     REAR
+}
+
+enum class VehicleVisualRotationAxis {
+    X,
+    Y,
+    Z
 }
 
 data class VehicleEffectPointDefinition(

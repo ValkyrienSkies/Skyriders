@@ -424,14 +424,14 @@ object WheeledVehicleDefinitions {
             seats = listOf(
                 VehicleSeatDefinition(
                     id = "driver",
-                    localPos = Vector3d(0.46, -0.72, 0.18),
+                    localPos = Vector3d(0.46, -0.65, 0.18),
                     role = VehicleSeatRole.DRIVER,
                     interactionZone = leftSeat,
                     requiredOpenPartId = leftDoor
                 ),
                 VehicleSeatDefinition(
                     id = "passenger",
-                    localPos = Vector3d(-0.46, -0.72, 0.18),
+                    localPos = Vector3d(-0.46, -0.65, 0.18),
                     role = VehicleSeatRole.PASSENGER,
                     interactionZone = rightSeat,
                     requiredOpenPartId = rightDoor
@@ -630,26 +630,10 @@ object WheeledVehicleDefinitions {
             wheelSpinSmoothingTime = 0.12,
             wheelParts = listOf(
                 VehicleWheelRenderDefinition(
-                    id = "front_left_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_flw"),
-                    pivot = Vector3d(1.34375, 0.328125, 1.4969),
-                    visualOffset = Vector3d(0.0, -0.25, 0.0),
-                    steerSource = VehicleWheelSteerSource.FRONT,
-                    spinSource = VehicleWheelSpinSource.FRONT
-                ),
-                VehicleWheelRenderDefinition(
-                    id = "front_right_wheel",
-                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_flw"),
-                    pivot = Vector3d(1.34375, 0.328125, 1.4969),
-                    visualOffset = Vector3d(-1.6875, -0.25, 0.0),
-                    steerSource = VehicleWheelSteerSource.FRONT,
-                    spinSource = VehicleWheelSpinSource.FRONT
-                ),
-                VehicleWheelRenderDefinition(
                     id = "rear_left_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_brw"),
                     pivot = Vector3d(1.34375, 0.328125, -0.7531),
-                    visualOffset = Vector3d(0.0, -0.25, 0.0),
+                    visualOffset = Vector3d(0.0, -0.20, 2.25),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
                 ),
@@ -657,30 +641,48 @@ object WheeledVehicleDefinitions {
                     id = "rear_right_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_blw"),
                     pivot = Vector3d(-0.34375, 0.328125, -0.7531),
-                    visualOffset = Vector3d(0.0, -0.25, 0.0),
+                    visualOffset = Vector3d(0.0, -0.20, 2.25),
                     steerSource = VehicleWheelSteerSource.NONE,
                     spinSource = VehicleWheelSpinSource.REAR
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "front_left_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_brw"),
+                    pivot = Vector3d(1.34375, 0.328125, -0.7531),
+                    visualOffset = Vector3d(0.0, -0.20, 0.0),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
+                ),
+                VehicleWheelRenderDefinition(
+                    id = "front_right_wheel",
+                    model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_blw"),
+                    pivot = Vector3d(-0.34375, 0.328125, -0.7531),
+                    visualOffset = Vector3d(0.0, -0.20, 0.0),
+                    steerSource = VehicleWheelSteerSource.FRONT,
+                    spinSource = VehicleWheelSpinSource.FRONT
                 ),
                 VehicleWheelRenderDefinition(
                     id = "steering_wheel",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_steer"),
                     pivot = Vector3d(0.09375, 1.078125, -0.1906),
                     steerSource = VehicleWheelSteerSource.FRONT,
-                    spinSource = VehicleWheelSpinSource.NONE
+                    spinSource = VehicleWheelSpinSource.NONE,
+                    steerAxis = VehicleVisualRotationAxis.Z,
+                    steerVisualScale = 2.6
                 )
             ),
             modelParts = listOf(
                 VehicleModelPartRenderDefinition(
                     id = "left_door",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_ldoor"),
-                    pivot = Vector3d(-0.458915625, 1.156365625, 1.233043125),
+                    pivot = Vector3d(-0.458915625, 1.156365625, -0.130723125),
                     openRotationDegrees = Vector3d(0.0, -68.0, 0.0),
                     partStateId = "left_door"
                 ),
                 VehicleModelPartRenderDefinition(
                     id = "right_door",
                     model = ResourceLocation(SkyridersMod.MOD_ID, "$base/bergentruck_rdoor"),
-                    pivot = Vector3d(1.458915625, 1.156365625, 1.233043125),
+                    pivot = Vector3d(1.458915625, 1.156365625, -0.130723125),
                     openRotationDegrees = Vector3d(0.0, 68.0, 0.0),
                     partStateId = "right_door"
                 )

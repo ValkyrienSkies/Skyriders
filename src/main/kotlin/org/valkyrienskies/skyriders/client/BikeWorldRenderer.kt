@@ -26,12 +26,14 @@ import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleModelPartRenderDefinition
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleRefuelSources
+import org.valkyrienskies.skyriders.content.VehicleVisualRotationAxis
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import kotlin.math.exp
+import kotlin.math.pow
 
 object BikeWorldRenderer {
     private val TEMP_FUEL_CAP_MARKER_IDS = setOf(
@@ -168,7 +170,8 @@ object BikeWorldRenderer {
                         ?: wheeled?.wheeledState?.debugSteerRad
                         ?: 0.0
                     VehicleWheelSteerSource.NONE -> 0.0
-                },
+                } * wheelPart.steerVisualScale,
+                steerAxis = wheelPart.steerAxis,
                 spinRad = when (wheelPart.spinSource) {
                     VehicleWheelSpinSource.FRONT -> visualState.frontWheelSpin
                     VehicleWheelSpinSource.REAR -> visualState.rearWheelSpin
@@ -229,12 +232,31 @@ object BikeWorldRenderer {
             ?.let { if (it) 1.0 else 0.0 }
             ?: 0.0
         val key = modelPart.partStateId ?: modelPart.id
-        val current = visualState.modelPartOpenAmounts.getOrPut(key) { target }
-        val alpha = 1.0 - exp(-visualState.lastDeltaSeconds / MODEL_PART_OPEN_SMOOTHING_SECONDS)
-        val next = current + (target - current) * alpha
-        val snapped = if (kotlin.math.abs(next - target) < 0.001) target else next
-        visualState.modelPartOpenAmounts[key] = snapped
-        return snapped
+        val animation = visualState.modelPartOpenAmounts.getOrPut(key) {
+            ModelPartOpenAnimation(current = target, start = target, target = target, elapsedSeconds = MODEL_PART_OPEN_DURATION_SECONDS)
+        }
+        if (animation.target != target) {
+            animation.start = animation.current
+            animation.target = target
+            animation.elapsedSeconds = 0.0
+        }
+
+        animation.elapsedSeconds = (animation.elapsedSeconds + visualState.lastDeltaSeconds)
+            .coerceAtMost(MODEL_PART_OPEN_DURATION_SECONDS)
+        val progress = (animation.elapsedSeconds / MODEL_PART_OPEN_DURATION_SECONDS).coerceIn(0.0, 1.0)
+        val eased = easeOutBack(progress).coerceIn(0.0, 1.0)
+        animation.current = animation.start + (animation.target - animation.start) * eased
+        if (progress >= 1.0 || kotlin.math.abs(animation.current - animation.target) < 0.001) {
+            animation.current = animation.target
+        }
+        return animation.current
+    }
+
+    private fun easeOutBack(t: Double): Double {
+        val c1 = MODEL_PART_BACK_OVERSHOOT
+        val c3 = c1 + 1.0
+        val x = t - 1.0
+        return 1.0 + c3 * x.pow(3.0) + c1 * x.pow(2.0)
     }
 
     private fun renderRaceFlagMarker(
@@ -393,6 +415,7 @@ object BikeWorldRenderer {
         pivot: Vector3d,
         visualOffset: Vector3d,
         steerRad: Double,
+        steerAxis: VehicleVisualRotationAxis,
         spinRad: Double,
         suspensionOffset: Double,
         packedLight: Int
@@ -406,7 +429,7 @@ object BikeWorldRenderer {
         }
         poseStack.translate(pivot.x, pivot.y, pivot.z)
         if (steerRad.isFinite() && steerRad != 0.0) {
-            poseStack.mulPose(Axis.YP.rotation(steerRad.toFloat()))
+            applyRotation(poseStack, steerAxis, steerRad)
         }
         if (spinRad.isFinite() && spinRad != 0.0) {
             poseStack.mulPose(Axis.XP.rotation((-spinRad).toFloat()))
@@ -416,6 +439,14 @@ object BikeWorldRenderer {
             model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
         }
         poseStack.popPose()
+    }
+
+    private fun applyRotation(poseStack: PoseStack, axis: VehicleVisualRotationAxis, radians: Double) {
+        when (axis) {
+            VehicleVisualRotationAxis.X -> poseStack.mulPose(Axis.XP.rotation(radians.toFloat()))
+            VehicleVisualRotationAxis.Y -> poseStack.mulPose(Axis.YP.rotation(radians.toFloat()))
+            VehicleVisualRotationAxis.Z -> poseStack.mulPose(Axis.ZP.rotation(radians.toFloat()))
+        }
     }
 
     private fun renderBakedModel(
@@ -459,7 +490,15 @@ object BikeWorldRenderer {
     )
 
     private const val FLAG_MODEL_YAW_CORRECTION_DEGREES = 180.0f
-    private const val MODEL_PART_OPEN_SMOOTHING_SECONDS = 0.18
+    private const val MODEL_PART_OPEN_DURATION_SECONDS = 0.12
+    private const val MODEL_PART_BACK_OVERSHOOT = 1.65
+
+    private data class ModelPartOpenAnimation(
+        var current: Double,
+        var start: Double,
+        var target: Double,
+        var elapsedSeconds: Double
+    )
 
     private data class RenderVisualState(
         var lastRenderNanos: Long,
@@ -474,6 +513,6 @@ object BikeWorldRenderer {
         var frontWheelSuspensionOffset: Double,
         var rearWheelSuspensionOffset: Double,
         var lastDeltaSeconds: Double,
-        val modelPartOpenAmounts: MutableMap<String, Double> = HashMap()
+        val modelPartOpenAmounts: MutableMap<String, ModelPartOpenAnimation> = HashMap()
     )
 }
