@@ -131,8 +131,13 @@ object BikeWorldRenderer {
         poseStack.translate(render.modelOffset.x, render.modelOffset.y, render.modelOffset.z)
         poseStack.scale(render.modelScale.toFloat(), render.modelScale.toFloat(), render.modelScale.toFloat())
 
-        if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight, render.renderOpenModelNoCull)) {
-            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) } ?: run {
+        val bodyRenderType = if (render.renderOpenModelNoCull) {
+            VehicleOpenModelRenderer.BLOCK_ATLAS_NO_CULL_RENDER_TYPE
+        } else {
+            RenderType.cutout()
+        }
+        model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, bodyRenderType) } ?: run {
+            if (!VehicleOpenModelRenderer.renderIfNeeded(render.model, poseStack, bufferSource, packedLight, render.renderOpenModelNoCull)) {
                 poseStack.popPose()
                 return
             }
@@ -217,15 +222,19 @@ object BikeWorldRenderer {
             poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.z.toFloat()))
         }
         poseStack.translate(-modelPart.pivot.x, -modelPart.pivot.y, -modelPart.pivot.z)
-        if (!VehicleOpenModelRenderer.renderIfNeeded(
+        val partRenderType = if (modelPart.renderOpenModelNoCull) {
+            VehicleOpenModelRenderer.BLOCK_ATLAS_NO_CULL_RENDER_TYPE
+        } else {
+            RenderType.cutout()
+        }
+        model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight, partRenderType) } ?: run {
+            VehicleOpenModelRenderer.renderIfNeeded(
                 modelPart.model,
                 poseStack,
                 bufferSource,
                 packedLight,
                 modelPart.renderOpenModelNoCull
             )
-        ) {
-            model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
         }
         poseStack.popPose()
     }
@@ -461,11 +470,12 @@ object BikeWorldRenderer {
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
         model: BakedModel,
-        packedLight: Int
+        packedLight: Int,
+        renderType: RenderType = RenderType.cutout()
     ) {
         Minecraft.getInstance().blockRenderer.modelRenderer.renderModel(
             poseStack.last(),
-            bufferSource.getBuffer(RenderType.cutout()),
+            bufferSource.getBuffer(renderType),
             null,
             model,
             1.0f,
@@ -474,7 +484,7 @@ object BikeWorldRenderer {
             packedLight,
             OverlayTexture.NO_OVERLAY,
             ModelData.EMPTY,
-            RenderType.cutout()
+            renderType
         )
     }
 
