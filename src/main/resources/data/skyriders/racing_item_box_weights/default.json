@@ -8,7 +8,7 @@
     { "item": "skyriders:sugar_rocket", "weight": 5, "frontMultiplier": 0.9, "backMultiplier": 1.25 },
     { "item": "skyriders:homing_sugar_rocket", "weight": 3, "frontMultiplier": 0.2, "backMultiplier": 1.9 },
     { "item": "skyriders:glasso", "weight": 3, "frontMultiplier": 0.75, "backMultiplier": 1.55 },
-    { "item": "skyriders:honey_heister", "weight": 2, "frontMultiplier": 0.55, "backMultiplier": 2.1 },
+    { "item": "skyriders:honey_heister", "weight": 4, "frontMultiplier": 0.55, "backMultiplier": 2.1 },
     { "item": "skyriders:boxing_glove", "weight": 3, "frontMultiplier": 0.2, "backMultiplier": 1.45 },
     { "item": "skyriders:grabby_hand", "weight": 3, "frontMultiplier": 0.1, "backMultiplier": 1.7 },
     { "item": "skyriders:thunderbolt", "weight": 2, "frontMultiplier": 0.1, "backMultiplier": 2.45 }
