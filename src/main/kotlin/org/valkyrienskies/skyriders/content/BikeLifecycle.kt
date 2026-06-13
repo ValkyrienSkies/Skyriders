@@ -18,8 +18,8 @@ import org.valkyrienskies.skyriders.network.SkyridersNetwork
 object BikeLifecycle {
     private const val VISUAL_SYNC_RADIUS = 128.0
     private const val VISUAL_SYNC_RADIUS_SQUARED = VISUAL_SYNC_RADIUS * VISUAL_SYNC_RADIUS
-    private const val VISUAL_SYNC_INTERVAL_TICKS = 2L
-    private const val IDLE_VISUAL_SYNC_INTERVAL_TICKS = 10L
+    private const val VISUAL_SYNC_INTERVAL_TICKS = 1L
+    private const val IDLE_VISUAL_SYNC_INTERVAL_TICKS = 4L
     private const val ACTIVE_LINEAR_SPEED_SQUARED = 0.04
     private const val ACTIVE_ANGULAR_SPEED_SQUARED = 0.01
     private val pendingRestoreLevels = mutableSetOf<ServerLevel>()
