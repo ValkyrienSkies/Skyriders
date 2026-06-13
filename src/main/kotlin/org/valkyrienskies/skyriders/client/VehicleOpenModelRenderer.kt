@@ -207,7 +207,6 @@ object VehicleOpenModelRenderer {
         packedLight: Int,
         phase: Double
     ) {
-        val shade = faceShade(face.normal).coerceIn(0.94f, 1.0f)
         for (i in 0 until 4) {
             val vertex = face.vertices[i]
             val uv = face.uvs[i]
@@ -226,7 +225,7 @@ object VehicleOpenModelRenderer {
                 (vertex.y() + offsetY) / 16.0f,
                 (vertex.z() + offsetZ) / 16.0f
             )
-                .color(color.x() * shade, color.y() * shade, color.z() * shade, RAINBOW_OVERLAY_ALPHA)
+                .color(color.x(), color.y(), color.z(), RAINBOW_OVERLAY_ALPHA)
                 .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(LightTexture.FULL_BRIGHT)
@@ -309,7 +308,7 @@ object VehicleOpenModelRenderer {
             4 -> Triple(x, 0.0, 1.0)
             else -> Triple(1.0, 0.0, x)
         }
-        val saturation = 0.68
+        val saturation = 0.42
         return Vector3f(
             (1.0 - saturation + rawR * saturation).toFloat(),
             (1.0 - saturation + rawG * saturation).toFloat(),
@@ -585,7 +584,7 @@ object VehicleOpenModelRenderer {
     const val MIN_CRACK_DAMAGE_FRACTION = 0.08
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
-    private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.14f
-    private const val RAINBOW_OVERLAY_ALPHA = 0.9f
+    private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.22f
+    private const val RAINBOW_OVERLAY_ALPHA = 0.82f
     private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }

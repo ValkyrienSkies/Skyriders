@@ -158,6 +158,7 @@ object SkyridersModClient {
     @JvmStatic
     fun registerGuiOverlays(event: RegisterGuiOverlaysEvent) {
         event.registerAboveAll("vehicle_hud") { _, guiGraphics, _, screenWidth, screenHeight ->
+            MoondropVignetteOverlay.render(guiGraphics, screenWidth, screenHeight)
             VehicleHudOverlay.render(guiGraphics, screenWidth, screenHeight)
             RaceResultsClientState.render(guiGraphics, screenWidth, screenHeight)
         }

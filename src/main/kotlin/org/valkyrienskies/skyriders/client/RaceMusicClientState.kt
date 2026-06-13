@@ -154,7 +154,7 @@ object RaceMusicClientState {
     }
 
     private const val RACE_FADE_STEP = 0.035f
-    private const val MOONDROP_FADE_IN_STEP = 0.055f
-    private const val MOONDROP_FADE_OUT_STEP = 0.028f
+    private const val MOONDROP_FADE_IN_STEP = 0.095f
+    private const val MOONDROP_FADE_OUT_STEP = 0.058f
     private const val MIN_START_VOLUME = 0.01f
 }
