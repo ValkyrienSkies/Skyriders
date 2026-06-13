@@ -222,11 +222,23 @@ object SkyridersModClient {
 
         @SubscribeEvent
         fun onInteractionKey(event: InputEvent.InteractionKeyMappingTriggered) {
-            if (!event.isUseItem) return
-
             val minecraft = Minecraft.getInstance()
             val player = minecraft.player ?: return
             val level = minecraft.level ?: return
+            if (event.isAttack) {
+                val eye = player.getEyePosition(1.0f)
+                val end = eye.add(player.lookAngle.scale(5.0))
+                val hitVehicle = VehicleInteractionHandler.findVehicleOnRay(level, eye, end) != null
+                if (hitVehicle) {
+                    SkyridersNetwork.sendVehicleMeleeAttack()
+                    event.isCanceled = true
+                    event.setSwingHand(true)
+                }
+                return
+            }
+
+            if (!event.isUseItem) return
+
             val shiftDown = minecraft.options.keyShift.isDown || player.isShiftKeyDown
             if (player.vehicle is BikeSeatEntity) {
                 if (!shiftDown && (!player.mainHandItem.isEmpty || !player.offhandItem.isEmpty)) return

@@ -136,7 +136,8 @@ class FakeItemBoxEntity(type: EntityType<FakeItemBoxEntity>, level: Level) : Ent
             origin = position,
             baseDamage = 28.0,
             radius = BLAST_RADIUS,
-            directTarget = directTarget
+            directTarget = directTarget,
+            ignoredBodyId = ownerBodyId.takeIf { it != 0L }
         )
         VehicleManager.getVehicles(level).forEach { vehicle ->
             if (vehicle.bodyId == ownerBodyId) return@forEach

@@ -31,10 +31,10 @@ object VehicleHudOverlay {
     private const val MINI_CRT_WIDGET_SIZE = 96
     private const val MINI_CRT_SCREEN_X = 13
     private const val MINI_CRT_SCREEN_Y = 14
-    private const val MINI_CRT_SCREEN_RIGHT = 72
-    private const val MINI_CRT_SCREEN_BOTTOM = 70
+    private const val MINI_CRT_SCREEN_RIGHT = 85
+    private const val MINI_CRT_SCREEN_BOTTOM = 84
     private const val MINI_CRT_SCREEN_PADDING = 4
-    private const val MINI_CRT_DASHBOARD_OVERLAP = 12
+    private const val MINI_CRT_DASHBOARD_OVERLAP = 20
     private const val DAMAGE_PART_MIN_PIXELS = 3
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")

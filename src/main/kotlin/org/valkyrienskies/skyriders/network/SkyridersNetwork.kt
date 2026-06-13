@@ -32,6 +32,7 @@ import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleFuel
+import org.valkyrienskies.skyriders.content.VehicleDamageEvents
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
 import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
@@ -143,6 +144,13 @@ object SkyridersNetwork {
         )
         CHANNEL.registerMessage(
             nextPacketId++,
+            VehicleMeleeAttackPacket::class.java,
+            VehicleMeleeAttackPacket::encode,
+            VehicleMeleeAttackPacket::decode,
+            VehicleMeleeAttackPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
             BikeHoistStatePacket::class.java,
             BikeHoistStatePacket::encode,
             BikeHoistStatePacket::decode,
@@ -200,6 +208,10 @@ object SkyridersNetwork {
 
     fun sendBikeUse(shiftDown: Boolean = false) {
         CHANNEL.sendToServer(BikeUsePacket(shiftDown))
+    }
+
+    fun sendVehicleMeleeAttack() {
+        CHANNEL.sendToServer(VehicleMeleeAttackPacket())
     }
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
@@ -733,6 +745,31 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: BikeUsePacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    class VehicleMeleeAttackPacket {
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            SkyridersNetworkStats.record("C2S.VehicleMeleeAttack", 0)
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                val player = context.sender ?: return@enqueueWork
+                VehicleDamageEvents.handleClientMeleeAttack(player)
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: VehicleMeleeAttackPacket, buf: FriendlyByteBuf) {
+            }
+
+            fun decode(buf: FriendlyByteBuf): VehicleMeleeAttackPacket {
+                return VehicleMeleeAttackPacket()
+            }
+
+            fun handle(packet: VehicleMeleeAttackPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

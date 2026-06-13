@@ -75,12 +75,12 @@ object VehicleDamage {
         val wheelZones = config.axles.flatMap { axle ->
             listOf(
                 repairZone(
-                    "${axle.id}_left",
+                    "${axle.id}_left_wheel",
                     Vector3d(-axle.halfTrackWidth, axle.localY, axle.localZ),
                     wheelZoneSize(axle.wheelRadius, axle.wheelWidth)
                 ),
                 repairZone(
-                    "${axle.id}_right",
+                    "${axle.id}_right_wheel",
                     Vector3d(axle.halfTrackWidth, axle.localY, axle.localZ),
                     wheelZoneSize(axle.wheelRadius, axle.wheelWidth)
                 )
@@ -104,10 +104,18 @@ object VehicleDamage {
         finishDamage(level, vehicle)
     }
 
-    fun damageExplosion(level: ServerLevel, origin: Vec3, baseDamage: Double, radius: Double, directTarget: IVehicle? = null) {
+    fun damageExplosion(
+        level: ServerLevel,
+        origin: Vec3,
+        baseDamage: Double,
+        radius: Double,
+        directTarget: IVehicle? = null,
+        ignoredBodyId: Long? = null
+    ) {
         val shipWorld = level.shipWorld ?: return
         val originVec = Vector3d(origin.x, origin.y, origin.z)
         VehicleManager.getVehicles(level).forEach { vehicle ->
+            if (ignoredBodyId != null && vehicle.bodyId == ignoredBodyId) return@forEach
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
             val vehicleRadius = vehicleRadius(vehicle)
             val effectiveRadius = radius + vehicleRadius

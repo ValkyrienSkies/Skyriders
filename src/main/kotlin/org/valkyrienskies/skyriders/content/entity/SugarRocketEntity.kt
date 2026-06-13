@@ -319,7 +319,8 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             origin = position,
             baseDamage = if (directTarget != null) 42.0 else 30.0,
             radius = BLAST_RADIUS,
-            directTarget = directTarget
+            directTarget = directTarget,
+            ignoredBodyId = ownerBodyId.takeIf { it != 0L }
         )
         VehicleManager.getVehicles(level).forEach { vehicle ->
             if (vehicle.bodyId == ownerBodyId) return@forEach
