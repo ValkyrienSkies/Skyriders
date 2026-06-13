@@ -1,5 +1,6 @@
 package org.valkyrienskies.skyriders.content
 
+import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
@@ -7,13 +8,17 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.item.Item
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
 import org.joml.Quaterniond
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import java.util.concurrent.ThreadLocalRandom
@@ -39,6 +44,14 @@ object VehicleDamage {
     private const val ENGINE_MALFUNCTION_START = 0.72
     private const val ENGINE_STALL_START = 0.38
     private const val ENGINE_STALL_CHANCE_PER_SECOND = 0.42
+    private const val CRITICAL_FUSE_TICKS = 90L
+    private const val CRITICAL_HISS_INTERVAL_TICKS = 16L
+    private const val CRITICAL_EFFECT_INTERVAL_TICKS = 8L
+    private const val CRITICAL_FLASH_START_TICKS = 22L
+    private const val CRITICAL_DROPS_MIN = 3
+    private const val CRITICAL_DROPS_RANDOM = 3
+
+    private val criticalFailures = HashMap<VehicleKey, CriticalFailureState>()
 
     fun bodyPartDefinition(bodyHealth: Double = BODY_HEALTH): VehiclePartDefinition = damageablePart(BODY_PART_ID, VehiclePartTypes.BODY, bodyHealth)
 
@@ -190,6 +203,7 @@ object VehicleDamage {
             stack.shrink(1)
         }
         clearEngineDestroyedState(vehicle)
+        criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
         player.displayClientMessage(Component.literal("Repaired ${partDisplayName(partId)}"), true)
         level.playSound(null, player.blockPosition(), SoundEvents.ANVIL_USE, SoundSource.PLAYERS, 0.45f, 1.35f)
         return true
@@ -223,6 +237,29 @@ object VehicleDamage {
         if (ThreadLocalRandom.current().nextDouble() < chance) {
             stopEngine(vehicle, stalled = true)
         }
+    }
+
+    fun tick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
+        val now = level.gameTime
+        val activeKeys = HashSet<VehicleKey>()
+        vehicles.forEach { vehicle ->
+            val key = VehicleKey(level.dimensionId, vehicle.bodyId)
+            activeKeys.add(key)
+            if (!isCriticalFailureArmed(vehicle)) {
+                criticalFailures.remove(key)
+                return@forEach
+            }
+
+            val state = criticalFailures.getOrPut(key) { CriticalFailureState(now) }
+            val elapsed = now - state.startTick
+            if (elapsed >= CRITICAL_FUSE_TICKS) {
+                detonateCriticalFailure(level, vehicle)
+                criticalFailures.remove(key)
+                return@forEach
+            }
+            playCriticalFailureEffects(level, vehicle, state, now, elapsed)
+        }
+        criticalFailures.keys.removeIf { key -> key.dimensionId == level.dimensionId && key !in activeKeys }
     }
 
     fun tractionScale(dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId, bodyId: Long): Double {
@@ -306,6 +343,115 @@ object VehicleDamage {
         }
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
+    }
+
+    private fun isCriticalFailureArmed(vehicle: IVehicle): Boolean {
+        return healthFraction(vehicle, BODY_PART_ID) <= 0.0 && healthFraction(vehicle, ENGINE_PART_ID) <= 0.0
+    }
+
+    private fun playCriticalFailureEffects(
+        level: ServerLevel,
+        vehicle: IVehicle,
+        state: CriticalFailureState,
+        now: Long,
+        elapsed: Long
+    ) {
+        val position = vehiclePosition(level, vehicle) ?: return
+        if (now - state.lastHissTick >= CRITICAL_HISS_INTERVAL_TICKS) {
+            val sound = if (ThreadLocalRandom.current().nextBoolean()) {
+                SkyridersSounds.TIRE_LEAK_1_SOUND.get()
+            } else {
+                SkyridersSounds.TIRE_LEAK_2_SOUND.get()
+            }
+            level.playSound(null, position.x, position.y, position.z, sound, SoundSource.NEUTRAL, 0.7f, randomPitch(0.75f, 0.95f))
+            state.lastHissTick = now
+        }
+        if (now - state.lastEffectTick >= CRITICAL_EFFECT_INTERVAL_TICKS) {
+            val size = vehicle.vehicleDefinition.body.collisionBoxSize
+            level.sendParticles(
+                ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                position.x,
+                position.y + size.y.coerceAtLeast(0.4) * 0.25,
+                position.z,
+                2,
+                size.x.coerceAtLeast(0.6) * 0.22,
+                size.y.coerceAtLeast(0.4) * 0.16,
+                size.z.coerceAtLeast(0.6) * 0.22,
+                0.015
+            )
+            level.sendParticles(
+                ParticleTypes.ELECTRIC_SPARK,
+                position.x,
+                position.y,
+                position.z,
+                3,
+                size.x.coerceAtLeast(0.6) * 0.22,
+                size.y.coerceAtLeast(0.4) * 0.18,
+                size.z.coerceAtLeast(0.6) * 0.22,
+                0.04
+            )
+            state.lastEffectTick = now
+        }
+        if (CRITICAL_FUSE_TICKS - elapsed <= CRITICAL_FLASH_START_TICKS && now - state.lastFlashTick >= 4L) {
+            level.sendParticles(ParticleTypes.FLASH, position.x, position.y + 0.35, position.z, 1, 0.0, 0.0, 0.0, 0.0)
+            level.playSound(null, position.x, position.y, position.z, SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.NEUTRAL, 0.42f, 1.85f)
+            state.lastFlashTick = now
+        }
+    }
+
+    private fun detonateCriticalFailure(level: ServerLevel, vehicle: IVehicle) {
+        val position = vehiclePosition(level, vehicle) ?: return
+        level.playSound(null, position.x, position.y, position.z, SkyridersSounds.SUGAR_ROCKET_EXPLODE_SOUND.get(), SoundSource.NEUTRAL, 1.4f, randomPitch(0.88f, 1.04f))
+        level.sendParticles(ParticleTypes.FLASH, position.x, position.y + 0.4, position.z, 1, 0.0, 0.0, 0.0, 0.0)
+        level.sendParticles(ParticleTypes.EXPLOSION, position.x, position.y + 0.25, position.z, 2, 0.35, 0.25, 0.35, 0.02)
+        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, position.x, position.y, position.z, 36, 0.9, 0.5, 0.9, 0.12)
+        val visual = BadExplosionEntity(SkyridersMod.BAD_EXPLOSION_ENTITY.get(), level)
+        visual.setPos(position.x, position.y, position.z)
+        level.addFreshEntity(visual)
+        damageExplosion(level, Vec3(position.x, position.y, position.z), baseDamage = 30.0, radius = 4.6, ignoredBodyId = vehicle.bodyId)
+        VehicleManager.removeVehicle(level, vehicle.bodyId)
+        dropCriticalFailureComponents(level, vehicle, position)
+    }
+
+    private fun dropCriticalFailureComponents(level: ServerLevel, vehicle: IVehicle, position: Vector3d) {
+        vehicleRecipeComponentDrops(level, vehicle).forEach { stack ->
+            val item = ItemEntity(
+                level,
+                position.x + ThreadLocalRandom.current().nextDouble(-0.35, 0.35),
+                position.y + 0.25,
+                position.z + ThreadLocalRandom.current().nextDouble(-0.35, 0.35),
+                stack.copy()
+            )
+            item.setDeltaMovement(
+                ThreadLocalRandom.current().nextDouble(-0.08, 0.08),
+                ThreadLocalRandom.current().nextDouble(0.08, 0.18),
+                ThreadLocalRandom.current().nextDouble(-0.08, 0.08)
+            )
+            level.addFreshEntity(item)
+        }
+    }
+
+    private fun vehicleRecipeComponentDrops(level: ServerLevel, vehicle: IVehicle): List<ItemStack> {
+        val recipe = level.recipeManager.byKey(vehicle.vehicleDefinition.id).orElse(null)
+        val ingredients = recipe?.ingredients
+            ?.flatMap { ingredient -> ingredient.items.toList() }
+            ?.filter { stack -> !stack.isEmpty && stack.item != Items.AIR }
+            ?: emptyList()
+        if (ingredients.isEmpty()) {
+            return List(CRITICAL_DROPS_MIN) { ItemStack(Items.IRON_INGOT) }
+        }
+
+        val random = ThreadLocalRandom.current()
+        val dropCount = (CRITICAL_DROPS_MIN + random.nextInt(CRITICAL_DROPS_RANDOM)).coerceAtMost(ingredients.size)
+        return ingredients.shuffled(random).take(dropCount).map { stack -> stack.copyWithCount(1) }
+    }
+
+    private fun vehiclePosition(level: ServerLevel, vehicle: IVehicle): Vector3d? {
+        return try {
+            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d())
+        } catch (_: IllegalStateException) {
+            null
+        } ?: level.shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.position?.let { Vector3d(it) }
     }
 
     private fun damageablePart(id: String, type: net.minecraft.resources.ResourceLocation, maxHealth: Double): VehiclePartDefinition {
@@ -513,6 +659,14 @@ object VehicleDamage {
         val size = vehicle.vehicleDefinition.body.collisionBoxSize
         return sqrt(size.x * size.x + size.z * size.z) * 0.5
     }
+
+    private data class VehicleKey(val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId, val bodyId: Long)
+    private data class CriticalFailureState(
+        val startTick: Long,
+        var lastHissTick: Long = startTick - CRITICAL_HISS_INTERVAL_TICKS,
+        var lastEffectTick: Long = startTick - CRITICAL_EFFECT_INTERVAL_TICKS,
+        var lastFlashTick: Long = startTick - 4L
+    )
 
     private fun Vector3d.isFinite(): Boolean {
         return x.isFinite() && y.isFinite() && z.isFinite()

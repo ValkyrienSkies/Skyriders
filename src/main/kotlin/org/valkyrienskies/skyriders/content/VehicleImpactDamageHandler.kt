@@ -34,8 +34,7 @@ object VehicleImpactDamageHandler {
     private val pendingCollisionCrashDamage = ConcurrentLinkedQueue<CollisionCrashDamage>()
 
     fun onCollisionStart(event: CollisionEvent) {
-        val contactSpeed = event.contactPoints.maxOfOrNull { contact -> planarLength(contact.velocity) } ?: return
-        if (contactSpeed < COLLISION_START_MIN_RELATIVE_SPEED) return
+        val contactSpeed = event.contactPoints.maxOfOrNull { contact -> contact.velocity.length() } ?: 0.0
 
         pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, contactSpeed))
         pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, contactSpeed))
@@ -100,8 +99,11 @@ object VehicleImpactDamageHandler {
             val lastTick = lastCrashDamageTickByVehicle[pending.bodyId]
             if (lastTick != null && now - lastTick < VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS) continue
             val vehicle = VehicleManager.getVehicle(level.dimensionId, pending.bodyId) ?: continue
+            val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId)
+            val impactSpeed = max(pending.contactSpeed, body?.kinematics?.velocity?.length() ?: 0.0)
+            if (impactSpeed < COLLISION_START_MIN_RELATIVE_SPEED) continue
             val massScale = sqrt(vehicle.vehicleDefinition.body.mass / 300.0).coerceIn(0.65, 2.4)
-            val severity = (pending.contactSpeed - COLLISION_START_MIN_RELATIVE_SPEED) *
+            val severity = (impactSpeed - COLLISION_START_MIN_RELATIVE_SPEED) *
                 massScale *
                 COLLISION_START_DAMAGE_PER_SPEED
             if (severity <= 0.0) continue

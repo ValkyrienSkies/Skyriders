@@ -65,6 +65,7 @@ object BikeLifecycle {
             val vehicles = VehicleManager.getVehicles(level.dimensionId)
             BoostPadHandler.gameTick(level, vehicles)
             VehicleImpactDamageHandler.tick(level, vehicles)
+            VehicleDamage.tick(level, vehicles)
             RaceManager.tickLevel(level)
             if (level.gameTime % VISUAL_SYNC_INTERVAL_TICKS == 0L) {
                 syncVisualState(level)
