@@ -7,7 +7,11 @@ import net.minecraft.resources.ResourceLocation
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleDamage
+import org.valkyrienskies.skyriders.content.VehicleInteractionActions
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehiclePartTypes
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.asin
@@ -22,11 +26,22 @@ object VehicleHudOverlay {
     private const val DASHBOARD_TEXTURE_HEIGHT = 256
     private const val METER_TEXTURE_WIDTH = 128
     private const val METER_TEXTURE_HEIGHT = 128
+    private const val MINI_CRT_TEXTURE_WIDTH = 96
+    private const val MINI_CRT_TEXTURE_HEIGHT = 96
+    private const val MINI_CRT_WIDGET_SIZE = 96
+    private const val MINI_CRT_SCREEN_X = 13
+    private const val MINI_CRT_SCREEN_Y = 14
+    private const val MINI_CRT_SCREEN_RIGHT = 72
+    private const val MINI_CRT_SCREEN_BOTTOM = 70
+    private const val MINI_CRT_SCREEN_PADDING = 4
+    private const val DAMAGE_PART_MIN_PIXELS = 3
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
     private val METER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/meter_round.png")
+    private val MINI_CRT_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/mini_crt.png")
 
     private val DASHBOARD_BASE = HudTextureRegion(0, 0, 176, 64)
+    private val MINI_CRT_BASE = HudTextureRegion(0, 0, 96, 96)
     private val DASHBOARD_STEERING_WHEEL = HudTextureRegion(0, 64, 80, 80)
     private val DASHBOARD_LIGHT = HudTextureRegion(176, 32, 5, 5)
     private val DASHBOARD_SMALL_LIGHT = HudTextureRegion(176, 38, 4, 4)
@@ -185,6 +200,7 @@ object VehicleHudOverlay {
         val dt = consumeRenderDt()
         val fuelSlosh = updateFuelTankSlosh(current, dt)
 
+        renderDamageCrt(guiGraphics, screenHeight, current)
         renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh)
         renderMeters(guiGraphics, screenWidth, screenHeight, current, dt)
         renderRacePlacement(guiGraphics, screenWidth, current)
@@ -220,6 +236,142 @@ object VehicleHudOverlay {
         //dashboardSpeedCounter.render(guiGraphics, x, y, snapshot.speed.roundToInt().coerceIn(0, 999).toString())
         dashboardGearCounter.render(guiGraphics, x, y, formatGear(snapshot.transmissionGear))
         dashboardFuelCounter.render(guiGraphics, x, y, (snapshot.fuel * 100.0).roundToInt().coerceIn(0, 999).toString())
+    }
+
+    private fun renderDamageCrt(guiGraphics: GuiGraphics, screenHeight: Int, snapshot: VehicleHudSnapshot) {
+        val x = 0
+        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE
+        guiGraphics.blitRegion(MINI_CRT_TEXTURE, MINI_CRT_BASE, x, y, MINI_CRT_TEXTURE_WIDTH, MINI_CRT_TEXTURE_HEIGHT)
+
+        val screenX = x + MINI_CRT_SCREEN_X
+        val screenY = y + MINI_CRT_SCREEN_Y
+        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X
+        val screenContentHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y
+        guiGraphics.fill(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight, 0xD0061208.toInt())
+
+        val minecraft = Minecraft.getInstance()
+        val level = minecraft.level ?: return
+        val vehicle = VehicleManager.getVehicle(level, snapshot.bodyId) ?: return
+        val damageParts = damageHudParts(vehicle)
+        if (damageParts.isEmpty()) return
+
+        guiGraphics.enableScissor(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight)
+        drawDamageHudBackground(guiGraphics, screenX, screenY, screenWidth, screenContentHeight)
+        drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts)
+        guiGraphics.disableScissor()
+    }
+
+    private fun drawDamageHudBackground(guiGraphics: GuiGraphics, x: Int, y: Int, width: Int, height: Int) {
+        guiGraphics.fill(x, y, x + width, y + height, 0xE0051208.toInt())
+        var lineY = y + 2
+        while (lineY < y + height) {
+            guiGraphics.fill(x + 1, lineY, x + width - 1, lineY + 1, 0x2400FF66)
+            lineY += 4
+        }
+        guiGraphics.fill(x + 1, y + 1, x + width - 1, y + 2, 0x4000FF99)
+        guiGraphics.fill(x + 1, y + height - 2, x + width - 1, y + height - 1, 0x3000AA44)
+    }
+
+    private fun drawDamageHudParts(
+        guiGraphics: GuiGraphics,
+        screenX: Int,
+        screenY: Int,
+        screenWidth: Int,
+        screenHeight: Int,
+        parts: List<DamageHudPart>
+    ) {
+        val minX = parts.minOf { it.centerX - it.sizeX * 0.5 }
+        val maxX = parts.maxOf { it.centerX + it.sizeX * 0.5 }
+        val minZ = parts.minOf { it.centerZ - it.sizeZ * 0.5 }
+        val maxZ = parts.maxOf { it.centerZ + it.sizeZ * 0.5 }
+        val contentWidth = (screenWidth - MINI_CRT_SCREEN_PADDING * 2).coerceAtLeast(1)
+        val contentHeight = (screenHeight - MINI_CRT_SCREEN_PADDING * 2).coerceAtLeast(1)
+        val spanX = (maxX - minX).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
+        val spanZ = (maxZ - minZ).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
+        val scale = minOf(contentWidth / spanX, contentHeight / spanZ)
+        val offsetX = screenX + MINI_CRT_SCREEN_PADDING + (contentWidth - spanX * scale) * 0.5
+        val offsetY = screenY + MINI_CRT_SCREEN_PADDING + (contentHeight - spanZ * scale) * 0.5
+
+        parts.sortedBy { it.drawOrder }.forEach { part ->
+            val left = (offsetX + (part.centerX - part.sizeX * 0.5 - minX) * scale).roundToInt()
+            val right = (offsetX + (part.centerX + part.sizeX * 0.5 - minX) * scale).roundToInt()
+            val top = (offsetY + (part.centerZ - part.sizeZ * 0.5 - minZ) * scale).roundToInt()
+            val bottom = (offsetY + (part.centerZ + part.sizeZ * 0.5 - minZ) * scale).roundToInt()
+            val minWidth = if (part.type == VehiclePartTypes.WHEEL) DAMAGE_PART_MIN_PIXELS + 1 else DAMAGE_PART_MIN_PIXELS
+            val drawLeft = left.coerceAtMost(right - minWidth)
+            val drawTop = top.coerceAtMost(bottom - minWidth)
+            val drawRight = right.coerceAtLeast(drawLeft + minWidth)
+            val drawBottom = bottom.coerceAtLeast(drawTop + minWidth)
+            val color = damageHudColor(part.healthFraction)
+            val fillColor = if (part.type == VehiclePartTypes.BODY) {
+                (color and 0x00FFFFFF) or 0xAA000000.toInt()
+            } else {
+                (color and 0x00FFFFFF) or 0xDD000000.toInt()
+            }
+            guiGraphics.fill(drawLeft - 1, drawTop - 1, drawRight + 1, drawBottom + 1, 0xF0010803.toInt())
+            guiGraphics.fill(drawLeft, drawTop, drawRight, drawBottom, fillColor)
+            guiGraphics.fill(drawLeft, drawTop, drawRight, drawTop + 1, brightenColor(fillColor))
+        }
+    }
+
+    private fun damageHudParts(vehicle: IVehicle): List<DamageHudPart> {
+        val partsById = vehicle.vehicleDefinition.parts.associateBy { it.id }
+        val zoneParts = vehicle.vehicleDefinition.interactions.zones.mapNotNull { zone ->
+            val partId = zone.partId ?: return@mapNotNull null
+            val part = partsById[partId] ?: return@mapNotNull null
+            if (VehicleInteractionActions.REPAIR !in zone.actions) return@mapNotNull null
+            if (part.type != VehiclePartTypes.BODY && part.type != VehiclePartTypes.ENGINE && part.type != VehiclePartTypes.WHEEL) {
+                return@mapNotNull null
+            }
+            if (!zone.center.isFinite() || !zone.size.isFinite()) return@mapNotNull null
+            DamageHudPart(
+                id = partId,
+                type = part.type,
+                centerX = zone.center.x,
+                centerZ = zone.center.z,
+                sizeX = zone.size.x.coerceAtLeast(0.18),
+                sizeZ = zone.size.z.coerceAtLeast(0.18),
+                healthFraction = VehicleDamage.healthFraction(vehicle, partId)
+            )
+        }
+        if (zoneParts.any { it.type == VehiclePartTypes.BODY }) return zoneParts
+
+        val bodyPart = partsById[VehicleDamage.BODY_PART_ID] ?: return zoneParts
+        return zoneParts + DamageHudPart(
+            id = VehicleDamage.BODY_PART_ID,
+            type = bodyPart.type,
+            centerX = vehicle.vehicleDefinition.body.collisionBoxOffset.x,
+            centerZ = vehicle.vehicleDefinition.body.collisionBoxOffset.z,
+            sizeX = vehicle.vehicleDefinition.body.collisionBoxSize.x.coerceAtLeast(0.4),
+            sizeZ = vehicle.vehicleDefinition.body.collisionBoxSize.z.coerceAtLeast(0.4),
+            healthFraction = VehicleDamage.healthFraction(vehicle, VehicleDamage.BODY_PART_ID)
+        )
+    }
+
+    private fun damageHudColor(healthFraction: Double): Int {
+        val health = healthFraction.coerceIn(0.0, 1.0)
+        return if (health <= 0.0) {
+            0xFFFF2020.toInt()
+        } else if (health < 0.45) {
+            lerpColor(0xFFFF2020.toInt(), 0xFFFFD93D.toInt(), health / 0.45)
+        } else {
+            lerpColor(0xFFFFD93D.toInt(), 0xFF20F060.toInt(), (health - 0.45) / 0.55)
+        }
+    }
+
+    private fun lerpColor(from: Int, to: Int, t: Double): Int {
+        val clamped = t.coerceIn(0.0, 1.0)
+        val r = (((from ushr 16) and 0xFF) + ((((to ushr 16) and 0xFF) - ((from ushr 16) and 0xFF)) * clamped)).roundToInt()
+        val g = (((from ushr 8) and 0xFF) + ((((to ushr 8) and 0xFF) - ((from ushr 8) and 0xFF)) * clamped)).roundToInt()
+        val b = ((from and 0xFF) + (((to and 0xFF) - (from and 0xFF)) * clamped)).roundToInt()
+        return 0xFF000000.toInt() or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
+    }
+
+    private fun brightenColor(color: Int): Int {
+        val r = (((color ushr 16) and 0xFF) + 42).coerceAtMost(255)
+        val g = (((color ushr 8) and 0xFF) + 42).coerceAtMost(255)
+        val b = ((color and 0xFF) + 42).coerceAtMost(255)
+        return (color and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
     }
 
     private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
@@ -491,6 +643,23 @@ object VehicleHudOverlay {
         val hasJump: Boolean = false,
         val receivedAtMillis: Long
     )
+
+    private data class DamageHudPart(
+        val id: String,
+        val type: ResourceLocation,
+        val centerX: Double,
+        val centerZ: Double,
+        val sizeX: Double,
+        val sizeZ: Double,
+        val healthFraction: Double
+    ) {
+        val drawOrder: Int = when (type) {
+            VehiclePartTypes.BODY -> 0
+            VehiclePartTypes.ENGINE -> 1
+            VehiclePartTypes.WHEEL -> 2
+            else -> 3
+        }
+    }
 
     private data class BooleanTextureWidget(
         val x: Int,
