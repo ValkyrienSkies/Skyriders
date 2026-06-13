@@ -61,7 +61,9 @@ object WheeledVehiclePhysicsSolver {
             steerRad = steerRad,
             drifting = driftGripActive
         )
-        val wheels = expandWheels(config)
+        val wheels = expandWheels(config).filterNot { wheel ->
+            VehicleDamage.isWheelDestroyed(physLevel.dimension, body.id, wheel.damagePartId())
+        }
         val contacts = wheels.map { wheel ->
             val axleSteer = if (wheel.axle.steerable) steerRad * wheel.axle.steerScale else 0.0
             WheelContactState(wheel, sampleWheel(body, physLevel, wheel, contactUp, axleSteer, config, dt))
@@ -127,6 +129,8 @@ object WheeledVehiclePhysicsSolver {
             )
         }
     }
+
+    private fun WheelInstance.damagePartId(): String = "${id}_wheel"
 
     private fun updateTransmission(
         input: VehicleInput,

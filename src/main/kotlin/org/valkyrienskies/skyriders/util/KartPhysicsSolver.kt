@@ -61,7 +61,12 @@ object KartPhysicsSolver {
             config
         )
         val contacts = config.wheelLocalPositions.mapIndexed { index, localPos ->
-            sampleWheel(body, physLevel, localPos, index < 2, contactUp, steerRad, config, dt)
+            val contact = sampleWheel(body, physLevel, localPos, index < 2, contactUp, steerRad, config, dt)
+            if (VehicleDamage.isWheelDestroyed(physLevel.dimension, body.id, kartWheelPartId(index))) {
+                contact.withoutWheelPhysics()
+            } else {
+                contact
+            }
         }
         val groundedContacts = contacts.filter(VehicleWheelContact::grounded)
         val grounded = groundedContacts.isNotEmpty()
@@ -228,6 +233,24 @@ object KartPhysicsSolver {
                 wheelRightWorld = wheelRight,
                 groundedMaxDistance = groundedMaxDistance
             )
+    }
+
+    private fun kartWheelPartId(index: Int): String = when (index) {
+        0 -> "front_left_wheel"
+        1 -> "front_right_wheel"
+        2 -> "rear_left_wheel"
+        3 -> "rear_right_wheel"
+        else -> ""
+    }
+
+    private fun VehicleWheelContact.withoutWheelPhysics(): VehicleWheelContact {
+        return copy(
+            grounded = false,
+            hitBody = null,
+            compressionDistance = 0.0,
+            surfaceVelocityWorld = Vector3d(),
+            relativeWheelVelocityWorld = Vector3d(wheelVelocityWorld)
+        )
     }
 
     private fun applySuspension(body: PhysVsBody, contact: VehicleWheelContact, config: KartPhysicsConfig): Double {

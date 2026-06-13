@@ -64,7 +64,7 @@ object BikePhysicsSolver {
         )
 
         val contactUp = safeNormalize(state.smoothedGroundNormal, WORLD_UP)
-        val frontContact = sampleWheelContact(
+        val sampledFrontContact = sampleWheelContact(
             body,
             physLevel,
             config.frontWheelLocalPos,
@@ -73,7 +73,17 @@ object BikePhysicsSolver {
             config,
             dt
         )
-        val rearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, 0.0, config, dt)
+        val sampledRearContact = sampleWheelContact(body, physLevel, config.rearWheelLocalPos, contactUp, 0.0, config, dt)
+        val frontContact = if (VehicleDamage.isWheelDestroyed(physLevel.dimension, body.id, VehicleDamage.FRONT_WHEEL_PART_ID)) {
+            sampledFrontContact.withoutWheelPhysics()
+        } else {
+            sampledFrontContact
+        }
+        val rearContact = if (VehicleDamage.isWheelDestroyed(physLevel.dimension, body.id, VehicleDamage.REAR_WHEEL_PART_ID)) {
+            sampledRearContact.withoutWheelPhysics()
+        } else {
+            sampledRearContact
+        }
         val contacts = listOf(frontContact, rearContact)
         val grounded = frontContact.grounded || rearContact.grounded
         updateDebugState(body, state, frontContact, rearContact, activeInput, frontSteerRad, drifting)
@@ -283,6 +293,17 @@ object BikePhysicsSolver {
             wheelVelocityWorld = wheelVelocity,
             surfaceVelocityWorld = surfaceVelocity,
             relativeWheelVelocityWorld = Vector3d(wheelVelocity).sub(surfaceVelocity)
+        )
+    }
+
+    private fun WheelContact.withoutWheelPhysics(): WheelContact {
+        return copy(
+            grounded = false,
+            hitBody = null,
+            compression = 0.0,
+            normalForceEstimate = 0.0,
+            surfaceVelocityWorld = Vector3d(),
+            relativeWheelVelocityWorld = Vector3d(wheelVelocityWorld)
         )
     }
 

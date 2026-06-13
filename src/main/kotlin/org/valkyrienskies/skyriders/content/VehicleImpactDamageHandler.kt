@@ -30,6 +30,10 @@ object VehicleImpactDamageHandler {
     private const val COLLISION_START_DAMAGE_PER_SPEED = 1.15
     private const val COLLISION_START_STEP_VERTICAL_COMPENSATION = 0.65
     private const val COLLISION_START_MAX_STEP_COMPENSATION = 2.5
+    private const val COLLISION_START_TERRAIN_STEP_MIN_VERTICAL_SPEED = 0.35
+    private const val COLLISION_START_TERRAIN_STEP_VERTICAL_RATIO = 0.06
+    private const val COLLISION_START_TERRAIN_STEP_IGNORE_SPEED = 10.0
+    private const val COLLISION_START_TERRAIN_STEP_DAMAGE_SCALE = 0.28
     private const val MOONDROP_SPINOUT_DURATION = 2.35
     private const val MOONDROP_SPINOUT_YAW_SPEED = 7.0
 
@@ -112,16 +116,23 @@ object VehicleImpactDamageHandler {
             if (lastTick != null && now - lastTick < VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS) continue
             val vehicle = VehicleManager.getVehicle(level.dimensionId, pending.bodyId) ?: continue
             applyMoondropCollisionSpinOut(level, vehicle, pending.otherBodyId)
+            val otherVehicle = VehicleManager.getVehicle(level.dimensionId, pending.otherBodyId)
             val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId)
             val rawImpactSpeed = max(pending.contactPlanarSpeed, body?.kinematics?.velocity?.let(::planarLength) ?: 0.0)
             val stepCompensation = (pending.contactVerticalSpeed * COLLISION_START_STEP_VERTICAL_COMPENSATION)
                 .coerceIn(0.0, COLLISION_START_MAX_STEP_COMPENSATION)
             val impactSpeed = (rawImpactSpeed - stepCompensation).coerceAtLeast(0.0)
             if (impactSpeed < COLLISION_START_MIN_RELATIVE_SPEED) continue
+            val terrainStepClip = otherVehicle == null &&
+                pending.contactVerticalSpeed >= COLLISION_START_TERRAIN_STEP_MIN_VERTICAL_SPEED &&
+                pending.contactVerticalSpeed >= pending.contactPlanarSpeed * COLLISION_START_TERRAIN_STEP_VERTICAL_RATIO
+            if (terrainStepClip && impactSpeed < COLLISION_START_TERRAIN_STEP_IGNORE_SPEED) continue
+            val terrainStepScale = if (terrainStepClip) COLLISION_START_TERRAIN_STEP_DAMAGE_SCALE else 1.0
             val massScale = sqrt(vehicle.vehicleDefinition.body.mass / 300.0).coerceIn(0.65, 2.4)
             val severity = (impactSpeed - COLLISION_START_MIN_RELATIVE_SPEED) *
                 massScale *
-                COLLISION_START_DAMAGE_PER_SPEED
+                COLLISION_START_DAMAGE_PER_SPEED *
+                terrainStepScale
             if (severity <= 0.0) continue
             VehicleDamage.damageCrash(level, vehicle, severity)
             lastCrashDamageTickByVehicle[pending.bodyId] = now

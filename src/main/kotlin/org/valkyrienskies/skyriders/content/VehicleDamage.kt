@@ -111,11 +111,11 @@ object VehicleDamage {
     fun damageCrash(level: ServerLevel, vehicle: IVehicle, severity: Double) {
         if (VehicleStatusEffects.isMoondropActive(vehicle)) return
         val damage = severity.takeIf { it.isFinite() && it > 0.0 } ?: return
-        damagePart(level, vehicle, BODY_PART_ID, damage * 0.85)
+        damagePart(level, vehicle, BODY_PART_ID, damage * 0.68)
         damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.32)
-        wheelPartIds(vehicle).randomOrNull()?.let { wheelId ->
-            damagePart(level, vehicle, wheelId, damage * 0.48)
-        }
+//        wheelPartIds(vehicle).randomOrNull()?.let { wheelId ->
+//            damagePart(level, vehicle, wheelId, damage * 0.48)
+//        }
         playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.72f, randomPitch(0.9f, 1.08f))
         finishDamage(level, vehicle)
     }
@@ -280,6 +280,16 @@ object VehicleDamage {
         val popped = wheels.count { isWheelPopped(vehicle, it) || healthFraction(vehicle, it) <= 0.0 }
         val poppedPenalty = 1.0 - popped.toDouble() / wheels.size * 0.7
         return (0.22 + 0.78 * averageHealth).coerceIn(0.22, 1.0) * poppedPenalty.coerceIn(0.25, 1.0)
+    }
+
+    fun isWheelDestroyed(
+        dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,
+        bodyId: Long,
+        partId: String
+    ): Boolean {
+        val vehicle = VehicleManager.getVehicle(dimensionId, bodyId) ?: return false
+        val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
+        return part.type == VehiclePartTypes.WHEEL && isPartDestroyed(vehicle, partId)
     }
 
     fun healthFraction(vehicle: IVehicle, partId: String): Double {
