@@ -31,6 +31,7 @@ import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import org.valkyrienskies.skyriders.network.SkyridersNetworkStats
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
@@ -54,7 +55,8 @@ object RaceCheckpointLapModes {
 object RaceManager {
     private const val COUNTDOWN_TICKS = 80
     private const val COUNTDOWN_MESSAGE_INTERVAL = 20
-    private const val LINE_PARTICLE_SPACING = 0.55
+    private const val LINE_PARTICLE_SPACING = 0.9
+    private const val MAX_LINE_PARTICLE_SAMPLES = 48
     private const val START_CAPTURE_RANGE = 128.0
     private const val MIN_LINE_LENGTH = 0.75
     private const val DANGER_RECOVERY_MIN_TICKS = 24
@@ -166,7 +168,6 @@ object RaceManager {
     }
 
     fun tickMarker(level: ServerLevel, marker: RaceMarkerBlockEntity) {
-        registerMarker(level, marker)
         tickCountdown(level, marker)
         val colorId = marker.colorId
         if (colorId < 0 || marker.endpointPos == null) return
@@ -864,11 +865,14 @@ object RaceManager {
         val line = marker.line(level) ?: return
         val length = line.length()
         if (length < MIN_LINE_LENGTH) return
-        val count = (length / LINE_PARTICLE_SPACING).toInt().coerceAtLeast(2)
+        val count = (length / LINE_PARTICLE_SPACING).toInt().coerceIn(2, MAX_LINE_PARTICLE_SAMPLES)
         level.players().forEach { player ->
             val seat = player.vehicle as? BikeSeatEntity ?: return@forEach
             val racer = race.racers[seat.bodyId] ?: return@forEach
-            val particle = lineParticle(markerStateForRacer(marker, racer, race))
+            val markerState = markerStateForRacer(marker, racer, race)
+            if (markerState == LineParticleState.BLOCKED) return@forEach
+            val particle = lineParticle(markerState)
+            SkyridersNetworkStats.recordBatch("S2C.RaceLineParticle", count + 1, (count + 1) * ESTIMATED_LINE_PARTICLE_BYTES)
             for (i in 0..count) {
                 val t = i.toDouble() / count.toDouble()
                 val p = line.point(t)
@@ -878,12 +882,14 @@ object RaceManager {
     }
 
     private fun markerStateForRacer(marker: RaceMarkerSnapshot, racer: RacerState, race: ActiveRace): LineParticleState {
+        val previous = marker.blockPos == racer.lastRecoveryMarkerPos
         if (marker.markerType == RaceMarkerTypes.CHECKPOINT) {
             if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return LineParticleState.BLOCKED
-            if (marker.checkpointIndex in racer.crossedCheckpoints) return LineParticleState.CROSSED
-            return if (marker.checkpointIndex == racer.nextCheckpointIndex) LineParticleState.NEXT else LineParticleState.BLOCKED
+            if (marker.checkpointIndex == racer.nextCheckpointIndex) return LineParticleState.NEXT
+            return if (previous) LineParticleState.CROSSED else LineParticleState.BLOCKED
         }
-        return if (racer.isReadyForFinishLine(race)) LineParticleState.NEXT else LineParticleState.BLOCKED
+        if (racer.isReadyForFinishLine(race)) return LineParticleState.NEXT
+        return if (previous) LineParticleState.CROSSED else LineParticleState.BLOCKED
     }
 
     private fun lineParticle(state: LineParticleState): DustParticleOptions {
@@ -1123,6 +1129,8 @@ object RaceManager {
     )
 
     private enum class LineParticleState { BLOCKED, NEXT, CROSSED }
+
+    private const val ESTIMATED_LINE_PARTICLE_BYTES = 40
 
     data class RacePlacement(val place: Int, val total: Int)
 

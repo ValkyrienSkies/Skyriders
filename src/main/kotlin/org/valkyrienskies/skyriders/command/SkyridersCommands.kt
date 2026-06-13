@@ -134,6 +134,10 @@ object SkyridersCommands {
                 .then(
                     literal("netstats")
                         .executes { ctx -> showNetworkStats(ctx.source) }
+                        .then(
+                            literal("reset")
+                                .executes { ctx -> resetNetworkStats(ctx.source) }
+                        )
                 )
                 .then(
                     literal("race")
@@ -388,7 +392,7 @@ object SkyridersCommands {
     private fun showNetworkStats(source: CommandSourceStack): Int {
         val snapshot = SkyridersNetworkStats.snapshot()
         if (snapshot.rows.isEmpty()) {
-            source.sendSuccess({ Component.literal("No Skyriders packet stats recorded yet.") }, false)
+            source.sendSuccess({ Component.literal("No Skyriders packet stats recorded since the last reset.") }, false)
             return 1
         }
 
@@ -411,6 +415,12 @@ object SkyridersCommands {
         }
         source.sendSuccess({ message }, false)
         return snapshot.rows.size
+    }
+
+    private fun resetNetworkStats(source: CommandSourceStack): Int {
+        SkyridersNetworkStats.reset()
+        source.sendSuccess({ Component.literal("Reset Skyriders network stats.") }, false)
+        return 1
     }
 
     private fun endRace(source: CommandSourceStack, colorInput: String): Int {

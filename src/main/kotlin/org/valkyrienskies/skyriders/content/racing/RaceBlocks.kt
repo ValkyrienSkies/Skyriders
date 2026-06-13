@@ -141,15 +141,7 @@ class RaceDangerBlock(properties: Properties) : BaseEntityBlock(properties) {
         level: Level,
         state: BlockState,
         blockEntityType: BlockEntityType<T>
-    ): BlockEntityTicker<T>? {
-        if (level.isClientSide || blockEntityType != SkyridersMod.RACE_DANGER_BLOCK_ENTITY.get()) return null
-        @Suppress("UNCHECKED_CAST")
-        return object : BlockEntityTicker<T> {
-            override fun tick(tickLevel: Level, tickPos: BlockPos, tickState: BlockState, blockEntity: T) {
-                RaceDangerBlockEntity.serverTick(tickLevel, tickPos, tickState, blockEntity as RaceDangerBlockEntity)
-            }
-        }
-    }
+    ): BlockEntityTicker<T>? = null
 
     override fun use(
         state: BlockState,

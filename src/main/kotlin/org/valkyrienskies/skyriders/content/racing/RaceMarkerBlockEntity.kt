@@ -173,6 +173,7 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
 
     private fun markDirtyAndSync() {
         setChanged()
+        (level as? ServerLevel)?.let { RaceManager.registerMarker(it, this) }
         val level = level ?: return
         level.sendBlockUpdated(blockPos, blockState, blockState, 3)
     }
@@ -193,7 +194,6 @@ class RaceMarkerBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(Skyr
 
         fun serverTick(level: Level, pos: BlockPos, state: BlockState, blockEntity: RaceMarkerBlockEntity) {
             val serverLevel = level as? ServerLevel ?: return
-            RaceManager.registerMarker(serverLevel, blockEntity)
             RaceManager.tickMarker(serverLevel, blockEntity)
         }
     }

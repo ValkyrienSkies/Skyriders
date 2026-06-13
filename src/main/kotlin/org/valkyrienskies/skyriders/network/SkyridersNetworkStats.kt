@@ -5,13 +5,23 @@ import java.util.concurrent.atomic.LongAdder
 
 object SkyridersNetworkStats {
     private val countersByPacket = ConcurrentHashMap<String, PacketCounters>()
-    private val startedAtMillis = System.currentTimeMillis()
+    @Volatile
+    private var startedAtMillis = System.currentTimeMillis()
 
     fun record(packetType: String, estimatedBytes: Int, itemCount: Int = 1) {
+        recordBatch(packetType, packetCount = 1, estimatedBytes = estimatedBytes, itemCount = itemCount)
+    }
+
+    fun recordBatch(packetType: String, packetCount: Int, estimatedBytes: Int, itemCount: Int = packetCount) {
         val counters = countersByPacket.getOrPut(packetType) { PacketCounters() }
-        counters.packets.increment()
+        counters.packets.add(packetCount.coerceAtLeast(0).toLong())
         counters.bytes.add(estimatedBytes.coerceAtLeast(0).toLong())
         counters.items.add(itemCount.coerceAtLeast(0).toLong())
+    }
+
+    fun reset() {
+        countersByPacket.clear()
+        startedAtMillis = System.currentTimeMillis()
     }
 
     fun snapshot(): NetworkStatsSnapshot {

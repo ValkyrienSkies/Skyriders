@@ -5,7 +5,6 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import org.valkyrienskies.skyriders.SkyridersMod
@@ -70,9 +69,5 @@ class RaceDangerBlockEntity(pos: BlockPos, state: BlockState) :
         private const val COLOR_KEY = "ColorId"
         private const val RADIUS_KEY = "Radius"
 
-        fun serverTick(level: Level, pos: BlockPos, state: BlockState, blockEntity: RaceDangerBlockEntity) {
-            val serverLevel = level as? ServerLevel ?: return
-            RaceManager.registerDanger(serverLevel, blockEntity)
-        }
     }
 }
