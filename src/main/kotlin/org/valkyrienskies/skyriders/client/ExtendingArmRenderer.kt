@@ -74,8 +74,7 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
         val length = sqrt(dx * dx + dy * dy + dz * dz)
         if (length < 0.05) return
 
-        val texture = if (entity.armKind == ExtendingArmEntity.GRABBY_HAND) GRABBY_TETHER_TEXTURE else BOXING_TETHER_TEXTURE
-        val buffer = bufferSource.getBuffer(RenderType.entityCutout(texture))
+        val buffer = bufferSource.getBuffer(RenderType.entityCutout(EXTENDING_SPRING_TEXTURE))
         val light = LevelRenderer.getLightColor(entity.level(), BlockPos.containing(entity.x, entity.y, entity.z))
         val horizontal = sqrt(dx * dx + dz * dz)
 
@@ -96,10 +95,10 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
 
     private fun drawTetherSegment(buffer: VertexConsumer, matrix: Matrix4f, normal: Matrix3f, light: Int, z0: Float, z1: Float) {
         val h = TETHER_HALF_WIDTH
-        quad(buffer, matrix, normal, light, -h, -h, z0, h, -h, z0, h, -h, z1, -h, -h, z1, 0.0f, 0.0f, 1.0f, 1.0f)
-        quad(buffer, matrix, normal, light, h, h, z0, -h, h, z0, -h, h, z1, h, h, z1, 0.0f, 0.0f, 1.0f, 1.0f)
-        quad(buffer, matrix, normal, light, -h, h, z0, -h, -h, z0, -h, -h, z1, -h, h, z1, 0.0f, 0.0f, 1.0f, 1.0f)
-        quad(buffer, matrix, normal, light, h, -h, z0, h, h, z0, h, h, z1, h, -h, z1, 0.0f, 0.0f, 1.0f, 1.0f)
+        quad(buffer, matrix, normal, light, -h, -h, z0, h, -h, z0, h, -h, z1, -h, -h, z1, SPRING_U_MIN, 0.0f, SPRING_U_MAX, 1.0f)
+        quad(buffer, matrix, normal, light, h, h, z0, -h, h, z0, -h, h, z1, h, h, z1, SPRING_U_MIN, 0.0f, SPRING_U_MAX, 1.0f)
+        quad(buffer, matrix, normal, light, -h, h, z0, -h, -h, z0, -h, -h, z1, -h, h, z1, SPRING_U_MIN, 0.0f, SPRING_U_MAX, 1.0f)
+        quad(buffer, matrix, normal, light, h, -h, z0, h, h, z0, h, h, z1, h, -h, z1, SPRING_U_MIN, 0.0f, SPRING_U_MAX, 1.0f)
     }
 
     private fun drawBox(
@@ -188,12 +187,13 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
         val GRABBY_HEAD_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/grabby_hand")
         private val BOXING_HEAD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/boxing_glove.png")
         private val GRABBY_HEAD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/grabby_hand.png")
-        private val BOXING_TETHER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/boxing_glove_tether.png")
-        private val GRABBY_TETHER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/grabby_hand_tether.png")
+        private val EXTENDING_SPRING_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/extending_spring.png")
         private const val HEAD_HALF = 0.32f
         private const val HEAD_MODEL_SCALE = 0.76f
         private const val TETHER_HALF_WIDTH = 0.09f
-        private const val TETHER_TILE_LENGTH = 0.5
+        private const val TETHER_TILE_LENGTH = 0.7
+        private const val SPRING_U_MIN = 6.0f / 16.0f
+        private const val SPRING_U_MAX = 10.0f / 16.0f
         private const val OWNER_Y_OFFSET = 0.5
     }
 }
