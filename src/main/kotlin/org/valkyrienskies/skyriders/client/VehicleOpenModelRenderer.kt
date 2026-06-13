@@ -208,8 +208,10 @@ object VehicleOpenModelRenderer {
         phase: Double,
         alphaScale: Float
     ) {
+        val center = faceCenter(face)
         for (i in 0 until 4) {
             val vertex = face.vertices[i]
+            val renderVertex = expandedRainbowVertex(vertex, center)
             val color = pastelRainbowColor(
                 phase +
                     vertex.x().toDouble() * 0.018 +
@@ -221,13 +223,27 @@ object VehicleOpenModelRenderer {
             val offsetZ = face.normal.z() * RAINBOW_SURFACE_OFFSET_MODEL_UNITS
             consumer.vertex(
                 pose.pose(),
-                (vertex.x() + offsetX) / 16.0f,
-                (vertex.y() + offsetY) / 16.0f,
-                (vertex.z() + offsetZ) / 16.0f
+                (renderVertex.x() + offsetX) / 16.0f,
+                (renderVertex.y() + offsetY) / 16.0f,
+                (renderVertex.z() + offsetZ) / 16.0f
             )
                 .color(color.x(), color.y(), color.z(), RAINBOW_OVERLAY_ALPHA * alphaScale)
                 .endVertex()
         }
+    }
+
+    private fun faceCenter(face: OpenFace): Vector3f {
+        val center = Vector3f()
+        face.vertices.forEach(center::add)
+        center.div(face.vertices.size.toFloat())
+        return center
+    }
+
+    private fun expandedRainbowVertex(vertex: Vector3f, center: Vector3f): Vector3f {
+        val fromCenter = Vector3f(vertex).sub(center)
+        val distance = fromCenter.length()
+        if (distance <= 1.0e-5f) return Vector3f(vertex)
+        return fromCenter.mul((distance + RAINBOW_EDGE_OVERHANG_MODEL_UNITS) / distance).add(center)
     }
 
     private fun faceIntersectsZone(
@@ -602,6 +618,7 @@ object VehicleOpenModelRenderer {
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
     private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.035f
+    private const val RAINBOW_EDGE_OVERHANG_MODEL_UNITS = 0.06f
     private const val RAINBOW_OVERLAY_ALPHA = 0.74f
     private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }

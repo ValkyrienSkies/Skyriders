@@ -1,8 +1,11 @@
 package org.valkyrienskies.skyriders.client
 
+import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.renderer.RenderType
 import org.joml.Vector3f
+import org.joml.Matrix4f
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
@@ -21,6 +24,8 @@ object MoondropVignetteOverlay {
         val maxInset = (minOf(screenWidth, screenHeight) * 0.18).roundToInt().coerceAtLeast(1)
         val layers = maxInset.coerceAtMost(MAX_LAYERS).coerceAtLeast(minOf(MIN_LAYERS, maxInset))
         val phase = System.currentTimeMillis() / 2600.0
+        val consumer = guiGraphics.bufferSource().getBuffer(RenderType.gui())
+        val matrix = guiGraphics.pose().last().pose()
         for (layer in 0 until layers) {
             val inset = (layer.toDouble() * maxInset.toDouble() / layers.toDouble()).roundToInt()
             val nextInset = ((layer + 1).toDouble() * maxInset.toDouble() / layers.toDouble()).roundToInt()
@@ -32,16 +37,61 @@ object MoondropVignetteOverlay {
             if (alpha <= 0) continue
 
             val colorOffset = layer * 0.009
-            val topColor = colorInt(pastelRainbow(phase + colorOffset), alpha)
-            val rightColor = colorInt(pastelRainbow(phase + 0.18 + colorOffset), alpha)
-            val bottomColor = colorInt(pastelRainbow(phase + 0.36 + colorOffset), alpha)
-            val leftColor = colorInt(pastelRainbow(phase + 0.54 + colorOffset), alpha)
+            val outerLeft = inset
+            val outerTop = inset
+            val outerRight = screenWidth - inset
+            val outerBottom = screenHeight - inset
+            val innerLeft = nextInset
+            val innerTop = nextInset
+            val innerRight = screenWidth - nextInset
+            val innerBottom = screenHeight - nextInset
+            val outerWidth = (outerRight - outerLeft).coerceAtLeast(1)
+            val outerHeight = (outerBottom - outerTop).coerceAtLeast(1)
+            val perimeter = (outerWidth * 2 + outerHeight * 2).coerceAtLeast(1).toDouble()
+            val topLeft = colorInt(pastelRainbow(phase + colorOffset), alpha)
+            val topRight = colorInt(pastelRainbow(phase + colorOffset + outerWidth / perimeter), alpha)
+            val bottomRight = colorInt(pastelRainbow(phase + colorOffset + (outerWidth + outerHeight) / perimeter), alpha)
+            val bottomLeft = colorInt(pastelRainbow(phase + colorOffset + (outerWidth * 2 + outerHeight) / perimeter), alpha)
 
-            guiGraphics.fill(inset, inset, screenWidth - inset, nextInset, topColor)
-            guiGraphics.fill(screenWidth - nextInset, inset, screenWidth - inset, screenHeight - inset, rightColor)
-            guiGraphics.fill(inset, screenHeight - nextInset, screenWidth - inset, screenHeight - inset, bottomColor)
-            guiGraphics.fill(inset, inset, nextInset, screenHeight - inset, leftColor)
+            drawQuad(consumer, matrix, outerLeft, outerTop, outerLeft, innerTop, outerRight, innerTop, outerRight, outerTop, topLeft, topLeft, topRight, topRight)
+            drawQuad(consumer, matrix, innerRight, innerTop, innerRight, outerBottom, outerRight, outerBottom, outerRight, outerTop, topRight, bottomRight, bottomRight, topRight)
+            drawQuad(consumer, matrix, outerLeft, innerBottom, outerLeft, outerBottom, outerRight, outerBottom, outerRight, innerBottom, bottomLeft, bottomLeft, bottomRight, bottomRight)
+            drawQuad(consumer, matrix, outerLeft, outerTop, outerLeft, outerBottom, innerLeft, innerBottom, innerLeft, innerTop, topLeft, bottomLeft, bottomLeft, topLeft)
         }
+        guiGraphics.flush()
+    }
+
+    private fun drawQuad(
+        consumer: VertexConsumer,
+        matrix: Matrix4f,
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int,
+        x3: Int,
+        y3: Int,
+        x4: Int,
+        y4: Int,
+        color1: Int,
+        color2: Int,
+        color3: Int,
+        color4: Int
+    ) {
+        vertex(consumer, matrix, x1, y1, color1)
+        vertex(consumer, matrix, x2, y2, color2)
+        vertex(consumer, matrix, x3, y3, color3)
+        vertex(consumer, matrix, x4, y4, color4)
+    }
+
+    private fun vertex(consumer: VertexConsumer, matrix: Matrix4f, x: Int, y: Int, color: Int) {
+        consumer.vertex(matrix, x.toFloat(), y.toFloat(), 0.0f)
+            .color(
+                ((color shr 16) and 255) / 255.0f,
+                ((color shr 8) and 255) / 255.0f,
+                (color and 255) / 255.0f,
+                ((color ushr 24) and 255) / 255.0f
+            )
+            .endVertex()
     }
 
     private fun colorInt(color: Vector3f, alpha: Int): Int {
