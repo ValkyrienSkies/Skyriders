@@ -41,7 +41,7 @@ object VehicleHudOverlay {
     private const val MINI_CRT_SCREEN_PADDING = 4
     private const val MINI_CRT_DASHBOARD_OVERLAP = 20
     private const val DAMAGE_PART_MIN_PIXELS = 3
-    private const val CRITICAL_WARNING_COLOR = 0xAAFF1F1F.toInt()
+    private const val CRITICAL_WARNING_COLOR = 0xB8B54CFF.toInt()
     private const val CRITICAL_TREMBLE_PIXELS = 3
     private const val CRITICAL_WARNING_FLASH_MILLIS = 85L
 
