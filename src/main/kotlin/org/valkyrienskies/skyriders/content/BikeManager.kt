@@ -344,7 +344,7 @@ object BikeManager {
                 rearWheelSpin = record.rearWheelSpin,
                 frontWheelAngularVelocity = record.frontWheelAngularVelocity,
                 rearWheelAngularVelocity = record.rearWheelAngularVelocity,
-                partStates = definition.toVehicleDefinition().initialPartStates()
+                partStates = definition.toVehicleDefinition().initialPartStates(record.partStates)
             )
         )
     }

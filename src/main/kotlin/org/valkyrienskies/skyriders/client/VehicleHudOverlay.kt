@@ -11,6 +11,7 @@ import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
+import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleDamage
@@ -291,7 +292,7 @@ object VehicleHudOverlay {
         if (damageParts.isEmpty()) return
 
         guiGraphics.enableScissor(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight)
-        drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts)
+        drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts, sideView = vehicle is IBike)
         if (criticalFailure) {
             drawCriticalCrtWarning(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, renderMillis)
         }
@@ -487,27 +488,39 @@ object VehicleHudOverlay {
         screenY: Int,
         screenWidth: Int,
         screenHeight: Int,
-        parts: List<DamageHudPart>
+        parts: List<DamageHudPart>,
+        sideView: Boolean
     ) {
-        val minX = parts.minOf { it.centerX - it.sizeX * 0.5 }
-        val maxX = parts.maxOf { it.centerX + it.sizeX * 0.5 }
-        val minZ = parts.minOf { it.centerZ - it.sizeZ * 0.5 }
-        val maxZ = parts.maxOf { it.centerZ + it.sizeZ * 0.5 }
+        val minX = parts.minOf { if (sideView) it.centerZ - it.sizeZ * 0.5 else it.centerX - it.sizeX * 0.5 }
+        val maxX = parts.maxOf { if (sideView) it.centerZ + it.sizeZ * 0.5 else it.centerX + it.sizeX * 0.5 }
+        val minY = parts.minOf { if (sideView) it.centerY - it.sizeY * 0.5 else it.centerZ - it.sizeZ * 0.5 }
+        val maxY = parts.maxOf { if (sideView) it.centerY + it.sizeY * 0.5 else it.centerZ + it.sizeZ * 0.5 }
         val contentWidth = (screenWidth - MINI_CRT_SCREEN_PADDING * 2).coerceAtLeast(1)
         val contentHeight = (screenHeight - MINI_CRT_SCREEN_PADDING * 2).coerceAtLeast(1)
         val spanX = (maxX - minX).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
-        val spanZ = (maxZ - minZ).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
-        val scale = minOf(contentWidth / spanX, contentHeight / spanZ)
+        val spanY = (maxY - minY).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
+        val scale = minOf(contentWidth / spanX, contentHeight / spanY)
         val screenCenterX = screenX + screenWidth * 0.5
         val screenCenterY = screenY + screenHeight * 0.5
         val contentCenterX = (minX + maxX) * 0.5
-        val contentCenterZ = (minZ + maxZ) * 0.5
+        val contentCenterY = (minY + maxY) * 0.5
 
         parts.sortedBy { it.drawOrder }.forEach { part ->
-            val left = (screenCenterX - (part.centerX + part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
-            val right = (screenCenterX - (part.centerX - part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
-            val top = (screenCenterY - (part.centerZ + part.sizeZ * 0.5 - contentCenterZ) * scale).roundToInt()
-            val bottom = (screenCenterY - (part.centerZ - part.sizeZ * 0.5 - contentCenterZ) * scale).roundToInt()
+            val left: Int
+            val right: Int
+            val top: Int
+            val bottom: Int
+            if (sideView) {
+                left = (screenCenterX + (part.centerZ - part.sizeZ * 0.5 - contentCenterX) * scale).roundToInt()
+                right = (screenCenterX + (part.centerZ + part.sizeZ * 0.5 - contentCenterX) * scale).roundToInt()
+                top = (screenCenterY - (part.centerY + part.sizeY * 0.5 - contentCenterY) * scale).roundToInt()
+                bottom = (screenCenterY - (part.centerY - part.sizeY * 0.5 - contentCenterY) * scale).roundToInt()
+            } else {
+                left = (screenCenterX - (part.centerX + part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
+                right = (screenCenterX - (part.centerX - part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
+                top = (screenCenterY - (part.centerZ + part.sizeZ * 0.5 - contentCenterY) * scale).roundToInt()
+                bottom = (screenCenterY - (part.centerZ - part.sizeZ * 0.5 - contentCenterY) * scale).roundToInt()
+            }
             val minWidth = if (part.type == VehiclePartTypes.WHEEL) DAMAGE_PART_MIN_PIXELS + 1 else DAMAGE_PART_MIN_PIXELS
             val drawLeft = left.coerceAtMost(right - minWidth)
             val drawTop = top.coerceAtMost(bottom - minWidth)
@@ -543,8 +556,10 @@ object VehicleHudOverlay {
                 id = partId,
                 type = part.type,
                 centerX = zone.center.x,
+                centerY = zone.center.y,
                 centerZ = zone.center.z,
                 sizeX = zone.size.x.coerceAtLeast(0.18),
+                sizeY = zone.size.y.coerceAtLeast(0.18),
                 sizeZ = zone.size.z.coerceAtLeast(0.18),
                 healthFraction = VehicleDamage.healthFraction(vehicle, partId)
             )
@@ -556,8 +571,10 @@ object VehicleHudOverlay {
             id = VehicleDamage.BODY_PART_ID,
             type = bodyPart.type,
             centerX = vehicle.vehicleDefinition.body.collisionBoxOffset.x,
+            centerY = vehicle.vehicleDefinition.body.collisionBoxOffset.y,
             centerZ = vehicle.vehicleDefinition.body.collisionBoxOffset.z,
             sizeX = vehicle.vehicleDefinition.body.collisionBoxSize.x.coerceAtLeast(0.4),
+            sizeY = vehicle.vehicleDefinition.body.collisionBoxSize.y.coerceAtLeast(0.4),
             sizeZ = vehicle.vehicleDefinition.body.collisionBoxSize.z.coerceAtLeast(0.4),
             healthFraction = VehicleDamage.healthFraction(vehicle, VehicleDamage.BODY_PART_ID)
         )
@@ -969,8 +986,10 @@ object VehicleHudOverlay {
         val id: String,
         val type: ResourceLocation,
         val centerX: Double,
+        val centerY: Double,
         val centerZ: Double,
         val sizeX: Double,
+        val sizeY: Double,
         val sizeZ: Double,
         val healthFraction: Double
     ) {
