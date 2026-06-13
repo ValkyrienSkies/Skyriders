@@ -36,6 +36,8 @@ object VehicleHudOverlay {
     private const val MINI_CRT_SCREEN_PADDING = 4
     private const val MINI_CRT_DASHBOARD_OVERLAP = 20
     private const val DAMAGE_PART_MIN_PIXELS = 3
+    private const val CRITICAL_WARNING_COLOR = 0xAAFF1F1F.toInt()
+    private const val CRITICAL_TREMBLE_PIXELS = 3
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
     private val METER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/meter_round.png")
@@ -200,10 +202,13 @@ object VehicleHudOverlay {
 //        }
         val dt = consumeRenderDt()
         val fuelSlosh = updateFuelTankSlosh(current, dt)
+        val level = minecraft.level
+        val vehicle = level?.let { VehicleManager.getVehicle(it, current.bodyId) }
+        val criticalFailure = vehicle?.let(VehicleDamage::isCriticalFailure) == true
 
-        renderDamageCrt(guiGraphics, screenHeight, current)
-        renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh)
-        renderMeters(guiGraphics, screenWidth, screenHeight, current, dt)
+        renderDamageCrt(guiGraphics, screenHeight, current, vehicle, criticalFailure)
+        renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh, criticalFailure)
+        renderMeters(guiGraphics, screenWidth, screenHeight, current, dt, criticalFailure)
         renderRacePlacement(guiGraphics, screenWidth, current)
     }
 
@@ -213,10 +218,12 @@ object VehicleHudOverlay {
         screenHeight: Int,
         snapshot: VehicleHudSnapshot,
         dt: Double,
-        fuelSlosh: FuelSloshState
+        fuelSlosh: FuelSloshState,
+        criticalFailure: Boolean
     ) {
-        val x = 0
-        val y = screenHeight - DASHBOARD_BASE.height
+        val shake = criticalTremble(criticalFailure, 0.15, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.OUT_POSITIVE)
+        val x = shake.x
+        val y = screenHeight - DASHBOARD_BASE.height + shake.y
         val steeringDegrees = updateVisualSteeringDegrees(snapshot.steer, dt)
         drawFuelTank(guiGraphics, x + 117, y + 8, 44, 22, snapshot.fuel, fuelSlosh)
         guiGraphics.blitRegion(DASHBOARD_TEXTURE, DASHBOARD_BASE, x, y, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT)
@@ -239,9 +246,16 @@ object VehicleHudOverlay {
         dashboardFuelCounter.render(guiGraphics, x, y, (snapshot.fuel * 100.0).roundToInt().coerceIn(0, 999).toString())
     }
 
-    private fun renderDamageCrt(guiGraphics: GuiGraphics, screenHeight: Int, snapshot: VehicleHudSnapshot) {
-        val x = 0
-        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP
+    private fun renderDamageCrt(
+        guiGraphics: GuiGraphics,
+        screenHeight: Int,
+        snapshot: VehicleHudSnapshot,
+        vehicle: IVehicle?,
+        criticalFailure: Boolean
+    ) {
+        val shake = criticalTremble(criticalFailure, 2.2, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.FREE)
+        val x = shake.x
+        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP + shake.y
         guiGraphics.blitRegion(MINI_CRT_TEXTURE, MINI_CRT_BASE, x, y, MINI_CRT_TEXTURE_WIDTH, MINI_CRT_TEXTURE_HEIGHT)
 
         val screenX = x + MINI_CRT_SCREEN_X
@@ -249,15 +263,30 @@ object VehicleHudOverlay {
         val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X + 1
         val screenContentHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y + 1
 
-        val minecraft = Minecraft.getInstance()
-        val level = minecraft.level ?: return
-        val vehicle = VehicleManager.getVehicle(level, snapshot.bodyId) ?: return
+        if (vehicle == null) return
         val damageParts = damageHudParts(vehicle)
         if (damageParts.isEmpty()) return
 
         guiGraphics.enableScissor(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight)
         drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts)
+        if (criticalFailure) {
+            drawCriticalCrtWarning(guiGraphics, screenX, screenY, screenWidth, screenContentHeight)
+        }
         guiGraphics.disableScissor()
+    }
+
+    private fun drawCriticalCrtWarning(guiGraphics: GuiGraphics, screenX: Int, screenY: Int, screenWidth: Int, screenHeight: Int) {
+        val now = System.currentTimeMillis()
+        if ((now / 85L) % 2L != 0L) return
+        val centerX = screenX + screenWidth / 2
+        val centerY = screenY + screenHeight / 2
+        val block = (screenWidth / 10).coerceIn(4, 7)
+        val gap = (block / 2).coerceAtLeast(2)
+        val barHeight = (screenHeight * 0.46).roundToInt().coerceAtLeast(block * 3)
+        val left = centerX - block / 2
+        val top = centerY - barHeight / 2 - gap
+        guiGraphics.fill(left, top, left + block, top + barHeight, CRITICAL_WARNING_COLOR)
+        guiGraphics.fill(left, top + barHeight + gap, left + block, top + barHeight + gap + block, CRITICAL_WARNING_COLOR)
     }
 
     private fun drawDamageHudParts(
@@ -368,12 +397,20 @@ object VehicleHudOverlay {
         return (color and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
     }
 
-    private fun renderMeters(guiGraphics: GuiGraphics, screenWidth: Int, screenHeight: Int, snapshot: VehicleHudSnapshot, dt: Double) {
+    private fun renderMeters(
+        guiGraphics: GuiGraphics,
+        screenWidth: Int,
+        screenHeight: Int,
+        snapshot: VehicleHudSnapshot,
+        dt: Double,
+        criticalFailure: Boolean
+    ) {
         val y = screenHeight - METER_BASE.height
         var currentIndex = 1
         meters.forEach { meter ->
             if (meter.isVisible(snapshot)) {
-                meter.render(guiGraphics, screenWidth + (meter.anchorOffsetX * currentIndex), y, snapshot, dt)
+                val shake = criticalTremble(criticalFailure, 4.0 + currentIndex, horizontal = EdgeShake.OUT_POSITIVE, vertical = EdgeShake.OUT_POSITIVE)
+                meter.render(guiGraphics, screenWidth + (meter.anchorOffsetX * currentIndex) + shake.x, y + shake.y, snapshot, dt)
                 currentIndex++
             }
         }
@@ -549,6 +586,19 @@ object VehicleHudOverlay {
         return if (result < 0.0) result + modulus else result
     }
 
+    private fun criticalTremble(criticalFailure: Boolean, salt: Double, horizontal: EdgeShake, vertical: EdgeShake): HudShakeOffset {
+        if (!criticalFailure) return HudShakeOffset.ZERO
+        val time = System.currentTimeMillis() / 1000.0
+        val rawX = trembleSample(time, salt)
+        val rawY = trembleSample(time, salt + 9.35)
+        return HudShakeOffset(horizontal.apply(rawX), vertical.apply(rawY))
+    }
+
+    private fun trembleSample(time: Double, salt: Double): Int {
+        val value = sin(time * 58.0 + salt) + sin(time * 113.0 + salt * 1.7) * 0.58
+        return (value * CRITICAL_TREMBLE_PIXELS).roundToInt().coerceIn(-CRITICAL_TREMBLE_PIXELS, CRITICAL_TREMBLE_PIXELS)
+    }
+
     private fun Vector3d.isFinite(): Boolean {
         return x.isFinite() && y.isFinite() && z.isFinite()
     }
@@ -716,6 +766,31 @@ object VehicleHudOverlay {
     private data class FuelSloshState(
         val tiltPixels: Double
     )
+
+    private data class HudShakeOffset(
+        val x: Int,
+        val y: Int
+    ) {
+        companion object {
+            val ZERO = HudShakeOffset(0, 0)
+        }
+    }
+
+    private enum class EdgeShake {
+        NONE,
+        FREE,
+        OUT_NEGATIVE,
+        OUT_POSITIVE;
+
+        fun apply(value: Int): Int {
+            return when (this) {
+                NONE -> 0
+                FREE -> value
+                OUT_NEGATIVE -> -kotlin.math.abs(value)
+                OUT_POSITIVE -> kotlin.math.abs(value)
+            }
+        }
+    }
 
     private data class VehicleMotion(
         val rollRad: Double,

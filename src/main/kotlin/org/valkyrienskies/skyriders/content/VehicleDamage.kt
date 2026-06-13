@@ -245,7 +245,7 @@ object VehicleDamage {
         vehicles.forEach { vehicle ->
             val key = VehicleKey(level.dimensionId, vehicle.bodyId)
             activeKeys.add(key)
-            if (!isCriticalFailureArmed(vehicle)) {
+            if (!isCriticalFailure(vehicle)) {
                 criticalFailures.remove(key)
                 return@forEach
             }
@@ -345,7 +345,7 @@ object VehicleDamage {
         BikeLifecycle.syncLevel(level)
     }
 
-    private fun isCriticalFailureArmed(vehicle: IVehicle): Boolean {
+    fun isCriticalFailure(vehicle: IVehicle): Boolean {
         return healthFraction(vehicle, BODY_PART_ID) <= 0.0 && healthFraction(vehicle, ENGINE_PART_ID) <= 0.0
     }
 
@@ -358,12 +358,7 @@ object VehicleDamage {
     ) {
         val position = vehiclePosition(level, vehicle) ?: return
         if (now - state.lastHissTick >= CRITICAL_HISS_INTERVAL_TICKS) {
-            val sound = if (ThreadLocalRandom.current().nextBoolean()) {
-                SkyridersSounds.TIRE_LEAK_1_SOUND.get()
-            } else {
-                SkyridersSounds.TIRE_LEAK_2_SOUND.get()
-            }
-            level.playSound(null, position.x, position.y, position.z, sound, SoundSource.NEUTRAL, 0.7f, randomPitch(0.75f, 0.95f))
+            level.playSound(null, position.x, position.y, position.z, SoundEvents.TNT_PRIMED, SoundSource.NEUTRAL, 0.78f, randomPitch(0.86f, 1.08f))
             state.lastHissTick = now
         }
         if (now - state.lastEffectTick >= CRITICAL_EFFECT_INTERVAL_TICKS) {
