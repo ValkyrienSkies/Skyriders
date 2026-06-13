@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "skyriders:item/grabby_hand"
-  }
+  "parent": "minecraft:builtin/entity"
 }

@@ -40,10 +40,9 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
     private fun renderHead(entity: ExtendingArmEntity, poseStack: PoseStack, bufferSource: MultiBufferSource) {
         val texture = headTexture(entity)
         val light = LevelRenderer.getLightColor(entity.level(), BlockPos.containing(entity.x, entity.y, entity.z))
-        val buffer = bufferSource.getBuffer(RenderType.entityCutout(texture))
         poseStack.pushPose()
         val velocity = entity.deltaMovement
-        if (velocity.lengthSqr() > 1.0e-8) {
+        if (!entity.retracting && velocity.lengthSqr() > 1.0e-8) {
             val horizontal = sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
             poseStack.mulPose(Axis.YP.rotationDegrees(Math.toDegrees(atan2(-velocity.x, -velocity.z)).toFloat()))
             poseStack.mulPose(Axis.XP.rotationDegrees(Math.toDegrees(atan2(velocity.y, horizontal)).toFloat()))
@@ -51,7 +50,16 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
             poseStack.mulPose(Axis.YP.rotationDegrees(-entity.yRot))
             poseStack.mulPose(Axis.XP.rotationDegrees(entity.xRot))
         }
-        drawBox(buffer, poseStack.last().pose(), poseStack.last().normal(), light, -HEAD_HALF, -HEAD_HALF, -HEAD_HALF, HEAD_HALF, HEAD_HALF, HEAD_HALF)
+        poseStack.pushPose()
+        poseStack.mulPose(Axis.XP.rotationDegrees(-90.0f))
+        poseStack.scale(HEAD_MODEL_SCALE, HEAD_MODEL_SCALE, HEAD_MODEL_SCALE)
+        poseStack.translate(-0.5, -0.5, -0.5)
+        val renderedModel = VehicleOpenModelRenderer.renderTexturedIfNeeded(headModel(entity), texture, poseStack, bufferSource, light)
+        poseStack.popPose()
+        if (!renderedModel) {
+            val buffer = bufferSource.getBuffer(RenderType.entityCutout(texture))
+            drawBox(buffer, poseStack.last().pose(), poseStack.last().normal(), light, -HEAD_HALF, -HEAD_HALF, -HEAD_HALF, HEAD_HALF, HEAD_HALF, HEAD_HALF)
+        }
         poseStack.popPose()
     }
 
@@ -171,12 +179,19 @@ class ExtendingArmRenderer(context: EntityRendererProvider.Context) : EntityRend
         return if (entity.armKind == ExtendingArmEntity.GRABBY_HAND) GRABBY_HEAD_TEXTURE else BOXING_HEAD_TEXTURE
     }
 
+    private fun headModel(entity: ExtendingArmEntity): ResourceLocation {
+        return if (entity.armKind == ExtendingArmEntity.GRABBY_HAND) GRABBY_HEAD_MODEL else BOXING_HEAD_MODEL
+    }
+
     companion object {
+        val BOXING_HEAD_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/boxing_glove")
+        val GRABBY_HEAD_MODEL = ResourceLocation(SkyridersMod.MOD_ID, "entity/grabby_hand")
         private val BOXING_HEAD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/boxing_glove.png")
         private val GRABBY_HEAD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/grabby_hand.png")
         private val BOXING_TETHER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/boxing_glove_tether.png")
         private val GRABBY_TETHER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/entity/grabby_hand_tether.png")
         private const val HEAD_HALF = 0.32f
+        private const val HEAD_MODEL_SCALE = 0.76f
         private const val TETHER_HALF_WIDTH = 0.09f
         private const val TETHER_TILE_LENGTH = 0.5
         private const val OWNER_Y_OFFSET = 0.5

@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import net.minecraftforge.client.extensions.common.IClientItemExtensions
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.bodies.VsBody
@@ -29,6 +30,7 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
 import org.valkyrienskies.skyriders.content.entity.FakeItemBoxEntity
+import java.util.function.Consumer
 
 open class HoneyCanisterItem(
     properties: Properties,
@@ -407,8 +409,14 @@ class HoneyHeisterItem(properties: Properties) : RacingVehicleItem(properties) {
 
 class ExtendingArmItem(
     properties: Properties,
-    private val armKind: Int
+    val armKind: Int
 ) : RacingVehicleItem(properties) {
+    override fun initializeClient(consumer: Consumer<IClientItemExtensions>) {
+        consumer.accept(object : IClientItemExtensions {
+            override fun getCustomRenderer() = ExtendingArmItemRenderer.instance()
+        })
+    }
+
     override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return false
         val entity = SkyridersMod.EXTENDING_ARM_ENTITY.get().create(level) ?: return false

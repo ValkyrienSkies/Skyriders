@@ -250,7 +250,9 @@ object VehicleOpenModelRenderer {
         val json = resource.open().bufferedReader(StandardCharsets.UTF_8).use { reader ->
             JsonParser.parseReader(reader).asJsonObject
         }
-        if (json.getString("loader") != "framework:open_model") return null
+        val loader = json.getString("loader")
+        val components = json.getAsJsonArray("components") ?: json.getAsJsonArray("elements")
+        if (loader != "framework:open_model" && (components == null || !json.has("format_version"))) return null
 
         val textures = json.getAsJsonObject("textures") ?: return null
         val textureAliases = textures.entrySet().associate { (key, value) ->
@@ -259,7 +261,7 @@ object VehicleOpenModelRenderer {
 
         val faces = ArrayList<OpenFace>()
         var requiresCustomTransforms = false
-        json.getAsJsonArray("components")?.forEach { element ->
+        components?.forEach { element ->
             val component = element.asJsonObject
             requiresCustomTransforms = requiresCustomTransforms || component.has("rotated")
             val from = component.getVector3d("from")
