@@ -159,6 +159,7 @@ object SkyridersModClient {
     fun registerGuiOverlays(event: RegisterGuiOverlaysEvent) {
         event.registerAboveAll("vehicle_hud") { _, guiGraphics, _, screenWidth, screenHeight ->
             VehicleHudOverlay.render(guiGraphics, screenWidth, screenHeight)
+            RaceResultsClientState.render(guiGraphics, screenWidth, screenHeight)
         }
     }
 
@@ -174,6 +175,7 @@ object SkyridersModClient {
             RaceCompassClientState.tick()
             RaceHudClientState.tick()
             RaceMusicClientState.tick()
+            RaceResultsClientState.tick()
             val player = minecraft.player ?: return
             tickRaceDangerRadiusPreview(minecraft)
             if (player.vehicle !is BikeSeatEntity) return
@@ -263,6 +265,7 @@ object SkyridersModClient {
             lastSentInput = VehicleInput.EMPTY
             BikeClientHoistState.hoisting = false
             RaceHudClientState.clear()
+            RaceResultsClientState.clear()
             RaceMusicClientState.stop()
             VehicleJukeboxClientSounds.clear()
         }

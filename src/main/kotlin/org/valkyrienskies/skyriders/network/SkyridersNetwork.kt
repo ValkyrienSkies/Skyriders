@@ -21,6 +21,7 @@ import org.valkyrienskies.skyriders.client.ClientBikeSyncHandler
 import org.valkyrienskies.skyriders.client.RaceCompassClientState
 import org.valkyrienskies.skyriders.client.RaceHudClientState
 import org.valkyrienskies.skyriders.client.RaceMusicClientState
+import org.valkyrienskies.skyriders.client.RaceResultsClientState
 import org.valkyrienskies.skyriders.client.RacingClientSounds
 import org.valkyrienskies.skyriders.client.VehicleHudOverlay
 import org.valkyrienskies.skyriders.content.BikeInput
@@ -40,6 +41,7 @@ import org.valkyrienskies.skyriders.content.WheeledVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
+import java.util.UUID
 import java.util.function.Supplier
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 
@@ -48,6 +50,8 @@ object SkyridersNetwork {
     private const val VEHICLE_DEBUG_SYNC_ENABLED = false
     private const val VEHICLE_VISUAL_ENGINE_ON_FLAG = 1
     private const val VEHICLE_VISUAL_LEAN_FLAG = 1 shl 1
+    private const val MAX_RACE_RESULT_ENTRIES = 16
+    private const val MAX_RACE_RESULT_TEXT_LENGTH = 48
     private var nextPacketId = 0
 
     private val CHANNEL: SimpleChannel = NetworkRegistry.ChannelBuilder
@@ -176,6 +180,13 @@ object SkyridersNetwork {
             RaceHudPacket::encode,
             RaceHudPacket::decode,
             RaceHudPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            RaceResultsPacket::class.java,
+            RaceResultsPacket::encode,
+            RaceResultsPacket::decode,
+            RaceResultsPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -581,6 +592,13 @@ object SkyridersNetwork {
     fun sendRaceHudClear(player: ServerPlayer) {
         SkyridersNetworkStats.record("S2C.RaceHud", 1)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceHudPacket(false, -1L, 0, 0, 0, 0, 0L))
+    }
+
+    fun sendRaceResults(player: ServerPlayer, results: List<RaceResultEntry>) {
+        val capped = results.take(MAX_RACE_RESULT_ENTRIES)
+        val bytes = 1 + capped.sumOf { 32 + estimateUtfBytes(it.playerName) + estimateUtfBytes(it.vehicleType) }
+        SkyridersNetworkStats.record("S2C.RaceResults", bytes)
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceResultsPacket(capped))
     }
 
     fun sendRocketExplosionSound(player: ServerPlayer, position: Vec3, volume: Float, pitch: Float) {
@@ -1475,6 +1493,65 @@ object SkyridersNetwork {
         }
     }
 
+    data class RaceResultEntry(
+        val place: Int,
+        val playerUuid: UUID,
+        val playerName: String,
+        val vehicleType: String,
+        val elapsedTicks: Long
+    )
+
+    data class RaceResultsPacket(val results: List<RaceResultEntry>) {
+        fun encode(buf: FriendlyByteBuf) {
+            val capped = results.take(MAX_RACE_RESULT_ENTRIES)
+            buf.writeVarInt(capped.size)
+            capped.forEach { result ->
+                buf.writeVarInt(result.place.coerceAtLeast(1))
+                buf.writeUUID(result.playerUuid)
+                buf.writeUtf(result.playerName, MAX_RACE_RESULT_TEXT_LENGTH)
+                buf.writeUtf(result.vehicleType, MAX_RACE_RESULT_TEXT_LENGTH)
+                buf.writeLong(result.elapsedTicks.coerceAtLeast(0L))
+            }
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable {
+                        RaceResultsClientState.show(results)
+                    }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: RaceResultsPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): RaceResultsPacket {
+                val count = buf.readVarInt().coerceIn(0, MAX_RACE_RESULT_ENTRIES)
+                val results = ArrayList<RaceResultEntry>(count)
+                repeat(count) {
+                    results += RaceResultEntry(
+                        place = buf.readVarInt().coerceAtLeast(1),
+                        playerUuid = buf.readUUID(),
+                        playerName = buf.readUtf(MAX_RACE_RESULT_TEXT_LENGTH),
+                        vehicleType = buf.readUtf(MAX_RACE_RESULT_TEXT_LENGTH),
+                        elapsedTicks = buf.readLong().coerceAtLeast(0L)
+                    )
+                }
+                return RaceResultsPacket(results)
+            }
+
+            fun handle(packet: RaceResultsPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
     data class RocketExplosionSoundPacket(val position: Vec3, val volume: Float, val pitch: Float) {
         fun encode(buf: FriendlyByteBuf) {
             buf.writeDouble(position.x)
@@ -1514,6 +1591,10 @@ object SkyridersNetwork {
 
     private fun estimateResourceLocationBytes(id: ResourceLocation): Int {
         return 1 + id.namespace.length + id.path.length
+    }
+
+    private fun estimateUtfBytes(value: String): Int {
+        return 1 + value.toByteArray(Charsets.UTF_8).size
     }
 
     private fun estimateBikeSyncBytes(records: List<BikeSaveRecord>): Int {

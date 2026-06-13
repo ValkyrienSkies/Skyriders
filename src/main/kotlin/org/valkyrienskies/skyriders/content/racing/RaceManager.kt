@@ -344,11 +344,11 @@ object RaceManager {
         val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return null
         val position = Vector3d(body.kinematics.position)
         if (line.distanceToSegment(position) > START_CAPTURE_RANGE) return null
-        val driver = driverForVehicle(level, vehicle.bodyId)
+        val driver = driverForVehicle(level, vehicle.bodyId) ?: return null
         return RacerState(
             bodyId = vehicle.bodyId,
-            driverId = driver?.uuid,
-            driverName = driver?.gameProfile?.name ?: vehicle.vehicleDefinition.displayName,
+            driverId = driver.uuid,
+            driverName = driver.gameProfile.name,
             vehicleType = vehicle.vehicleDefinition.id.toString(),
             position = position,
             lastRecoveryTarget = Vector3d(line.center),
@@ -425,16 +425,18 @@ object RaceManager {
             pulseEndpoint(level, marker)
             val place = race.finishOrder.size
             val total = race.totalParticipants
-            driverForBody(level, racer.bodyId)?.let { driver ->
-                saveLeaderboardEntry(level, race, racer, marker, driver)
-                driver.sendTitle("Finished $place/$total", fadeIn = 4, stay = 42, fadeOut = 12)
-                SkyridersNetwork.sendRaceCompassTarget(driver, null)
-                SkyridersNetwork.sendRaceHudClear(driver)
-                SkyridersNetwork.sendRaceMusicStop(driver)
-                notifyOtherRacersFinished(level, race, racer.bodyId, driver.gameProfile.name, place)
+            playerForRacer(level, racer)?.let { player ->
+                addRaceResult(level, race, racer, place, player)
+                saveLeaderboardEntry(level, race, racer, marker, player)
+                player.sendTitle("Finished $place/$total", fadeIn = 4, stay = 42, fadeOut = 12)
+                SkyridersNetwork.sendRaceCompassTarget(player, null)
+                SkyridersNetwork.sendRaceHudClear(player)
+                SkyridersNetwork.sendRaceMusicStop(player)
+                notifyOtherRacersFinished(level, race, racer.bodyId, player.gameProfile.name, place)
             }
             race.racers.remove(racer.bodyId)
             if (race.racers.isEmpty()) {
+                sendRaceResultsToFinishers(level, race)
                 stopRace(level, race)
             }
         }
@@ -474,6 +476,26 @@ object RaceManager {
                 SkyridersNetwork.sendRaceHudClear(driver)
                 SkyridersNetwork.sendRaceMusicStop(driver)
             }
+    }
+
+    private fun addRaceResult(level: ServerLevel, race: ActiveRace, racer: RacerState, place: Int, player: ServerPlayer) {
+        if (race.finishResults.any { it.playerUuid == player.uuid }) return
+        race.finishResults += SkyridersNetwork.RaceResultEntry(
+            place = place,
+            playerUuid = player.uuid,
+            playerName = player.gameProfile.name,
+            vehicleType = racer.vehicleType,
+            elapsedTicks = (level.gameTime - racer.raceStartedAtGameTime).coerceAtLeast(0L)
+        )
+    }
+
+    private fun sendRaceResultsToFinishers(level: ServerLevel, race: ActiveRace) {
+        val results = race.finishResults.sortedBy { it.place }
+        if (results.isEmpty()) return
+        results
+            .mapNotNull { result -> level.server.playerList.getPlayer(result.playerUuid) }
+            .distinctBy { it.uuid }
+            .forEach { player -> SkyridersNetwork.sendRaceResults(player, results) }
     }
 
     private fun sendRaceHudPositions(level: ServerLevel, race: ActiveRace) {
@@ -1043,6 +1065,7 @@ object RaceManager {
         val dangerBlocks: List<RaceDangerSnapshot>,
         val racers: LinkedHashMap<Long, RacerState>,
         val finishOrder: MutableList<Long> = mutableListOf(),
+        val finishResults: MutableList<SkyridersNetwork.RaceResultEntry> = mutableListOf(),
         val forceLoadedMarkerChunks: MutableSet<Long> = HashSet(),
         val musicTrack: ResourceLocation?,
         val totalLaps: Int,
