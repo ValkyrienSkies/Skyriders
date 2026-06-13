@@ -21,6 +21,7 @@ import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleSoundPositions
 import org.valkyrienskies.skyriders.content.VehicleSoundDefinition
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -441,11 +442,7 @@ object BikeClientEffects {
 
         val soundId = if (engineOn) vehicle.vehicleDefinition.sounds.engineStart else vehicle.vehicleDefinition.sounds.engineStop
         soundId ?: return
-        val position = try {
-            vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d()) ?: return
-        } catch (_: IllegalStateException) {
-            return
-        }
+        val position = VehicleSoundPositions.engineWorldPosition(vehicle) ?: return
         minecraft.soundManager.play(
             SimpleSoundInstance(
                 soundId,
@@ -673,16 +670,10 @@ object BikeClientEffects {
         }
 
         fun update(speed: Double, throttle: Double, engineRpm: Double?) {
-            val transform = try {
-                vehicle.getRenderTransform()
-            } catch (_: IllegalStateException) {
-                volume = 0.0f
-                return
-            } ?: run {
+            val position = VehicleSoundPositions.engineWorldPosition(vehicle) ?: run {
                 volume = 0.0f
                 return
             }
-            val position = transform.toWorld.transformPosition(Vector3d())
             x = position.x
             y = position.y
             z = position.z

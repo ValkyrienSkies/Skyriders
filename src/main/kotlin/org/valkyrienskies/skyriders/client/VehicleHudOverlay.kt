@@ -371,7 +371,7 @@ object VehicleHudOverlay {
             particle.vx *= particle.drag
             particle.vy *= particle.drag
             if (particle.type == HudParticleType.SPARK) {
-                particle.vy += 32.0 * safeDt
+                particle.vy += 520.0 * safeDt
             }
         }
     }
@@ -387,9 +387,18 @@ object VehicleHudOverlay {
             val x = particle.x.roundToInt()
             val y = particle.y.roundToInt()
             if (particle.type == HudParticleType.SPARK) {
-                guiGraphics.fill(x, y, x + size + 1, y + size, color)
-                if (size <= 2) {
-                    guiGraphics.fill(x + 1, y - 1, x + 2, y + size + 1, color)
+                val tailX = (-particle.vx * 0.035).roundToInt().coerceIn(-7, 7)
+                val tailY = (-particle.vy * 0.035).roundToInt().coerceIn(-7, 7)
+                guiGraphics.fill(x, y, x + size + 1, y + size + 1, color)
+                if (tailX != 0 || tailY != 0) {
+                    val tailColor = ((alpha * 0.55).roundToInt().coerceIn(0, 255) shl 24) or (particle.color and 0x00FFFFFF)
+                    guiGraphics.fill(
+                        minOf(x, x + tailX),
+                        minOf(y, y + tailY),
+                        maxOf(x + size, x + tailX + size),
+                        maxOf(y + size, y + tailY + size),
+                        tailColor
+                    )
                 }
             } else {
                 guiGraphics.fill(x, y, x + size, y + size, color)
@@ -403,41 +412,26 @@ object VehicleHudOverlay {
 
     private fun spawnCrtSparks(origin: HudPoint, count: Int, force: Double) {
         val random = ThreadLocalRandom.current()
-        val screenX = origin.x + MINI_CRT_SCREEN_X
-        val screenY = origin.y + MINI_CRT_SCREEN_Y
-        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X + 1
-        val screenHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y + 1
+        val upperEdgeY = origin.y + MINI_CRT_SCREEN_Y + random.nextDouble(-2.0, 5.0)
+        val rightEdgeX = origin.x + MINI_CRT_SCREEN_RIGHT + random.nextDouble(-4.0, 4.0)
+        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X + 1.0
+        val screenHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y + 1.0
         repeat(count) {
-            val edge = random.nextInt(4)
+            val fromTop = random.nextDouble() < 0.68
             val spawnX: Double
             val spawnY: Double
             val velocityX: Double
             val velocityY: Double
-            when (edge) {
-                0 -> {
-                    spawnX = screenX + random.nextDouble(2.0, screenWidth - 2.0)
-                    spawnY = screenY + random.nextDouble(0.0, 3.0)
-                    velocityX = random.nextDouble(-24.0, 24.0)
-                    velocityY = random.nextDouble(-92.0, -32.0)
-                }
-                1 -> {
-                    spawnX = screenX + screenWidth - random.nextDouble(0.0, 3.0)
-                    spawnY = screenY + random.nextDouble(2.0, screenHeight - 2.0)
-                    velocityX = random.nextDouble(42.0, 94.0)
-                    velocityY = random.nextDouble(-46.0, 20.0)
-                }
-                2 -> {
-                    spawnX = screenX + random.nextDouble(2.0, screenWidth - 2.0)
-                    spawnY = screenY + screenHeight - random.nextDouble(0.0, 3.0)
-                    velocityX = random.nextDouble(-26.0, 26.0)
-                    velocityY = random.nextDouble(24.0, 74.0)
-                }
-                else -> {
-                    spawnX = screenX + random.nextDouble(0.0, 3.0)
-                    spawnY = screenY + random.nextDouble(2.0, screenHeight - 2.0)
-                    velocityX = random.nextDouble(-94.0, -42.0)
-                    velocityY = random.nextDouble(-46.0, 20.0)
-                }
+            if (fromTop) {
+                spawnX = origin.x + MINI_CRT_SCREEN_X + random.nextDouble(screenWidth * 0.45, screenWidth + 8.0)
+                spawnY = upperEdgeY
+                velocityX = random.nextDouble(34.0, 155.0)
+                velocityY = random.nextDouble(-250.0, -115.0)
+            } else {
+                spawnX = rightEdgeX
+                spawnY = origin.y + MINI_CRT_SCREEN_Y + random.nextDouble(0.0, screenHeight * 0.68)
+                velocityX = random.nextDouble(125.0, 265.0)
+                velocityY = random.nextDouble(-165.0, -35.0)
             }
             val color = if (random.nextBoolean()) 0xFFFFEA62.toInt() else 0xFFFFB000.toInt()
             addHudParticle(
@@ -447,12 +441,12 @@ object VehicleHudOverlay {
                     y = spawnY,
                     vx = velocityX * force,
                     vy = velocityY * force,
-                    lifetime = random.nextDouble(0.16, 0.36),
-                    size = random.nextDouble(1.0, 2.2),
+                    lifetime = random.nextDouble(0.42, 0.72),
+                    size = random.nextDouble(2.0, 3.8),
                     grow = 0.0,
                     color = color,
-                    alpha = random.nextDouble(0.72, 1.0),
-                    drag = 0.82
+                    alpha = random.nextDouble(0.9, 1.0),
+                    drag = 0.94
                 )
             )
         }

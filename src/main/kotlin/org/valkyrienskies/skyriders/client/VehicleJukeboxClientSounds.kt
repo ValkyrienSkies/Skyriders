@@ -6,10 +6,10 @@ import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.sounds.SoundSource
 import net.minecraft.util.RandomSource
-import org.joml.Vector3d
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.skyriders.content.VehicleJukebox
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleSoundPositions
 
 object VehicleJukeboxClientSounds {
     private val activeSounds = HashMap<BodyId, TruckDiscSound>()
@@ -85,11 +85,7 @@ object VehicleJukeboxClientSounds {
         private fun updatePosition() {
             val level = Minecraft.getInstance().level ?: return
             val vehicle = VehicleManager.getVehicle(level, bodyId) ?: return
-            val position = try {
-                vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d(0.0, 0.75, 0.0))
-            } catch (_: IllegalStateException) {
-                null
-            } ?: return
+            val position = VehicleSoundPositions.jukeboxWorldPosition(vehicle) ?: return
             x = position.x
             y = position.y
             z = position.z
