@@ -311,7 +311,7 @@ object BikeClientEffects {
         destroyed: Boolean
     ) {
         val damage = damageFraction.coerceIn(0.0, 1.0)
-        val smokeChance = if (destroyed) 0.95 else (damage * 0.78).coerceIn(0.0, 0.78)
+        val smokeChance = if (destroyed) 0.32 else (damage * 0.78).coerceIn(0.0, 0.78)
         if (level.random.nextDouble() < smokeChance) {
             val particle = when {
                 destroyed -> ParticleTypes.CAMPFIRE_COSY_SMOKE

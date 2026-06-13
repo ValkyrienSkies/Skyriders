@@ -12,6 +12,7 @@ import net.minecraft.world.inventory.InventoryMenu
 import org.joml.Vector3d
 import org.joml.Vector3f
 import java.nio.charset.StandardCharsets
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -152,10 +153,9 @@ object VehicleOpenModelRenderer {
         packedLight: Int,
         alpha: Float
     ) {
-        val uvs = crackUvs()
         for (i in 0 until 4) {
             val vertex = face.vertices[i]
-            val uv = uvs[i]
+            val uv = crackUv(vertex, face.normal)
             val offsetX = face.normal.x() * CRACK_SURFACE_OFFSET_MODEL_UNITS
             val offsetY = face.normal.y() * CRACK_SURFACE_OFFSET_MODEL_UNITS
             val offsetZ = face.normal.z() * CRACK_SURFACE_OFFSET_MODEL_UNITS
@@ -221,12 +221,19 @@ object VehicleOpenModelRenderer {
             point.z <= zone.center.z + halfZ
     }
 
-    private fun crackUvs(): Array<Vector3f> {
-        return arrayOf(
-            Vector3f(0.0f, 1.0f, 0.0f),
-            Vector3f(1.0f, 1.0f, 0.0f),
-            Vector3f(1.0f, 0.0f, 0.0f),
-            Vector3f(0.0f, 0.0f, 0.0f)
+    private fun crackUv(vertex: Vector3f, normal: Vector3f): Vector3f {
+        val absX = abs(normal.x())
+        val absY = abs(normal.y())
+        val absZ = abs(normal.z())
+        val (u, v) = when {
+            absY >= absX && absY >= absZ -> vertex.x() to vertex.z()
+            absX >= absY && absX >= absZ -> vertex.z() to vertex.y()
+            else -> vertex.x() to vertex.y()
+        }
+        return Vector3f(
+            u / CRACK_TEXTURE_MODEL_UNITS,
+            1.0f - v / CRACK_TEXTURE_MODEL_UNITS,
+            0.0f
         )
     }
 
@@ -496,4 +503,5 @@ object VehicleOpenModelRenderer {
     const val MIN_CRACK_DAMAGE_FRACTION = 0.08
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
+    private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }
