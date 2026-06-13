@@ -1,5 +1,7 @@
 package org.valkyrienskies.skyriders.content.item
 
+import net.minecraft.ChatFormatting
+import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.sounds.SoundEvents
@@ -10,6 +12,7 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.TooltipFlag
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
@@ -521,6 +524,10 @@ class GlassoItem(properties: Properties) : RacingVehicleItem(properties) {
 }
 
 abstract class RacingVehicleItem(properties: Properties) : Item(properties) {
+    override fun appendHoverText(stack: ItemStack, level: Level?, tooltip: MutableList<Component>, flag: TooltipFlag) {
+        tooltip.add(Component.translatable("${descriptionId}.tooltip").withStyle(ChatFormatting.GRAY))
+    }
+
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder<ItemStack> {
         val stack = player.getItemInHand(hand)
         if (level.isClientSide) {
