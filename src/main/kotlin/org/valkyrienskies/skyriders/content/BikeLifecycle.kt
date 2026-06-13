@@ -64,6 +64,7 @@ object BikeLifecycle {
             VehicleManager.tick(level.dimensionId)
             val vehicles = VehicleManager.getVehicles(level.dimensionId)
             BoostPadHandler.gameTick(level, vehicles)
+            VehicleStatusEffects.gameTick(level, vehicles)
             VehicleImpactDamageHandler.tick(level, vehicles)
             VehicleDamage.tick(level, vehicles)
             RaceManager.tickLevel(level)
@@ -129,6 +130,7 @@ object BikeLifecycle {
     }
 
     private fun isVehicleVisuallyActive(vehicle: IVehicle): Boolean {
+        if (VehicleStatusEffects.isMoondropActive(vehicle)) return true
         if (isVehicleEngineOn(vehicle)) return true
         val kinematics = try {
             vehicle.level.shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics

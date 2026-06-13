@@ -18,6 +18,7 @@ import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleInteractionActions
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehiclePartTypes
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import kotlin.math.abs
@@ -310,7 +311,17 @@ object VehicleHudOverlay {
         if (damageParts.isEmpty()) return
 
         guiGraphics.enableScissor(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight)
-        drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts, sideView = vehicle is IBike)
+        drawDamageHudParts(
+            guiGraphics,
+            screenX,
+            screenY,
+            screenWidth,
+            screenContentHeight,
+            damageParts,
+            sideView = vehicle is IBike,
+            moondropActive = VehicleStatusEffects.isMoondropActive(vehicle),
+            renderMillis = renderMillis
+        )
         if (criticalFailure) {
             drawCriticalCrtWarning(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, renderMillis)
         }
@@ -540,7 +551,9 @@ object VehicleHudOverlay {
         screenWidth: Int,
         screenHeight: Int,
         parts: List<DamageHudPart>,
-        sideView: Boolean
+        sideView: Boolean,
+        moondropActive: Boolean,
+        renderMillis: Long
     ) {
         val minX = parts.minOf { if (sideView) it.centerZ - it.sizeZ * 0.5 else it.centerX - it.sizeX * 0.5 }
         val maxX = parts.maxOf { if (sideView) it.centerZ + it.sizeZ * 0.5 else it.centerX + it.sizeX * 0.5 }
@@ -577,7 +590,11 @@ object VehicleHudOverlay {
             val drawTop = top.coerceAtMost(bottom - minWidth)
             val drawRight = right.coerceAtLeast(drawLeft + minWidth)
             val drawBottom = bottom.coerceAtLeast(drawTop + minWidth)
-            val color = damageHudColor(part.healthFraction)
+            val color = if (moondropActive) {
+                moondropDamageHudColor(renderMillis, part.drawOrder, part.centerX + part.centerY + part.centerZ)
+            } else {
+                damageHudColor(part.healthFraction)
+            }
             val fillAlpha = if (part.type == VehiclePartTypes.BODY) 0x76000000 else 0xB8000000.toInt()
             val fillColor = (color and 0x00FFFFFF) or fillAlpha
             val outlineColor = lightenColor((color and 0x00FFFFFF) or 0xCC000000.toInt())
@@ -690,6 +707,34 @@ object VehicleHudOverlay {
         } else {
             lerpColor(0xFFFFD93D.toInt(), 0xFF20F060.toInt(), (health - 0.45) / 0.55)
         }
+    }
+
+    private fun moondropDamageHudColor(renderMillis: Long, drawOrder: Int, offset: Double): Int {
+        val hue = renderMillis / 2200.0 + drawOrder * 0.09 + offset * 0.035
+        val color = pastelRainbow(hue)
+        return 0xFF000000.toInt() or
+            ((color.x * 255.0f).roundToInt().coerceIn(0, 255) shl 16) or
+            ((color.y * 255.0f).roundToInt().coerceIn(0, 255) shl 8) or
+            (color.z * 255.0f).roundToInt().coerceIn(0, 255)
+    }
+
+    private fun pastelRainbow(phase: Double): org.joml.Vector3f {
+        val hue = phase - kotlin.math.floor(phase)
+        val x = 1.0 - kotlin.math.abs((hue * 6.0) % 2.0 - 1.0)
+        val (rawR, rawG, rawB) = when ((hue * 6.0).toInt()) {
+            0 -> Triple(1.0, x, 0.0)
+            1 -> Triple(x, 1.0, 0.0)
+            2 -> Triple(0.0, 1.0, x)
+            3 -> Triple(0.0, x, 1.0)
+            4 -> Triple(x, 0.0, 1.0)
+            else -> Triple(1.0, 0.0, x)
+        }
+        val saturation = 0.36
+        return org.joml.Vector3f(
+            (1.0 - saturation + rawR * saturation).toFloat(),
+            (1.0 - saturation + rawG * saturation).toFloat(),
+            (1.0 - saturation + rawB * saturation).toFloat()
+        )
     }
 
     private fun lerpColor(from: Int, to: Int, t: Double): Int {

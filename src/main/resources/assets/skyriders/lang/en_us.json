@@ -32,6 +32,7 @@
   "item.skyriders.repair_pak": "Repair Pak",
   "item.skyriders.fake_item_box": "Fake Item Box",
   "item.skyriders.thunderbolt": "Thunderbolt",
+  "item.skyriders.moondrop": "Moondrop",
   "item.skyriders.cavendish": "Cavendish",
   "item.skyriders.glasso": "Glasso",
   "item.skyriders.honey_heister": "Honey Heister",
@@ -94,6 +95,7 @@
   "skyriders.subtitle.grabby_hand_grab": "Grabby hand grabs",
   "skyriders.subtitle.race_start": "Race starts",
   "skyriders.subtitle.finish": "Race finished",
+  "skyriders.subtitle.underpalemoonlight": "Under Pale Moonlight plays",
 
   "death.attack.skyriders.vehicle_impact": "%1$s was run over",
   "death.attack.skyriders.vehicle_impact.player": "%1$s was run over while trying to escape %2$s",

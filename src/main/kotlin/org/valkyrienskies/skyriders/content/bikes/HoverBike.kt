@@ -11,6 +11,7 @@ import org.valkyrienskies.skyriders.content.BikeDefinition
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikePhysicsConfig
 import org.valkyrienskies.skyriders.content.BikeRuntimeState
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import kotlin.math.exp
 import kotlin.math.max
 
@@ -59,7 +60,7 @@ private object HoverBikePhysics {
 
         contacts.forEach { contact -> applyHoverForce(body, contact, config) }
         if (input.riderPresent) {
-            applyDrive(body, forward, terrainUp, activeInput, forwardSpeed, grounded, config)
+            applyDrive(body, physLevel, forward, terrainUp, activeInput, forwardSpeed, grounded, config)
             applyBrake(body, forward, right, activeInput, config)
             applySteering(body, terrainUp, activeInput, speed, grounded, config)
             applyBalance(body, forward, right, up, terrainUp, activeInput, speed, grounded, config)
@@ -116,6 +117,7 @@ private object HoverBikePhysics {
 
     private fun applyDrive(
         body: PhysVsBody,
+        physLevel: PhysLevel,
         forward: Vector3d,
         terrainUp: Vector3d,
         input: BikeInput,
@@ -127,7 +129,12 @@ private object HoverBikePhysics {
         if (throttle == 0.0) return
 
         val driveForward = projectOntoPlane(forward, terrainUp, forward)
-        val speedFactor = computeSpeedLimitFactor(forwardSpeed, throttle, config)
+        val speedFactor = computeSpeedLimitFactor(
+            forwardSpeed,
+            throttle,
+            config,
+            VehicleStatusEffects.topSpeedMultiplier(physLevel.dimension, body.id)
+        )
         val controlScale = if (grounded) 1.0 else AIR_CONTROL_SCALE
         val force = throttle * speedFactor * config.mass * 42.0 * config.longitudinalGrip * controlScale
         safeApplyWorldForce(body, driveForward.mul(force), body.kinematics.position)
@@ -271,9 +278,10 @@ private object HoverBikePhysics {
     private fun computeSpeedLimitFactor(
         forwardSpeed: Double,
         throttle: Double,
-        config: BikePhysicsConfig
+        config: BikePhysicsConfig,
+        topSpeedMultiplier: Double
     ): Double {
-        val topSpeed = config.wheelTopSpeed
+        val topSpeed = config.wheelTopSpeed * topSpeedMultiplier.coerceAtLeast(1.0)
         if (!topSpeed.isFinite() || topSpeed <= 0.0) return 1.0
         val signedSpeed = forwardSpeed * if (throttle > 0.0) 1.0 else -1.0
         if (signedSpeed <= topSpeed * 0.85) return 1.0

@@ -109,6 +109,7 @@ object VehicleDamage {
     }
 
     fun damageCrash(level: ServerLevel, vehicle: IVehicle, severity: Double) {
+        if (VehicleStatusEffects.isMoondropActive(vehicle)) return
         val damage = severity.takeIf { it.isFinite() && it > 0.0 } ?: return
         damagePart(level, vehicle, BODY_PART_ID, damage * 0.85)
         damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.32)
@@ -131,6 +132,7 @@ object VehicleDamage {
         val originVec = Vector3d(origin.x, origin.y, origin.z)
         VehicleManager.getVehicles(level).forEach { vehicle ->
             if (ignoredBodyId != null && vehicle.bodyId == ignoredBodyId) return@forEach
+            if (VehicleStatusEffects.isMoondropActive(vehicle)) return@forEach
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
             val vehicleRadius = vehicleRadius(vehicle)
             val effectiveRadius = radius + vehicleRadius
@@ -151,6 +153,7 @@ object VehicleDamage {
     }
 
     fun damageAt(level: ServerLevel, vehicle: IVehicle, worldPos: Vec3, amount: Double) {
+        if (VehicleStatusEffects.isMoondropActive(vehicle)) return
         val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
         val partId = targetedPart(vehicle, worldPos) ?: BODY_PART_ID
         val scaled = when {
@@ -247,6 +250,10 @@ object VehicleDamage {
         vehicles.forEach { vehicle ->
             val key = VehicleKey(level.dimensionId, vehicle.bodyId)
             activeKeys.add(key)
+            if (VehicleStatusEffects.isMoondropActive(vehicle)) {
+                criticalFailures.remove(key)
+                return@forEach
+            }
             if (!isCriticalFailure(vehicle)) {
                 criticalFailures.remove(key)
                 return@forEach

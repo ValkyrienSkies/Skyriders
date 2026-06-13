@@ -44,12 +44,13 @@ object WheeledVehiclePhysicsSolver {
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
         val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id) *
             VehicleDamage.tractionScale(physLevel.dimension, body.id)
+        val topSpeedMultiplier = VehicleStatusEffects.topSpeedMultiplier(physLevel.dimension, body.id)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val driftSpeed = planarSpeed(body, contactUp)
         val driftGripActive = updateDriftState(state, activeInput, driftSpeed, dt, config)
         updateDriftBoost(body, state, activeInput.riderPresent, driftGripActive, forward, config, dt)
-        val driveCommand = updateTransmission(activeInput, forwardSpeed, config, state, dt)
+        val driveCommand = updateTransmission(activeInput, forwardSpeed, config, state, dt, topSpeedMultiplier)
         val steerRad = updateSteerAngle(state, activeInput.steer, forwardSpeed, config, dt)
         val driveLimitSpeed = computeDriveLimitSpeed(
             body = body,
@@ -132,8 +133,10 @@ object WheeledVehiclePhysicsSolver {
         forwardSpeed: Double,
         config: WheeledVehiclePhysicsConfig,
         state: WheeledVehicleRuntimeState,
-        dt: Double
+        dt: Double,
+        topSpeedMultiplier: Double
     ): DriveCommand {
+        val speedMultiplier = topSpeedMultiplier.coerceAtLeast(1.0)
         val transmission = config.transmission
         val maxForwardGear = transmission.forwardGears.size
         state.transmissionShiftCooldown = max(0.0, state.transmissionShiftCooldown - dt.coerceIn(0.0, 0.1))
@@ -154,7 +157,7 @@ object WheeledVehiclePhysicsSolver {
                 driveThrottle = 0.0,
                 gear = state.transmissionGear,
                 gearConfig = null,
-                topSpeed = config.wheelTopSpeed,
+                topSpeed = config.wheelTopSpeed * speedMultiplier,
                 config = config,
                 state = state,
                 dt = dt
@@ -164,7 +167,7 @@ object WheeledVehiclePhysicsSolver {
             return DriveCommand(
                 throttle = 0.0,
                 brake = brake,
-                wheelTopSpeed = config.wheelTopSpeed,
+                wheelTopSpeed = config.wheelTopSpeed * speedMultiplier,
                 torqueMultiplier = transmission.neutralDrag,
                 engineBrakeScale = 0.0
             )
@@ -207,7 +210,7 @@ object WheeledVehiclePhysicsSolver {
             gear > 0 && gearConfig != null -> gearConfig.maxSpeed
             gear < 0 -> transmission.reverseTopSpeed
             else -> config.wheelTopSpeed
-        }
+        } * speedMultiplier
         val engineDrive = updateEngineRpm(
             input = input,
             forwardSpeed = forwardSpeed,

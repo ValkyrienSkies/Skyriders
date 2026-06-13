@@ -99,7 +99,7 @@ object BikePhysicsSolver {
         applyTireForces(body, frontContact, true, drifting, config, tractionScale)
         applyTireForces(body, rearContact, false, drifting, config, tractionScale)
         if (riderPresent) {
-            applyDriveAndBrakes(body, frontContact, rearContact, activeInput, drifting, config, state, dt, tractionScale)
+            applyDriveAndBrakes(body, physLevel, frontContact, rearContact, activeInput, drifting, config, state, dt, tractionScale)
         } else {
             state.frontWheelAngularVelocity = applyParkingBrake(
                 body,
@@ -384,6 +384,7 @@ object BikePhysicsSolver {
 
     private fun applyDriveAndBrakes(
         body: PhysVsBody,
+        physLevel: PhysLevel,
         front: WheelContact,
         rear: WheelContact,
         input: BikeInput,
@@ -393,6 +394,7 @@ object BikePhysicsSolver {
         dt: Double,
         tractionScale: Double
     ) {
+        val topSpeedMultiplier = VehicleStatusEffects.topSpeedMultiplier(physLevel.dimension, body.id)
         val throttle = input.throttle.coerceIn(-1.0, 1.0)
         val driveScale = if (drifting) config.driftDriveForceScale else 1.0
         val frontBrake = if (!drifting) input.brake * 0.65 else 0.0
@@ -409,6 +411,7 @@ object BikePhysicsSolver {
             driven = !rear.grounded && front.grounded && throttle > 0.0,
             forceScale = frontForceScale,
             config = config,
+            topSpeedMultiplier = topSpeedMultiplier,
             state = state,
             dt = dt,
             tractionScale = tractionScale,
@@ -423,6 +426,7 @@ object BikePhysicsSolver {
             driven = true,
             forceScale = rearForceScale,
             config = config,
+            topSpeedMultiplier = topSpeedMultiplier,
             state = state,
             dt = dt,
             tractionScale = tractionScale,
@@ -439,6 +443,7 @@ object BikePhysicsSolver {
         driven: Boolean,
         forceScale: Double,
         config: BikePhysicsConfig,
+        topSpeedMultiplier: Double,
         state: BikeRuntimeState,
         dt: Double,
         tractionScale: Double,
@@ -446,12 +451,13 @@ object BikePhysicsSolver {
     ): Double {
         val stepDt = dt.coerceIn(0.0, 0.1)
         val radius = max(config.wheelRadius, 0.05)
-        val maxOmega = max(config.wheelTopSpeed, 1.0) * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
+        val wheelTopSpeed = config.wheelTopSpeed * topSpeedMultiplier.coerceAtLeast(1.0)
+        val maxOmega = max(wheelTopSpeed, 1.0) * MAX_WHEEL_TOP_SPEED_MULTIPLIER / radius
         val groundSpeed = if (contact.grounded) safeDot(contact.relativeWheelVelocityWorld, contact.wheelForwardWorld) else 0.0
         var omega = if (angularVelocity.isFinite()) angularVelocity else groundSpeed / radius
 
         if (driven && throttle != 0.0) {
-            val motorTargetOmega = throttle.coerceIn(-1.0, 1.0) * config.wheelTopSpeed * 1.08 / radius
+            val motorTargetOmega = throttle.coerceIn(-1.0, 1.0) * wheelTopSpeed * 1.08 / radius
             val motorAlpha = 1.0 - exp(-stepDt * WHEEL_MOTOR_RESPONSE * abs(throttle))
             omega = lerp(omega, motorTargetOmega, motorAlpha)
         }

@@ -149,6 +149,9 @@ object SkyridersSounds {
     val RACE_MUSIC_FTAV: RegistryObject<SoundEvent> = SOUND_EVENTS.register("fasterthanavalkyrie") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "fasterthanavalkyrie"))
     }
+    val UNDER_PALE_MOONLIGHT_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("underpalemoonlight") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "underpalemoonlight"))
+    }
     val RACE_MUSIC_TRACKS: List<RegistryObject<SoundEvent>> = listOf(
         RACE_MUSIC_STORMCHASING,
         RACE_MUSIC_FTAV

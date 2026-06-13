@@ -12,6 +12,7 @@
     { "item": "skyriders:honey_heister", "weight": 4, "frontMultiplier": 0.55, "backMultiplier": 2.1 },
     { "item": "skyriders:boxing_glove", "weight": 3, "frontMultiplier": 0.2, "backMultiplier": 1.45 },
     { "item": "skyriders:grabby_hand", "weight": 3, "frontMultiplier": 0.1, "backMultiplier": 1.7 },
-    { "item": "skyriders:thunderbolt", "weight": 2, "frontMultiplier": 0.1, "backMultiplier": 2.45 }
+    { "item": "skyriders:thunderbolt", "weight": 2, "frontMultiplier": 0.1, "backMultiplier": 2.45 },
+    { "item": "skyriders:moondrop", "weight": 0.45, "frontMultiplier": 0.0, "backMultiplier": 3.2 }
   ]
 }

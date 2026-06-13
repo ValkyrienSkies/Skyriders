@@ -28,6 +28,8 @@ object VehicleImpactDamageHandler {
     private const val VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS = 12L
     private const val COLLISION_START_MIN_RELATIVE_SPEED = 3.0
     private const val COLLISION_START_DAMAGE_PER_SPEED = 2.1
+    private const val MOONDROP_SPINOUT_DURATION = 2.35
+    private const val MOONDROP_SPINOUT_YAW_SPEED = 7.0
 
     private val lastDamageTickByImpact = HashMap<ImpactKey, Long>()
     private val lastCrashDamageTickByVehicle = HashMap<Long, Long>()
@@ -36,8 +38,8 @@ object VehicleImpactDamageHandler {
     fun onCollisionStart(event: CollisionEvent) {
         val contactSpeed = event.contactPoints.maxOfOrNull { contact -> contact.velocity.length() } ?: 0.0
 
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, contactSpeed))
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, contactSpeed))
+        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, event.shipIdB, contactSpeed))
+        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, event.shipIdA, contactSpeed))
     }
 
     fun tick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
@@ -99,6 +101,7 @@ object VehicleImpactDamageHandler {
             val lastTick = lastCrashDamageTickByVehicle[pending.bodyId]
             if (lastTick != null && now - lastTick < VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS) continue
             val vehicle = VehicleManager.getVehicle(level.dimensionId, pending.bodyId) ?: continue
+            applyMoondropCollisionSpinOut(level, vehicle, pending.otherBodyId)
             val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId)
             val impactSpeed = max(pending.contactSpeed, body?.kinematics?.velocity?.length() ?: 0.0)
             if (impactSpeed < COLLISION_START_MIN_RELATIVE_SPEED) continue
@@ -111,6 +114,13 @@ object VehicleImpactDamageHandler {
             lastCrashDamageTickByVehicle[pending.bodyId] = now
         }
         deferred.forEach(pendingCollisionCrashDamage::add)
+    }
+
+    private fun applyMoondropCollisionSpinOut(level: ServerLevel, source: IVehicle, targetBodyId: Long) {
+        if (!VehicleStatusEffects.isMoondropActive(source)) return
+        val target = VehicleManager.getVehicle(level.dimensionId, targetBodyId) ?: return
+        if (VehicleStatusEffects.isMoondropActive(target)) return
+        VehicleStatusEffects.applySpinOut(target, duration = MOONDROP_SPINOUT_DURATION, yawSpeed = MOONDROP_SPINOUT_YAW_SPEED)
     }
 
     private fun impactDamage(vehicle: IVehicle, relativeSpeed: Double, driver: LivingEntity?): Double {
@@ -218,6 +228,7 @@ object VehicleImpactDamageHandler {
     private data class CollisionCrashDamage(
         val dimensionId: DimensionId,
         val bodyId: Long,
+        val otherBodyId: Long,
         val contactSpeed: Double
     )
 }

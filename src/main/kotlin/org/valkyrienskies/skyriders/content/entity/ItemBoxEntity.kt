@@ -162,17 +162,21 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
         val entries = loadPlaceWeightedEntries(level)
         if (entries.isEmpty()) return null
         val placeFactor = placeFactor(level, bodyId)
-        val totalWeight = entries.sumOf { it.effectiveWeight(placeFactor, lowFuel, damageFactor) }
+        val weightedEntries = entries.mapNotNull { entry ->
+            val weight = entry.effectiveWeight(placeFactor, lowFuel, damageFactor)
+            if (weight > 0.0) WeightedReward(entry, weight) else null
+        }
+        val totalWeight = weightedEntries.sumOf { it.weight }
         if (totalWeight <= 0.0) return null
 
         var pick = level.random.nextDouble() * totalWeight
-        entries.forEach { entry ->
-            pick -= entry.effectiveWeight(placeFactor, lowFuel, damageFactor)
+        weightedEntries.forEach { weighted ->
+            pick -= weighted.weight
             if (pick <= 0.0) {
-                return listOf(entry.stack())
+                return listOf(weighted.reward.stack())
             }
         }
-        return listOf(entries.last().stack())
+        return listOf(weightedEntries.last().reward.stack())
     }
 
     private fun placeFactor(level: ServerLevel, bodyId: Long): Double {
@@ -393,6 +397,8 @@ class ItemBoxEntity(type: EntityType<ItemBoxEntity>, level: Level) : Entity(type
 
         fun stack(): ItemStack = ItemStack(item, count.coerceAtMost(item.defaultInstance.maxStackSize))
     }
+
+    private data class WeightedReward(val reward: PlaceWeightedReward, val weight: Double)
 }
 
 private fun JsonObject.doubleOr(key: String, defaultValue: Double): Double {

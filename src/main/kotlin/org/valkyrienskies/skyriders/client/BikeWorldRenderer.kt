@@ -29,6 +29,7 @@ import org.valkyrienskies.skyriders.content.VehicleModelPartRenderDefinition
 import org.valkyrienskies.skyriders.content.VehiclePartTypes
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleRefuelSources
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.VehicleVisualRotationAxis
 import org.valkyrienskies.skyriders.content.VehicleWheelSpinSource
 import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
@@ -39,6 +40,7 @@ import kotlin.math.exp
 import kotlin.math.pow
 
 object BikeWorldRenderer {
+    private const val MOONDROP_OVERLAY_SCROLL_SPEED = 0.18
     private val TEMP_FUEL_CAP_MARKER_IDS = setOf(
         "skyriders:dirt_bike",
         "skyriders:speedster",
@@ -90,6 +92,7 @@ object BikeWorldRenderer {
         bufferSource.endBatch(RenderType.cutout())
         bufferSource.endBatch(RenderType.lines())
         VehicleOpenModelRenderer.endDamageCrackBatches(bufferSource)
+        VehicleOpenModelRenderer.endRainbowOverlayBatch(bufferSource)
     }
 
     private fun renderVehicle(
@@ -118,6 +121,8 @@ object BikeWorldRenderer {
         val model = minecraft.modelManager.getModel(render.model)
             .takeUnless { it === missingModel }
         val visualState = updateRenderVisualState(vehicle)
+        val moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
+        val moondropPhase = System.nanoTime() / 1_000_000_000.0 * MOONDROP_OVERLAY_SCROLL_SPEED
 
         val packedLight = LevelRenderer.getLightColor(
             vehicle.level,
@@ -158,6 +163,15 @@ object BikeWorldRenderer {
             modelScale = render.modelScale,
             modelYawRad = render.modelYawRad
         )
+        if (moondropActive) {
+            VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
+                modelLocation = render.model,
+                poseStack = poseStack,
+                bufferSource = bufferSource,
+                packedLight = packedLight,
+                phase = moondropPhase
+            )
+        }
 
         render.modelParts.forEach { modelPart ->
             val partModel = minecraft.modelManager.getModel(modelPart.model)
@@ -169,7 +183,9 @@ object BikeWorldRenderer {
                 modelPart = modelPart,
                 model = partModel,
                 visualState = visualState,
-                packedLight = packedLight
+                packedLight = packedLight,
+                moondropActive = moondropActive,
+                moondropPhase = moondropPhase
             )
         }
 
@@ -209,7 +225,9 @@ object BikeWorldRenderer {
                     VehicleWheelSpinSource.NONE -> 0.0
                 },
                 packedLight = packedLight,
-                damageFraction = damagePartId?.let { VehicleDamage.damageFraction(vehicle, it) } ?: 0.0
+                damageFraction = damagePartId?.let { VehicleDamage.damageFraction(vehicle, it) } ?: 0.0,
+                moondropActive = moondropActive,
+                moondropPhase = moondropPhase
             )
         }
 
@@ -223,7 +241,9 @@ object BikeWorldRenderer {
         modelPart: VehicleModelPartRenderDefinition,
         model: BakedModel?,
         visualState: RenderVisualState,
-        packedLight: Int
+        packedLight: Int,
+        moondropActive: Boolean,
+        moondropPhase: Double
     ) {
         val openAmount = modelPartOpenAmount(vehicle, modelPart, visualState)
         val rotation = Vector3d(modelPart.closedRotationDegrees).lerp(modelPart.openRotationDegrees, openAmount)
@@ -258,6 +278,15 @@ object BikeWorldRenderer {
                     forceRender = true
                 )
             }
+        }
+        if (moondropActive) {
+            VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
+                modelLocation = modelPart.model,
+                poseStack = poseStack,
+                bufferSource = bufferSource,
+                packedLight = packedLight,
+                phase = moondropPhase
+            )
         }
         poseStack.popPose()
     }
@@ -493,7 +522,9 @@ object BikeWorldRenderer {
         spinRad: Double,
         suspensionOffset: Double,
         packedLight: Int,
-        damageFraction: Double
+        damageFraction: Double,
+        moondropActive: Boolean,
+        moondropPhase: Double
     ) {
         poseStack.pushPose()
         if (suspensionOffset.isFinite() && suspensionOffset != 0.0) {
@@ -520,6 +551,15 @@ object BikeWorldRenderer {
             packedLight = packedLight,
             damageFraction = damageFraction
         )
+        if (moondropActive) {
+            VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
+                modelLocation = modelLocation,
+                poseStack = poseStack,
+                bufferSource = bufferSource,
+                packedLight = packedLight,
+                phase = moondropPhase
+            )
+        }
         poseStack.popPose()
     }
 

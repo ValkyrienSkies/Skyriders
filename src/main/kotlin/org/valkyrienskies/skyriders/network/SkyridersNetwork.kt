@@ -34,6 +34,7 @@ import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleDamageEvents
+import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSaveRecord
 import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
@@ -46,10 +47,11 @@ import java.util.function.Supplier
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 
 object SkyridersNetwork {
-    private const val PROTOCOL_VERSION = "2"
+    private const val PROTOCOL_VERSION = "3"
     private const val VEHICLE_DEBUG_SYNC_ENABLED = false
     private const val VEHICLE_VISUAL_ENGINE_ON_FLAG = 1
     private const val VEHICLE_VISUAL_LEAN_FLAG = 1 shl 1
+    private const val VEHICLE_VISUAL_MOONDROP_FLAG = 1 shl 2
     private const val MAX_RACE_RESULT_ENTRIES = 16
     private const val MAX_RACE_RESULT_TEXT_LENGTH = 48
     private var nextPacketId = 0
@@ -166,6 +168,13 @@ object SkyridersNetwork {
             RaceCompassTargetPacket::encode,
             RaceCompassTargetPacket::decode,
             RaceCompassTargetPacket::handle
+        )
+        CHANNEL.registerMessage(
+            nextPacketId++,
+            MoondropMusicPacket::class.java,
+            MoondropMusicPacket::encode,
+            MoondropMusicPacket::decode,
+            MoondropMusicPacket::handle
         )
         CHANNEL.registerMessage(
             nextPacketId++,
@@ -517,7 +526,8 @@ object SkyridersNetwork {
                         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
                         rearWheelAngularVelocity = state.rearWheelAngularVelocity,
                         frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
                     )
                 }
                 is KartVehicle -> {
@@ -531,7 +541,8 @@ object SkyridersNetwork {
                         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
                         rearWheelAngularVelocity = state.rearWheelAngularVelocity,
                         frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
                     )
                 }
                 is WheeledVehicle -> {
@@ -545,7 +556,8 @@ object SkyridersNetwork {
                         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
                         rearWheelAngularVelocity = state.rearWheelAngularVelocity,
                         frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
                     )
                 }
                 else -> null
@@ -574,6 +586,11 @@ object SkyridersNetwork {
     fun sendRaceMusicStop(player: ServerPlayer) {
         SkyridersNetworkStats.record("S2C.RaceMusic", 1)
         CHANNEL.send(PacketDistributor.PLAYER.with { player }, RaceMusicPacket(false, EMPTY_SOUND))
+    }
+
+    fun sendMoondropMusic(player: ServerPlayer, durationTicks: Int) {
+        SkyridersNetworkStats.record("S2C.MoondropMusic", 4)
+        CHANNEL.send(PacketDistributor.PLAYER.with { player }, MoondropMusicPacket(durationTicks.coerceAtLeast(1)))
     }
 
     fun sendRaceHudPosition(
@@ -1272,7 +1289,8 @@ object SkyridersNetwork {
                 buf.writeLong(state.bodyId)
                 val flags =
                     (if (state.engineOn) VEHICLE_VISUAL_ENGINE_ON_FLAG else 0) or
-                        (if (state.visualLeanRad.isFinite()) VEHICLE_VISUAL_LEAN_FLAG else 0)
+                        (if (state.visualLeanRad.isFinite()) VEHICLE_VISUAL_LEAN_FLAG else 0) or
+                        (if (state.moondropActive) VEHICLE_VISUAL_MOONDROP_FLAG else 0)
                 buf.writeByte(flags)
                 if (state.visualLeanRad.isFinite()) {
                     buf.writeDouble(state.visualLeanRad)
@@ -1294,6 +1312,7 @@ object SkyridersNetwork {
                     Runnable {
                         val level = net.minecraft.client.Minecraft.getInstance().level ?: return@Runnable
                         states.forEach { state ->
+                            VehicleStatusEffects.setClientMoondropVisual(level.dimensionId, state.bodyId, state.moondropActive)
                             VehicleManager.applyVisualWheelState(
                                 level = level,
                                 bodyId = state.bodyId,
@@ -1339,7 +1358,8 @@ object SkyridersNetwork {
                         frontWheelAngularVelocity = buf.readDouble(),
                         rearWheelAngularVelocity = buf.readDouble(),
                         frontWheelSuspensionOffset = buf.readDouble(),
-                        rearWheelSuspensionOffset = buf.readDouble()
+                        rearWheelSuspensionOffset = buf.readDouble(),
+                        moondropActive = (flags and VEHICLE_VISUAL_MOONDROP_FLAG) != 0
                     )
                 }
                 return VehicleVisualStatePacket(states)
@@ -1361,7 +1381,8 @@ object SkyridersNetwork {
         val frontWheelAngularVelocity: Double,
         val rearWheelAngularVelocity: Double,
         val frontWheelSuspensionOffset: Double,
-        val rearWheelSuspensionOffset: Double
+        val rearWheelSuspensionOffset: Double,
+        val moondropActive: Boolean = false
     )
 
     data class RaceCompassTargetPacket(val active: Boolean, val target: Vec3) {
@@ -1394,6 +1415,36 @@ object SkyridersNetwork {
             }
 
             fun handle(packet: RaceCompassTargetPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
+                packet.handle(contextSupplier)
+            }
+        }
+    }
+
+    data class MoondropMusicPacket(val durationTicks: Int) {
+        fun encode(buf: FriendlyByteBuf) {
+            buf.writeVarInt(durationTicks.coerceAtLeast(1))
+        }
+
+        fun handle(contextSupplier: Supplier<NetworkEvent.Context>) {
+            val context = contextSupplier.get()
+            context.enqueueWork {
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
+                    Runnable { RaceMusicClientState.startMoondrop(durationTicks.coerceAtLeast(1)) }
+                }
+            }
+            context.packetHandled = true
+        }
+
+        companion object {
+            fun encode(packet: MoondropMusicPacket, buf: FriendlyByteBuf) {
+                packet.encode(buf)
+            }
+
+            fun decode(buf: FriendlyByteBuf): MoondropMusicPacket {
+                return MoondropMusicPacket(buf.readVarInt())
+            }
+
+            fun handle(packet: MoondropMusicPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
                 packet.handle(contextSupplier)
             }
         }

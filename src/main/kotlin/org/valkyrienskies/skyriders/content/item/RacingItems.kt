@@ -30,6 +30,7 @@ import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.entity.CavendishEntity
 import org.valkyrienskies.skyriders.content.entity.ExtendingArmEntity
 import org.valkyrienskies.skyriders.content.entity.FakeItemBoxEntity
+import org.valkyrienskies.skyriders.network.SkyridersNetwork
 import java.util.function.Consumer
 
 open class HoneyCanisterItem(
@@ -250,6 +251,33 @@ class ThunderboltItem(properties: Properties) : RacingVehicleItem(properties) {
         const val LIGHTNING_Y_OFFSET = 0.1
         const val HAZARD_DESTROY_SPARK_COUNT = 14
         const val HAZARD_DESTROY_Y_OFFSET = 0.35
+    }
+}
+
+class MoondropItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun isFoil(stack: ItemStack): Boolean = true
+
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        VehicleStatusEffects.applyMoondrop(vehicle, DURATION_SECONDS)
+        playItemUseSound(level, player)
+        level.playSound(
+            null,
+            player.x,
+            player.y,
+            player.z,
+            SoundEvents.ENCHANTMENT_TABLE_USE,
+            SoundSource.PLAYERS,
+            0.85f,
+            1.35f
+        )
+        if (player is net.minecraft.server.level.ServerPlayer) {
+            SkyridersNetwork.sendMoondropMusic(player, (DURATION_SECONDS * 20.0).toInt())
+        }
+        return true
+    }
+
+    private companion object {
+        const val DURATION_SECONDS = 25.0
     }
 }
 

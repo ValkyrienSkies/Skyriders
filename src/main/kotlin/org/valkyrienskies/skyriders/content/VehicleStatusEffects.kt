@@ -1,12 +1,16 @@
 package org.valkyrienskies.skyriders.content
 
+import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
+import org.joml.Vector3f
 import org.valkyrienskies.core.api.bodies.PhysVsBody
+import org.valkyrienskies.core.api.bodies.VsBody
 import org.valkyrienskies.core.api.bodies.properties.BodyId
 import org.valkyrienskies.core.api.world.properties.DimensionId
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import org.valkyrienskies.skyriders.util.VehiclePhysicsMath
@@ -35,6 +39,12 @@ object VehicleStatusEffects {
     private const val DEFAULT_CARRY_MAX_ACCELERATION = 85.0
     private const val DEFAULT_SLIPPERY_DURATION = 2.35
     private const val DEFAULT_SLIPPERY_TRACTION_SCALE = 0.18
+    private const val MOONDROP_DURATION = 25.0
+    private const val MOONDROP_TOP_SPEED_MULTIPLIER = 1.3
+    private const val MOONDROP_REPAIR_INTERVAL_TICKS = 20L
+    private const val MOONDROP_REPAIR_FRACTION = 0.04
+    private const val MOONDROP_TRAIL_INTERVAL_TICKS = 2L
+    private const val MOONDROP_TRAIL_MIN_SPEED = 0.45
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -120,6 +130,12 @@ object VehicleStatusEffects {
         state.slipperyTractionScale = tractionScale.coerceIn(0.02, 1.0)
     }
 
+    fun applyMoondrop(vehicle: IVehicle, duration: Double = MOONDROP_DURATION) {
+        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+        state.moondropDuration = duration.coerceAtLeast(0.05)
+        state.moondropTimeRemaining = max(state.moondropTimeRemaining, state.moondropDuration)
+    }
+
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
         val state = states[key(vehicle)]
         return if ((state?.spinOutTimeRemaining ?: 0.0) > 0.0 && state?.spinOutPreserveMomentum != true) {
@@ -141,9 +157,52 @@ object VehicleStatusEffects {
         return (states[key(vehicle)]?.boostTimeRemaining ?: 0.0) > 0.0
     }
 
+    fun isMoondropActive(vehicle: IVehicle): Boolean {
+        val state = states[key(vehicle)] ?: return false
+        return state.moondropTimeRemaining > 0.0 || state.moondropVisualActive
+    }
+
+    fun isMoondropActive(dimensionId: DimensionId, bodyId: BodyId): Boolean {
+        val state = states[VehicleKey(dimensionId, bodyId)] ?: return false
+        return state.moondropTimeRemaining > 0.0 || state.moondropVisualActive
+    }
+
+    fun topSpeedMultiplier(dimensionId: DimensionId, bodyId: BodyId): Double {
+        return if (isMoondropActive(dimensionId, bodyId)) MOONDROP_TOP_SPEED_MULTIPLIER else 1.0
+    }
+
+    fun setClientMoondropVisual(dimensionId: DimensionId, bodyId: BodyId, active: Boolean) {
+        val key = VehicleKey(dimensionId, bodyId)
+        val state = states.getOrPut(key) { RuntimeState() }
+        state.moondropVisualActive = active
+        if (!active && state.isIdle()) {
+            states.remove(key, state)
+        }
+    }
+
     fun tractionScale(dimensionId: DimensionId, bodyId: BodyId): Double {
         val state = states[VehicleKey(dimensionId, bodyId)] ?: return 1.0
         return if (state.slipperyTimeRemaining > 0.0) state.slipperyTractionScale else 1.0
+    }
+
+    fun gameTick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
+        val now = level.gameTime
+        val shipWorld = level.shipWorld ?: return
+        vehicles.forEach { vehicle ->
+            val state = states[key(vehicle)] ?: return@forEach
+            if (state.moondropTimeRemaining <= 0.0) return@forEach
+
+            if (now - state.moondropLastRepairTick >= MOONDROP_REPAIR_INTERVAL_TICKS) {
+                VehicleDamage.repairAllParts(level, vehicle, MOONDROP_REPAIR_FRACTION)
+                state.moondropLastRepairTick = now
+            }
+
+            if (now - state.moondropLastTrailTick >= MOONDROP_TRAIL_INTERVAL_TICKS) {
+                val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
+                spawnMoondropTrail(level, body, now)
+                state.moondropLastTrailTick = now
+            }
+        }
     }
 
     fun physTick(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
@@ -181,8 +240,41 @@ object VehicleStatusEffects {
         if (state.slipperyTimeRemaining > 0.0) {
             state.slipperyTimeRemaining = (state.slipperyTimeRemaining - safeDt).coerceAtLeast(0.0)
         }
+        if (state.moondropTimeRemaining > 0.0) {
+            state.moondropTimeRemaining = (state.moondropTimeRemaining - safeDt).coerceAtLeast(0.0)
+        }
         if (state.isIdle()) {
             states.remove(key(vehicle), state)
+        }
+    }
+
+    private fun spawnMoondropTrail(level: ServerLevel, body: VsBody, now: Long) {
+        val velocity = body.kinematics.velocity
+        val speed = velocity.length()
+        if (speed < MOONDROP_TRAIL_MIN_SPEED || !VehiclePhysicsMath.isFinite(velocity)) return
+
+        val center = body.kinematics.position
+        val backwards = Vector3d(velocity).normalize().negate()
+        repeat(3) { index ->
+            val phase = now * 0.035 + index * 0.21 + level.random.nextDouble() * 0.18
+            val color = pastelRainbowVector(phase)
+            val offset = Vector3d(backwards).mul(0.35 + index * 0.18)
+                .add(
+                    randomBetween(level, -0.35, 0.35),
+                    randomBetween(level, 0.15, 0.85),
+                    randomBetween(level, -0.35, 0.35)
+                )
+            level.sendParticles(
+                DustParticleOptions(color, 1.05f),
+                center.x() + offset.x,
+                center.y() + offset.y,
+                center.z() + offset.z,
+                1,
+                0.04,
+                0.04,
+                0.04,
+                0.02
+            )
         }
     }
 
@@ -317,6 +409,29 @@ object VehicleStatusEffects {
         return ThreadLocalRandom.current().nextDouble(min.toDouble(), max.toDouble()).toFloat()
     }
 
+    private fun randomBetween(level: ServerLevel, min: Double, max: Double): Double {
+        return min + level.random.nextDouble() * (max - min)
+    }
+
+    private fun pastelRainbowVector(phase: Double): Vector3f {
+        val hue = phase - kotlin.math.floor(phase)
+        val x = 1.0 - kotlin.math.abs((hue * 6.0) % 2.0 - 1.0)
+        val (rawR, rawG, rawB) = when ((hue * 6.0).toInt()) {
+            0 -> Triple(1.0, x, 0.0)
+            1 -> Triple(x, 1.0, 0.0)
+            2 -> Triple(0.0, 1.0, x)
+            3 -> Triple(0.0, x, 1.0)
+            4 -> Triple(x, 0.0, 1.0)
+            else -> Triple(1.0, 0.0, x)
+        }
+        val saturation = 0.38
+        return Vector3f(
+            (1.0 - saturation + rawR * saturation).toFloat(),
+            (1.0 - saturation + rawG * saturation).toFloat(),
+            (1.0 - saturation + rawB * saturation).toFloat()
+        )
+    }
+
     private data class VehicleKey(val dimension: DimensionId, val bodyId: BodyId)
 
     private class RuntimeState {
@@ -344,6 +459,11 @@ object VehicleStatusEffects {
         var carryTarget: Vector3d? = null
         var slipperyTimeRemaining: Double = 0.0
         var slipperyTractionScale: Double = 1.0
+        var moondropTimeRemaining: Double = 0.0
+        var moondropDuration: Double = 0.0
+        var moondropVisualActive: Boolean = false
+        var moondropLastRepairTick: Long = Long.MIN_VALUE / 4
+        var moondropLastTrailTick: Long = Long.MIN_VALUE / 4
 
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
@@ -351,7 +471,9 @@ object VehicleStatusEffects {
                 boostTimeRemaining <= 0.0 &&
                 pullTimeRemaining <= 0.0 &&
                 carryTimeRemaining <= 0.0 &&
-                slipperyTimeRemaining <= 0.0
+                slipperyTimeRemaining <= 0.0 &&
+                moondropTimeRemaining <= 0.0 &&
+                !moondropVisualActive
         }
     }
 }

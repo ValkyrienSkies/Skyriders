@@ -24,6 +24,7 @@ object VehicleOpenModelRenderer {
     private val damageCrackRenderTypes = (0..9).map { stage ->
         RenderType.entityTranslucent(ResourceLocation("textures/block/destroy_stage_$stage.png"))
     }
+    private val rainbowOverlayRenderType = RenderType.entityTranslucent(InventoryMenu.BLOCK_ATLAS)
 
     fun renderIfNeeded(
         modelLocation: ResourceLocation,
@@ -105,8 +106,31 @@ object VehicleOpenModelRenderer {
         return model.faces.isNotEmpty()
     }
 
+    fun renderRainbowOverlayIfNeeded(
+        modelLocation: ResourceLocation,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        packedLight: Int,
+        phase: Double
+    ): Boolean {
+        val model = getModel(modelLocation) ?: return false
+        val minecraft = Minecraft.getInstance()
+        val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
+        val consumer = bufferSource.getBuffer(rainbowOverlayRenderType)
+        val pose = poseStack.last()
+        model.faces.forEach { face ->
+            val sprite = spriteLookup.apply(face.texture)
+            renderRainbowFace(face, sprite, consumer, pose, packedLight, phase)
+        }
+        return model.faces.isNotEmpty()
+    }
+
     fun endDamageCrackBatches(bufferSource: MultiBufferSource.BufferSource) {
         damageCrackRenderTypes.forEach(bufferSource::endBatch)
+    }
+
+    fun endRainbowOverlayBatch(bufferSource: MultiBufferSource.BufferSource) {
+        bufferSource.endBatch(rainbowOverlayRenderType)
     }
 
     fun renderTexturedIfNeeded(
@@ -174,6 +198,42 @@ object VehicleOpenModelRenderer {
         }
     }
 
+    private fun renderRainbowFace(
+        face: OpenFace,
+        sprite: net.minecraft.client.renderer.texture.TextureAtlasSprite,
+        consumer: com.mojang.blaze3d.vertex.VertexConsumer,
+        pose: PoseStack.Pose,
+        packedLight: Int,
+        phase: Double
+    ) {
+        val shade = faceShade(face.normal).coerceIn(0.72f, 1.0f)
+        for (i in 0 until 4) {
+            val vertex = face.vertices[i]
+            val uv = face.uvs[i]
+            val color = pastelRainbowColor(
+                phase +
+                    vertex.x().toDouble() * 0.018 +
+                    vertex.y().toDouble() * 0.024 +
+                    vertex.z().toDouble() * 0.015
+            )
+            val offsetX = face.normal.x() * RAINBOW_SURFACE_OFFSET_MODEL_UNITS
+            val offsetY = face.normal.y() * RAINBOW_SURFACE_OFFSET_MODEL_UNITS
+            val offsetZ = face.normal.z() * RAINBOW_SURFACE_OFFSET_MODEL_UNITS
+            consumer.vertex(
+                pose.pose(),
+                (vertex.x() + offsetX) / 16.0f,
+                (vertex.y() + offsetY) / 16.0f,
+                (vertex.z() + offsetZ) / 16.0f
+            )
+                .color(color.x() * shade, color.y() * shade, color.z() * shade, RAINBOW_OVERLAY_ALPHA)
+                .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
+                .overlayCoords(OverlayTexture.NO_OVERLAY)
+                .uv2(packedLight)
+                .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
+                .endVertex()
+        }
+    }
+
     private fun faceIntersectsZone(
         face: OpenFace,
         zone: DamageCrackZone,
@@ -234,6 +294,25 @@ object VehicleOpenModelRenderer {
             u / CRACK_TEXTURE_MODEL_UNITS,
             1.0f - v / CRACK_TEXTURE_MODEL_UNITS,
             0.0f
+        )
+    }
+
+    private fun pastelRainbowColor(phase: Double): Vector3f {
+        val hue = phase - kotlin.math.floor(phase)
+        val x = 1.0 - kotlin.math.abs((hue * 6.0) % 2.0 - 1.0)
+        val (rawR, rawG, rawB) = when ((hue * 6.0).toInt()) {
+            0 -> Triple(1.0, x, 0.0)
+            1 -> Triple(x, 1.0, 0.0)
+            2 -> Triple(0.0, 1.0, x)
+            3 -> Triple(0.0, x, 1.0)
+            4 -> Triple(x, 0.0, 1.0)
+            else -> Triple(1.0, 0.0, x)
+        }
+        val saturation = 0.35
+        return Vector3f(
+            (1.0 - saturation + rawR * saturation).toFloat(),
+            (1.0 - saturation + rawG * saturation).toFloat(),
+            (1.0 - saturation + rawB * saturation).toFloat()
         )
     }
 
@@ -505,5 +584,7 @@ object VehicleOpenModelRenderer {
     const val MIN_CRACK_DAMAGE_FRACTION = 0.08
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
+    private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.055f
+    private const val RAINBOW_OVERLAY_ALPHA = 0.42f
     private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }

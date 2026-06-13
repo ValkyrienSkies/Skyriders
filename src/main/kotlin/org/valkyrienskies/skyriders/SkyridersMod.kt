@@ -63,6 +63,7 @@ import org.valkyrienskies.skyriders.content.item.HoneyHeisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyCanisterItem
 import org.valkyrienskies.skyriders.content.item.HoneyTankItem
 import org.valkyrienskies.skyriders.content.item.ItemBoxItem
+import org.valkyrienskies.skyriders.content.item.MoondropItem
 import org.valkyrienskies.skyriders.content.item.OpenModelComponentItem
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.item.RacingDispenserBehaviors
@@ -196,6 +197,9 @@ object SkyridersMod {
     val THUNDERBOLT: RegistryObject<Item> = ITEMS.register("thunderbolt") {
         ThunderboltItem(Item.Properties().stacksTo(16))
     }
+    val MOONDROP: RegistryObject<Item> = ITEMS.register("moondrop") {
+        MoondropItem(Item.Properties().stacksTo(16).rarity(Rarity.EPIC))
+    }
     val CAVENDISH: RegistryObject<Item> = ITEMS.register("cavendish") {
         CavendishItem(Item.Properties().stacksTo(16))
     }
@@ -326,6 +330,7 @@ object SkyridersMod {
                 output.accept(BOXING_GLOVE.get())
                 output.accept(GRABBY_HAND.get())
                 output.accept(THUNDERBOLT.get())
+                output.accept(MOONDROP.get())
                 output.accept(STORMCHASING_DISC.get())
                 output.accept(FTV_DISC.get())
             }

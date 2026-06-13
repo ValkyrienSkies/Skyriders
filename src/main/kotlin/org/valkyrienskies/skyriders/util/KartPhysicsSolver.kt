@@ -46,6 +46,7 @@ object KartPhysicsSolver {
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
         val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id) *
             VehicleDamage.tractionScale(physLevel.dimension, body.id)
+        val topSpeedMultiplier = VehicleStatusEffects.topSpeedMultiplier(physLevel.dimension, body.id)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val driftSpeed = planarSpeed(body, contactUp)
@@ -98,7 +99,19 @@ object KartPhysicsSolver {
         }
 
         if (activeInput.riderPresent) {
-            applyDriveAndBrake(body, appliedContacts, forwardSpeed, terrainUp, activeInput, driftGripActive, steerRad, config, state, tractionScale)
+            applyDriveAndBrake(
+                body,
+                appliedContacts,
+                forwardSpeed,
+                terrainUp,
+                activeInput,
+                driftGripActive,
+                steerRad,
+                config,
+                state,
+                tractionScale,
+                topSpeedMultiplier
+            )
             if (stabilizedGrounded) {
                 val activeStepWheels = contacts.count(VehicleWheelContact::grounded).coerceAtLeast(1)
                 contacts.forEach { contact ->
@@ -119,7 +132,7 @@ object KartPhysicsSolver {
         }
         dampAngularVelocity(body)
         val wheelInput = if (activeInput.riderPresent) activeInput else VehicleInput(handbrake = 1.0)
-        updateWheelAngularVelocities(state, appliedContacts, wheelInput, driftGripActive && activeInput.riderPresent, config, dt)
+        updateWheelAngularVelocities(state, appliedContacts, wheelInput, driftGripActive && activeInput.riderPresent, config, dt, topSpeedMultiplier)
         updateVisualWheelState(state, contacts, config, dt)
     }
 
@@ -314,9 +327,10 @@ object KartPhysicsSolver {
         steerRad: Double,
         config: KartPhysicsConfig,
         state: KartRuntimeState,
-        tractionScale: Double
+        tractionScale: Double,
+        topSpeedMultiplier: Double
     ) {
-        val driveCommand = updateKartDriveCommand(input, forwardSpeed, config, state)
+        val driveCommand = updateKartDriveCommand(input, forwardSpeed, config, state, topSpeedMultiplier)
         val rearContacts = contacts.filter { !it.front && it.contact.grounded && it.normalForce > 0.0 }
         if (rearContacts.isEmpty()) return
 
@@ -436,9 +450,11 @@ object KartPhysicsSolver {
         input: VehicleInput,
         drifting: Boolean,
         config: KartPhysicsConfig,
-        dt: Double
+        dt: Double,
+        topSpeedMultiplier: Double
     ) {
-        val topSpeed = if (drifting) config.wheelTopSpeed * config.driftTopSpeedMultiplier else config.wheelTopSpeed
+        val wheelTopSpeed = config.wheelTopSpeed * topSpeedMultiplier.coerceAtLeast(1.0)
+        val topSpeed = if (drifting) wheelTopSpeed * config.driftTopSpeedMultiplier else wheelTopSpeed
         val brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0))
         state.frontWheelAngularVelocity = updateWheelGroupAngularVelocity(
             contacts = contacts.filter(KartContact::front),
@@ -902,8 +918,10 @@ object KartPhysicsSolver {
         input: VehicleInput,
         forwardSpeed: Double,
         config: KartPhysicsConfig,
-        state: KartRuntimeState
+        state: KartRuntimeState,
+        topSpeedMultiplier: Double
     ): KartDriveCommand {
+        val speedMultiplier = topSpeedMultiplier.coerceAtLeast(1.0)
         val transmission = config.transmission
         if (transmission == null) {
             state.debugTransmissionGear = 0
@@ -911,7 +929,7 @@ object KartPhysicsSolver {
             return KartDriveCommand(
                 throttle = input.throttle.coerceIn(-1.0, 1.0),
                 brake = input.brake.coerceIn(0.0, 1.0).coerceAtLeast(input.handbrake.coerceIn(0.0, 1.0)),
-                topSpeed = config.wheelTopSpeed,
+                topSpeed = config.wheelTopSpeed * speedMultiplier,
                 torqueMultiplier = 1.0
             )
         }
@@ -961,7 +979,7 @@ object KartPhysicsSolver {
             gear > 0 && gearConfig != null -> gearConfig.maxSpeed
             gear < 0 -> transmission.reverseTopSpeed
             else -> config.wheelTopSpeed
-        }
+        } * speedMultiplier
         val baseTorque = when {
             gear > 0 && gearConfig != null -> gearConfig.torqueMultiplier * kartGearLaunchTorqueFactor(gearConfig, forwardSpeed)
             gear < 0 -> transmission.reverseTorqueMultiplier
