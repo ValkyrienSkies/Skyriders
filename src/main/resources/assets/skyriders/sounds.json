@@ -444,5 +444,23 @@
       }
     ],
     "subtitle": "skyriders.subtitle.engine_break"
+  },
+  "crt_critical_start": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/crt_critical_start",
+        "type": "file"
+      }
+    ],
+    "subtitle": "skyriders.subtitle.crt_critical_start"
+  },
+  "crt_warning_beep": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/crt_warning_beep",
+        "type": "file"
+      }
+    ],
+    "subtitle": "skyriders.subtitle.crt_warning_beep"
   }
 }

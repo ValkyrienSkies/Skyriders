@@ -94,6 +94,12 @@ object SkyridersSounds {
     val ENGINE_BREAK_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_break") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_break"))
     }
+    val CRT_CRITICAL_START_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("crt_critical_start") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "crt_critical_start"))
+    }
+    val CRT_WARNING_BEEP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("crt_warning_beep") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "crt_warning_beep"))
+    }
 
     //group racing
     val BOOST_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boost") {

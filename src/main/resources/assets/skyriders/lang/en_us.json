@@ -74,6 +74,8 @@
   "skyriders.subtitle.tire_pop": "Tire pops",
   "skyriders.subtitle.tire_leak": "Tire leaks",
   "skyriders.subtitle.engine_break": "Engine breaks",
+  "skyriders.subtitle.crt_critical_start": "CRT critical warning starts",
+  "skyriders.subtitle.crt_warning_beep": "CRT warning beeps",
   "skyriders.subtitle.truck_door_open": "Truck door opens",
   "skyriders.subtitle.truck_door_close": "Truck door closes",
 

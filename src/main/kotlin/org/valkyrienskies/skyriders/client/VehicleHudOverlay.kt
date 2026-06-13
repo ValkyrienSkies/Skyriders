@@ -3,11 +3,16 @@ package org.valkyrienskies.skyriders.client
 import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
+import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.sounds.SoundEvent
+import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleInteractionActions
 import org.valkyrienskies.skyriders.content.VehicleManager
@@ -38,6 +43,7 @@ object VehicleHudOverlay {
     private const val DAMAGE_PART_MIN_PIXELS = 3
     private const val CRITICAL_WARNING_COLOR = 0xAAFF1F1F.toInt()
     private const val CRITICAL_TREMBLE_PIXELS = 3
+    private const val CRITICAL_WARNING_FLASH_MILLIS = 85L
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
     private val METER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/meter_round.png")
@@ -164,6 +170,9 @@ object VehicleHudOverlay {
     private var visualFuelTiltPixels = 0.0
     private var visualFuelTiltVelocity = 0.0
     private var previousFuelForwardSpeed: Double? = null
+    private var previousCriticalBodyId: Long? = null
+    private var previousCriticalFailure = false
+    private var lastWarningBeepCycle = Long.MIN_VALUE
     private val visualMeterValues = HashMap<String, Double>()
 
     fun updateVehicle(packet: SkyridersNetwork.VehicleTelemetryPacket) {
@@ -205,8 +214,10 @@ object VehicleHudOverlay {
         val level = minecraft.level
         val vehicle = level?.let { VehicleManager.getVehicle(it, current.bodyId) }
         val criticalFailure = vehicle?.let(VehicleDamage::isCriticalFailure) == true
+        val renderMillis = System.currentTimeMillis()
+        updateCriticalHudSounds(minecraft, current.bodyId, criticalFailure, renderMillis)
 
-        renderDamageCrt(guiGraphics, screenHeight, current, vehicle, criticalFailure)
+        renderDamageCrt(guiGraphics, screenHeight, current, vehicle, criticalFailure, renderMillis)
         renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh, criticalFailure)
         renderMeters(guiGraphics, screenWidth, screenHeight, current, dt, criticalFailure)
         renderRacePlacement(guiGraphics, screenWidth, current)
@@ -251,7 +262,8 @@ object VehicleHudOverlay {
         screenHeight: Int,
         snapshot: VehicleHudSnapshot,
         vehicle: IVehicle?,
-        criticalFailure: Boolean
+        criticalFailure: Boolean,
+        renderMillis: Long
     ) {
         val shake = criticalTremble(criticalFailure, 2.2, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.FREE)
         val x = shake.x
@@ -270,14 +282,13 @@ object VehicleHudOverlay {
         guiGraphics.enableScissor(screenX, screenY, screenX + screenWidth, screenY + screenContentHeight)
         drawDamageHudParts(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, damageParts)
         if (criticalFailure) {
-            drawCriticalCrtWarning(guiGraphics, screenX, screenY, screenWidth, screenContentHeight)
+            drawCriticalCrtWarning(guiGraphics, screenX, screenY, screenWidth, screenContentHeight, renderMillis)
         }
         guiGraphics.disableScissor()
     }
 
-    private fun drawCriticalCrtWarning(guiGraphics: GuiGraphics, screenX: Int, screenY: Int, screenWidth: Int, screenHeight: Int) {
-        val now = System.currentTimeMillis()
-        if ((now / 85L) % 2L != 0L) return
+    private fun drawCriticalCrtWarning(guiGraphics: GuiGraphics, screenX: Int, screenY: Int, screenWidth: Int, screenHeight: Int, now: Long) {
+        if (!isCriticalWarningFlashVisible(now)) return
         val centerX = screenX + screenWidth / 2
         val centerY = screenY + screenHeight / 2
         val block = (screenWidth / 10).coerceIn(4, 7)
@@ -449,6 +460,9 @@ object VehicleHudOverlay {
         visualFuelTiltPixels = 0.0
         visualFuelTiltVelocity = 0.0
         previousFuelForwardSpeed = null
+        previousCriticalBodyId = null
+        previousCriticalFailure = false
+        lastWarningBeepCycle = Long.MIN_VALUE
         visualMeterValues.clear()
     }
 
@@ -597,6 +611,59 @@ object VehicleHudOverlay {
     private fun trembleSample(time: Double, salt: Double): Int {
         val value = sin(time * 58.0 + salt) + sin(time * 113.0 + salt * 1.7) * 0.58
         return (value * CRITICAL_TREMBLE_PIXELS).roundToInt().coerceIn(-CRITICAL_TREMBLE_PIXELS, CRITICAL_TREMBLE_PIXELS)
+    }
+
+    private fun updateCriticalHudSounds(minecraft: Minecraft, bodyId: Long, criticalFailure: Boolean, now: Long) {
+        val bodyChanged = previousCriticalBodyId != bodyId
+        if (bodyChanged) {
+            previousCriticalBodyId = bodyId
+            previousCriticalFailure = false
+            lastWarningBeepCycle = Long.MIN_VALUE
+        }
+
+        if (criticalFailure && !previousCriticalFailure) {
+            playHudSound(minecraft, SkyridersSounds.CRT_CRITICAL_START_SOUND.get(), volume = 0.9f, pitch = 1.0f)
+        }
+
+        if (criticalFailure && isCriticalWarningFlashVisible(now)) {
+            val cycle = criticalWarningFlashCycle(now)
+            if (cycle != lastWarningBeepCycle) {
+                playHudSound(minecraft, SkyridersSounds.CRT_WARNING_BEEP_SOUND.get(), volume = 0.75f, pitch = 1.0f)
+                lastWarningBeepCycle = cycle
+            }
+        }
+
+        if (!criticalFailure) {
+            lastWarningBeepCycle = Long.MIN_VALUE
+        }
+        previousCriticalFailure = criticalFailure
+    }
+
+    private fun criticalWarningFlashCycle(now: Long): Long {
+        return now / CRITICAL_WARNING_FLASH_MILLIS
+    }
+
+    private fun isCriticalWarningFlashVisible(now: Long): Boolean {
+        return criticalWarningFlashCycle(now) % 2L == 0L
+    }
+
+    private fun playHudSound(minecraft: Minecraft, sound: SoundEvent, volume: Float, pitch: Float) {
+        minecraft.soundManager.play(
+            SimpleSoundInstance(
+                sound.location,
+                SoundSource.MASTER,
+                volume,
+                pitch,
+                SoundInstance.createUnseededRandom(),
+                false,
+                0,
+                SoundInstance.Attenuation.NONE,
+                0.0,
+                0.0,
+                0.0,
+                true
+            )
+        )
     }
 
     private fun Vector3d.isFinite(): Boolean {
