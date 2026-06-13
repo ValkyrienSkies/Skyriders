@@ -134,6 +134,11 @@ object VehicleStatusEffects {
         val state = states.getOrPut(key(vehicle)) { RuntimeState() }
         state.moondropDuration = duration.coerceAtLeast(0.05)
         state.moondropTimeRemaining = max(state.moondropTimeRemaining, state.moondropDuration)
+        val level = vehicle.level as? ServerLevel
+        if (level != null) {
+            val endTick = level.gameTime + (state.moondropDuration * 20.0).toLong().coerceAtLeast(1L)
+            state.moondropEndGameTick = max(state.moondropEndGameTick, endTick)
+        }
     }
 
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
@@ -187,20 +192,28 @@ object VehicleStatusEffects {
 
     fun gameTick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
         val now = level.gameTime
-        val shipWorld = level.shipWorld ?: return
+        val shipWorld = level.shipWorld
         vehicles.forEach { vehicle ->
             val state = states[key(vehicle)] ?: return@forEach
-            if (state.moondropTimeRemaining <= 0.0) return@forEach
-
-            if (now - state.moondropLastRepairTick >= MOONDROP_REPAIR_INTERVAL_TICKS) {
-                VehicleDamage.repairAllParts(level, vehicle, MOONDROP_REPAIR_FRACTION)
-                state.moondropLastRepairTick = now
+            if (state.moondropEndGameTick != Long.MIN_VALUE) {
+                state.moondropTimeRemaining = ((state.moondropEndGameTick - now).coerceAtLeast(0L) / 20.0)
+            } else if (state.moondropTimeRemaining > 0.0) {
+                state.moondropTimeRemaining = (state.moondropTimeRemaining - 0.05).coerceAtLeast(0.0)
             }
 
-            if (now - state.moondropLastTrailTick >= MOONDROP_TRAIL_INTERVAL_TICKS) {
-                val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@forEach
-                spawnMoondropTrail(level, body, now)
-                state.moondropLastTrailTick = now
+            if (state.moondropTimeRemaining > 0.0) {
+                if (now - state.moondropLastRepairTick >= MOONDROP_REPAIR_INTERVAL_TICKS) {
+                    VehicleDamage.repairAllParts(level, vehicle, MOONDROP_REPAIR_FRACTION)
+                    state.moondropLastRepairTick = now
+                }
+
+                if (now - state.moondropLastTrailTick >= MOONDROP_TRAIL_INTERVAL_TICKS) {
+                    val body = shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
+                    spawnMoondropTrail(level, body, now)
+                    state.moondropLastTrailTick = now
+                }
+            } else if (state.isIdle()) {
+                states.remove(key(vehicle), state)
             }
         }
     }
@@ -239,9 +252,6 @@ object VehicleStatusEffects {
         }
         if (state.slipperyTimeRemaining > 0.0) {
             state.slipperyTimeRemaining = (state.slipperyTimeRemaining - safeDt).coerceAtLeast(0.0)
-        }
-        if (state.moondropTimeRemaining > 0.0) {
-            state.moondropTimeRemaining = (state.moondropTimeRemaining - safeDt).coerceAtLeast(0.0)
         }
         if (state.isIdle()) {
             states.remove(key(vehicle), state)
@@ -461,6 +471,7 @@ object VehicleStatusEffects {
         var slipperyTractionScale: Double = 1.0
         var moondropTimeRemaining: Double = 0.0
         var moondropDuration: Double = 0.0
+        var moondropEndGameTick: Long = Long.MIN_VALUE
         var moondropVisualActive: Boolean = false
         var moondropLastRepairTick: Long = Long.MIN_VALUE / 4
         var moondropLastTrailTick: Long = Long.MIN_VALUE / 4

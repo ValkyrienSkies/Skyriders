@@ -92,7 +92,7 @@ object RaceMusicClientState {
             looping = true
             attenuation = SoundInstance.Attenuation.NONE
             relative = true
-            volume = 0.0f
+            volume = MIN_START_VOLUME
             pitch = 1.0f
         }
 
@@ -124,7 +124,7 @@ object RaceMusicClientState {
             looping = true
             attenuation = SoundInstance.Attenuation.NONE
             relative = true
-            volume = 0.0f
+            volume = MIN_START_VOLUME
             pitch = 1.0f
         }
 
@@ -156,4 +156,5 @@ object RaceMusicClientState {
     private const val RACE_FADE_STEP = 0.035f
     private const val MOONDROP_FADE_IN_STEP = 0.055f
     private const val MOONDROP_FADE_OUT_STEP = 0.028f
+    private const val MIN_START_VOLUME = 0.01f
 }
