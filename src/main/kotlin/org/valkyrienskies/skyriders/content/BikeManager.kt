@@ -160,10 +160,19 @@ object BikeManager {
     }
 
     fun restoreBikes(level: Level, records: Iterable<BikeSaveRecord>): Int {
+        val previousVisualStates = if (level.isClientSide) {
+            getBikes(level).associate { bike -> bike.bodyId to BikeVisualRuntimeState.from(bike) }
+        } else {
+            emptyMap()
+        }
         clearBikes(level)
         var restoredCount = 0
         records.forEach { record ->
-            if (restoreBike(level, record) != null) restoredCount++
+            val bike = restoreBike(level, record)
+            if (bike != null) {
+                previousVisualStates[bike.bodyId]?.applyTo(bike)
+                restoredCount++
+            }
         }
         return restoredCount
     }
@@ -213,6 +222,41 @@ object BikeManager {
 
     private fun bikeMap(level: Level): ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IBike>> {
         return if (level.isClientSide) clientBikesByDimension else serverBikesByDimension
+    }
+
+    private data class BikeVisualRuntimeState(
+        val visualLeanRad: Double,
+        val visualSteerRad: Double,
+        val frontWheelSpin: Double,
+        val rearWheelSpin: Double,
+        val frontWheelAngularVelocity: Double,
+        val rearWheelAngularVelocity: Double,
+        val frontWheelSuspensionOffset: Double,
+        val rearWheelSuspensionOffset: Double
+    ) {
+        fun applyTo(bike: IBike) {
+            bike.state.visualLeanRad = visualLeanRad
+            bike.state.visualSteerRad = visualSteerRad
+            bike.state.frontWheelSpin = frontWheelSpin
+            bike.state.rearWheelSpin = rearWheelSpin
+            bike.state.frontWheelAngularVelocity = frontWheelAngularVelocity
+            bike.state.rearWheelAngularVelocity = rearWheelAngularVelocity
+            bike.state.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+            bike.state.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+        }
+
+        companion object {
+            fun from(bike: IBike): BikeVisualRuntimeState = BikeVisualRuntimeState(
+                visualLeanRad = bike.state.visualLeanRad,
+                visualSteerRad = bike.state.visualSteerRad,
+                frontWheelSpin = bike.state.frontWheelSpin,
+                rearWheelSpin = bike.state.rearWheelSpin,
+                frontWheelAngularVelocity = bike.state.frontWheelAngularVelocity,
+                rearWheelAngularVelocity = bike.state.rearWheelAngularVelocity,
+                frontWheelSuspensionOffset = bike.state.frontWheelSuspensionOffset,
+                rearWheelSuspensionOffset = bike.state.rearWheelSuspensionOffset
+            )
+        }
     }
 
     private fun createBike(definition: BikeDefinition, level: ServerLevel, position: Vector3dc): IBike {

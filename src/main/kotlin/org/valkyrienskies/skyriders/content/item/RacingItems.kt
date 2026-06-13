@@ -64,7 +64,7 @@ open class HoneyCanisterItem(
 
 class RoyalJellyCanisterItem(properties: Properties) : HoneyCanisterItem(
     properties,
-    boostDuration = 1.45,
+    boostDuration = 0.85,
     boostAcceleration = 58.0,
     boostTargetSpeed = 46.0,
     boostFadeRange = 11.0

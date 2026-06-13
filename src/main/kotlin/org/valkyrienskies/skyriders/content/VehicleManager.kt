@@ -113,12 +113,24 @@ object VehicleManager {
             BikeDefinitions.resolveSavedId(record.vehicleType)?.let(BikeDefinitions::get) != null
         }
         val vehicleRecords = recordList - bikeRecords.toSet()
+        val previousVisualStates = if (level.isClientSide) {
+            vehicleMap(level)[level.dimensionId]
+                ?.values
+                ?.associate { vehicle -> vehicle.bodyId to VehicleVisualRuntimeState.from(vehicle) }
+                ?: emptyMap()
+        } else {
+            emptyMap()
+        }
 
         val restoredBikes = BikeManager.restoreBikes(level, bikeRecords.map(VehicleSaveRecord::toBikeSaveRecord))
         clearVehicles(level)
         var restoredCount = 0
         vehicleRecords.forEach { record ->
-            if (restoreVehicle(level, record) != null) restoredCount++
+            val vehicle = restoreVehicle(level, record)
+            if (vehicle != null) {
+                previousVisualStates[vehicle.bodyId]?.applyTo(vehicle)
+                restoredCount++
+            }
         }
         return restoredBikes + restoredCount
     }
@@ -556,5 +568,98 @@ object VehicleManager {
 
     private fun vehicleMap(level: Level): ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>> {
         return if (level.isClientSide) clientVehiclesByDimension else serverVehiclesByDimension
+    }
+
+    private data class VehicleVisualRuntimeState(
+        val debugSteerRad: Double,
+        val smoothedSteerRad: Double,
+        val frontWheelSpin: Double,
+        val rearWheelSpin: Double,
+        val frontWheelAngularVelocity: Double,
+        val rearWheelAngularVelocity: Double,
+        val frontWheelSuspensionOffset: Double,
+        val rearWheelSuspensionOffset: Double,
+        val wheelSpinById: Map<String, Double>,
+        val wheelAngularVelocityById: Map<String, Double>,
+        val visualWheelAngularVelocityById: Map<String, Double>,
+        val wheelSuspensionOffsetById: Map<String, Double>
+    ) {
+        fun applyTo(vehicle: IVehicle) {
+            when (vehicle) {
+                is KartVehicle -> {
+                    vehicle.kartState.debugSteerRad = debugSteerRad
+                    vehicle.kartState.smoothedSteerRad = smoothedSteerRad
+                    vehicle.kartState.frontWheelSpin = frontWheelSpin
+                    vehicle.kartState.rearWheelSpin = rearWheelSpin
+                    vehicle.kartState.frontWheelAngularVelocity = frontWheelAngularVelocity
+                    vehicle.kartState.rearWheelAngularVelocity = rearWheelAngularVelocity
+                    vehicle.kartState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+                    vehicle.kartState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+                }
+                is WheeledVehicle -> {
+                    vehicle.wheeledState.debugSteerRad = debugSteerRad
+                    vehicle.wheeledState.smoothedSteerRad = smoothedSteerRad
+                    vehicle.wheeledState.frontWheelSpin = frontWheelSpin
+                    vehicle.wheeledState.rearWheelSpin = rearWheelSpin
+                    vehicle.wheeledState.frontWheelAngularVelocity = frontWheelAngularVelocity
+                    vehicle.wheeledState.rearWheelAngularVelocity = rearWheelAngularVelocity
+                    vehicle.wheeledState.frontWheelSuspensionOffset = frontWheelSuspensionOffset
+                    vehicle.wheeledState.rearWheelSuspensionOffset = rearWheelSuspensionOffset
+                    vehicle.wheeledState.wheelSpinById.putAll(wheelSpinById)
+                    vehicle.wheeledState.wheelAngularVelocityById.putAll(wheelAngularVelocityById)
+                    vehicle.wheeledState.visualWheelAngularVelocityById.putAll(visualWheelAngularVelocityById)
+                    vehicle.wheeledState.wheelSuspensionOffsetById.putAll(wheelSuspensionOffsetById)
+                }
+            }
+        }
+
+        companion object {
+            fun from(vehicle: IVehicle): VehicleVisualRuntimeState {
+                return when (vehicle) {
+                    is KartVehicle -> VehicleVisualRuntimeState(
+                        debugSteerRad = vehicle.kartState.debugSteerRad,
+                        smoothedSteerRad = vehicle.kartState.smoothedSteerRad,
+                        frontWheelSpin = vehicle.kartState.frontWheelSpin,
+                        rearWheelSpin = vehicle.kartState.rearWheelSpin,
+                        frontWheelAngularVelocity = vehicle.kartState.frontWheelAngularVelocity,
+                        rearWheelAngularVelocity = vehicle.kartState.rearWheelAngularVelocity,
+                        frontWheelSuspensionOffset = vehicle.kartState.frontWheelSuspensionOffset,
+                        rearWheelSuspensionOffset = vehicle.kartState.rearWheelSuspensionOffset,
+                        wheelSpinById = emptyMap(),
+                        wheelAngularVelocityById = emptyMap(),
+                        visualWheelAngularVelocityById = emptyMap(),
+                        wheelSuspensionOffsetById = emptyMap()
+                    )
+                    is WheeledVehicle -> VehicleVisualRuntimeState(
+                        debugSteerRad = vehicle.wheeledState.debugSteerRad,
+                        smoothedSteerRad = vehicle.wheeledState.smoothedSteerRad,
+                        frontWheelSpin = vehicle.wheeledState.frontWheelSpin,
+                        rearWheelSpin = vehicle.wheeledState.rearWheelSpin,
+                        frontWheelAngularVelocity = vehicle.wheeledState.frontWheelAngularVelocity,
+                        rearWheelAngularVelocity = vehicle.wheeledState.rearWheelAngularVelocity,
+                        frontWheelSuspensionOffset = vehicle.wheeledState.frontWheelSuspensionOffset,
+                        rearWheelSuspensionOffset = vehicle.wheeledState.rearWheelSuspensionOffset,
+                        wheelSpinById = vehicle.wheeledState.wheelSpinById.toMap(),
+                        wheelAngularVelocityById = vehicle.wheeledState.wheelAngularVelocityById.toMap(),
+                        visualWheelAngularVelocityById = vehicle.wheeledState.visualWheelAngularVelocityById.toMap(),
+                        wheelSuspensionOffsetById = vehicle.wheeledState.wheelSuspensionOffsetById.toMap()
+                    )
+                    else -> VehicleVisualRuntimeState(
+                        debugSteerRad = 0.0,
+                        smoothedSteerRad = 0.0,
+                        frontWheelSpin = 0.0,
+                        rearWheelSpin = 0.0,
+                        frontWheelAngularVelocity = 0.0,
+                        rearWheelAngularVelocity = 0.0,
+                        frontWheelSuspensionOffset = 0.0,
+                        rearWheelSuspensionOffset = 0.0,
+                        wheelSpinById = emptyMap(),
+                        wheelAngularVelocityById = emptyMap(),
+                        visualWheelAngularVelocityById = emptyMap(),
+                        wheelSuspensionOffsetById = emptyMap()
+                    )
+                }
+            }
+        }
     }
 }

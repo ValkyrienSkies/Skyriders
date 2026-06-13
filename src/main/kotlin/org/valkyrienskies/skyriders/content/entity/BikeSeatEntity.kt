@@ -197,7 +197,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     }
 
     companion object {
-        private const val TELEMETRY_SYNC_INTERVAL_TICKS = 4L
+        private const val TELEMETRY_SYNC_INTERVAL_TICKS = 1L
         private const val BODY_ID_TAG = "BodyId"
         private const val SEAT_ID_TAG = "SeatId"
         private const val DEFAULT_SEAT_ID = VehicleInteractionDefinition.SEAT
