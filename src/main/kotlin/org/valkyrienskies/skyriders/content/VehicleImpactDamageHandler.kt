@@ -26,8 +26,10 @@ object VehicleImpactDamageHandler {
     private const val MAX_DAMAGE = 20.0
     private const val ENTITY_VELOCITY_TICKS_PER_SECOND = 20.0
     private const val VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS = 12L
-    private const val COLLISION_START_MIN_RELATIVE_SPEED = 3.0
-    private const val COLLISION_START_DAMAGE_PER_SPEED = 2.1
+    private const val COLLISION_START_MIN_RELATIVE_SPEED = 7.0
+    private const val COLLISION_START_DAMAGE_PER_SPEED = 1.15
+    private const val COLLISION_START_STEP_VERTICAL_COMPENSATION = 0.65
+    private const val COLLISION_START_MAX_STEP_COMPENSATION = 2.5
     private const val MOONDROP_SPINOUT_DURATION = 2.35
     private const val MOONDROP_SPINOUT_YAW_SPEED = 7.0
 
@@ -36,10 +38,18 @@ object VehicleImpactDamageHandler {
     private val pendingCollisionCrashDamage = ConcurrentLinkedQueue<CollisionCrashDamage>()
 
     fun onCollisionStart(event: CollisionEvent) {
-        val contactSpeed = event.contactPoints.maxOfOrNull { contact -> contact.velocity.length() } ?: 0.0
+        val contactSpeed = event.contactPoints
+            .map { contact ->
+                CollisionContactSpeed(
+                    planarSpeed = planarLength(contact.velocity),
+                    verticalSpeed = kotlin.math.abs(contact.velocity.y())
+                )
+            }
+            .maxByOrNull { it.planarSpeed }
+            ?: CollisionContactSpeed.ZERO
 
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, event.shipIdB, contactSpeed))
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, event.shipIdA, contactSpeed))
+        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, event.shipIdB, contactSpeed.planarSpeed, contactSpeed.verticalSpeed))
+        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, event.shipIdA, contactSpeed.planarSpeed, contactSpeed.verticalSpeed))
     }
 
     fun tick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
@@ -103,7 +113,10 @@ object VehicleImpactDamageHandler {
             val vehicle = VehicleManager.getVehicle(level.dimensionId, pending.bodyId) ?: continue
             applyMoondropCollisionSpinOut(level, vehicle, pending.otherBodyId)
             val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId)
-            val impactSpeed = max(pending.contactSpeed, body?.kinematics?.velocity?.length() ?: 0.0)
+            val rawImpactSpeed = max(pending.contactPlanarSpeed, body?.kinematics?.velocity?.let(::planarLength) ?: 0.0)
+            val stepCompensation = (pending.contactVerticalSpeed * COLLISION_START_STEP_VERTICAL_COMPENSATION)
+                .coerceIn(0.0, COLLISION_START_MAX_STEP_COMPENSATION)
+            val impactSpeed = (rawImpactSpeed - stepCompensation).coerceAtLeast(0.0)
             if (impactSpeed < COLLISION_START_MIN_RELATIVE_SPEED) continue
             val massScale = sqrt(vehicle.vehicleDefinition.body.mass / 300.0).coerceIn(0.65, 2.4)
             val severity = (impactSpeed - COLLISION_START_MIN_RELATIVE_SPEED) *
@@ -229,6 +242,16 @@ object VehicleImpactDamageHandler {
         val dimensionId: DimensionId,
         val bodyId: Long,
         val otherBodyId: Long,
-        val contactSpeed: Double
+        val contactPlanarSpeed: Double,
+        val contactVerticalSpeed: Double
     )
+
+    private data class CollisionContactSpeed(
+        val planarSpeed: Double,
+        val verticalSpeed: Double
+    ) {
+        companion object {
+            val ZERO = CollisionContactSpeed(0.0, 0.0)
+        }
+    }
 }
