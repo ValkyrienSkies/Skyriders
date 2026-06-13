@@ -380,25 +380,25 @@
         "name": "skyriders:damage/crash_1",
         "type": "file",
         "attenuation_distance": 32,
-        "weight": 4
+        "weight": 8
       },
       {
         "name": "skyriders:damage/crash_2",
         "type": "file",
         "attenuation_distance": 32,
-        "weight": 4
+        "weight": 8
       },
       {
         "name": "skyriders:damage/crash_3",
         "type": "file",
         "attenuation_distance": 32,
-        "weight": 4
+        "weight": 8
       },
       {
         "name": "skyriders:damage/crash_4",
         "type": "file",
         "attenuation_distance": 32,
-        "weight": 4
+        "weight": 8
       },
       {
         "name": "skyriders:damage/crash_5",

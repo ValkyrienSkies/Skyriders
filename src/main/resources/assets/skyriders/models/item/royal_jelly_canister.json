@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "skyriders:item/honey_canister"
+    "layer0": "skyriders:item/royal_jelly_canister"
   }
 }
