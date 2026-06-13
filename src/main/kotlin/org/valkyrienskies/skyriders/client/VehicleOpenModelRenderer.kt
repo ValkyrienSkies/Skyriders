@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderStateShard
 import net.minecraft.client.renderer.RenderType
@@ -28,7 +27,7 @@ object VehicleOpenModelRenderer {
     private val damageCrackRenderTypes = (0..9).map { stage ->
         RenderType.entityTranslucent(ResourceLocation("textures/block/destroy_stage_$stage.png"))
     }
-    private val rainbowOverlayRenderType = RainbowOverlayRenderType.create(InventoryMenu.BLOCK_ATLAS)
+    private val rainbowOverlayRenderType = RainbowOverlayRenderType.create()
 
     fun renderIfNeeded(
         modelLocation: ResourceLocation,
@@ -121,13 +120,10 @@ object VehicleOpenModelRenderer {
         val alphaScale = intensity.coerceIn(0.0, 1.0).toFloat()
         if (alphaScale <= 0.0f) return false
         val model = getModel(modelLocation) ?: return false
-        val minecraft = Minecraft.getInstance()
-        val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
         val consumer = bufferSource.getBuffer(rainbowOverlayRenderType)
         val pose = poseStack.last()
         model.faces.forEach { face ->
-            val sprite = spriteLookup.apply(face.texture)
-            renderRainbowFace(face, sprite, consumer, pose, packedLight, phase, alphaScale)
+            renderRainbowFace(face, consumer, pose, phase, alphaScale)
         }
         return model.faces.isNotEmpty()
     }
@@ -207,10 +203,8 @@ object VehicleOpenModelRenderer {
 
     private fun renderRainbowFace(
         face: OpenFace,
-        sprite: net.minecraft.client.renderer.texture.TextureAtlasSprite,
         consumer: com.mojang.blaze3d.vertex.VertexConsumer,
         pose: PoseStack.Pose,
-        packedLight: Int,
         phase: Double,
         alphaScale: Float
     ) {
@@ -232,10 +226,6 @@ object VehicleOpenModelRenderer {
                 (vertex.z() + offsetZ) / 16.0f
             )
                 .color(color.x(), color.y(), color.z(), RAINBOW_OVERLAY_ALPHA * alphaScale)
-                .uv(sprite.getU0(), sprite.getV0())
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(LightTexture.FULL_BRIGHT)
-                .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
                 .endVertex()
         }
     }
@@ -588,21 +578,19 @@ object VehicleOpenModelRenderer {
     )
 
     private object RainbowOverlayRenderType : RenderStateShard("skyriders_rainbow_overlay_access", {}, {}) {
-        fun create(texture: ResourceLocation): RenderType {
+        fun create(): RenderType {
             return RenderType.create(
                 "skyriders_rainbow_overlay",
-                DefaultVertexFormat.NEW_ENTITY,
+                DefaultVertexFormat.POSITION_COLOR,
                 VertexFormat.Mode.QUADS,
                 256,
                 false,
                 true,
                 RenderType.CompositeState.builder()
-                    .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
-                    .setTextureState(TextureStateShard(texture, false, false))
+                    .setShaderState(POSITION_COLOR_SHADER)
+                    .setTextureState(NO_TEXTURE)
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setCullState(NO_CULL)
-                    .setLightmapState(LIGHTMAP)
-                    .setOverlayState(OVERLAY)
                     .setLayeringState(POLYGON_OFFSET_LAYERING)
                     .setWriteMaskState(COLOR_WRITE)
                     .createCompositeState(false)
@@ -614,6 +602,6 @@ object VehicleOpenModelRenderer {
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
     private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.035f
-    private const val RAINBOW_OVERLAY_ALPHA = 0.82f
+    private const val RAINBOW_OVERLAY_ALPHA = 0.74f
     private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }

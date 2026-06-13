@@ -46,6 +46,7 @@ object VehicleStatusEffects {
     private const val MOONDROP_TRAIL_INTERVAL_TICKS = 2L
     private const val MOONDROP_TRAIL_MIN_SPEED = 0.45
     private const val MOONDROP_VISUAL_FADE_MILLIS = 1800L
+    private const val MOONDROP_VISUAL_MIN_INTENSITY = 0.012
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -185,14 +186,16 @@ object VehicleStatusEffects {
             state.moondropVisualActive = true
             state.moondropVisualFadeStartedMillis = 0L
             state.moondropVisualFadeUntilMillis = 0L
-        } else if (state.moondropVisualActive || state.moondropVisualIntensity(now) > 0.0) {
+        } else if (state.moondropVisualActive) {
             state.moondropVisualActive = false
             state.moondropVisualFadeStartedMillis = now
             state.moondropVisualFadeUntilMillis = now + MOONDROP_VISUAL_FADE_MILLIS
         } else {
             state.moondropVisualActive = false
-            state.moondropVisualFadeStartedMillis = 0L
-            state.moondropVisualFadeUntilMillis = 0L
+            if (state.moondropVisualIntensity(now) <= 0.0) {
+                state.moondropVisualFadeStartedMillis = 0L
+                state.moondropVisualFadeUntilMillis = 0L
+            }
         }
         if (!active && state.isIdle()) {
             states.remove(key, state)
@@ -504,7 +507,8 @@ object VehicleStatusEffects {
             if (fadeUntil <= 0L || now >= fadeUntil) return 0.0
             val fadeStart = moondropVisualFadeStartedMillis
             val duration = (fadeUntil - fadeStart).coerceAtLeast(1L)
-            return ((fadeUntil - now).toDouble() / duration.toDouble()).coerceIn(0.0, 1.0)
+            val intensity = ((fadeUntil - now).toDouble() / duration.toDouble()).coerceIn(0.0, 1.0)
+            return if (intensity <= MOONDROP_VISUAL_MIN_INTENSITY) 0.0 else intensity
         }
 
         fun isIdle(): Boolean {

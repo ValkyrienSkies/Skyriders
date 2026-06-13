@@ -16,22 +16,26 @@ object MoondropVignetteOverlay {
         val seat = player.vehicle as? BikeSeatEntity ?: return
         val vehicle = VehicleManager.getVehicle(player.level().dimensionId, seat.bodyId) ?: return
         val intensity = VehicleStatusEffects.moondropVisualIntensity(vehicle).coerceIn(0.0, 1.0)
-        if (intensity <= 0.0) return
+        if (intensity <= MIN_VISIBLE_INTENSITY) return
 
-        val layers = 9
-        val maxInset = (minOf(screenWidth, screenHeight) * 0.16).roundToInt().coerceAtLeast(layers)
-        val layerSize = (maxInset / layers).coerceAtLeast(1)
+        val maxInset = (minOf(screenWidth, screenHeight) * 0.18).roundToInt().coerceAtLeast(1)
+        val layers = maxInset.coerceAtMost(MAX_LAYERS).coerceAtLeast(minOf(MIN_LAYERS, maxInset))
         val phase = System.currentTimeMillis() / 2600.0
         for (layer in 0 until layers) {
-            val inset = layer * layerSize
-            val nextInset = ((layer + 1) * layerSize).coerceAtMost(maxInset)
-            val alpha = ((1.0 - layer.toDouble() / layers.toDouble()) * MAX_ALPHA * intensity).roundToInt().coerceIn(0, 255)
+            val inset = (layer.toDouble() * maxInset.toDouble() / layers.toDouble()).roundToInt()
+            val nextInset = ((layer + 1).toDouble() * maxInset.toDouble() / layers.toDouble()).roundToInt()
+                .coerceAtLeast(inset + 1)
+                .coerceAtMost(maxInset)
+            val edgeFactor = 1.0 - layer.toDouble() / layers.toDouble()
+            val smoothFactor = edgeFactor * edgeFactor * (3.0 - 2.0 * edgeFactor)
+            val alpha = (smoothFactor * MAX_ALPHA * intensity).roundToInt().coerceIn(0, 255)
             if (alpha <= 0) continue
 
-            val topColor = colorInt(pastelRainbow(phase + layer * 0.035), alpha)
-            val rightColor = colorInt(pastelRainbow(phase + 0.18 + layer * 0.035), alpha)
-            val bottomColor = colorInt(pastelRainbow(phase + 0.36 + layer * 0.035), alpha)
-            val leftColor = colorInt(pastelRainbow(phase + 0.54 + layer * 0.035), alpha)
+            val colorOffset = layer * 0.009
+            val topColor = colorInt(pastelRainbow(phase + colorOffset), alpha)
+            val rightColor = colorInt(pastelRainbow(phase + 0.18 + colorOffset), alpha)
+            val bottomColor = colorInt(pastelRainbow(phase + 0.36 + colorOffset), alpha)
+            val leftColor = colorInt(pastelRainbow(phase + 0.54 + colorOffset), alpha)
 
             guiGraphics.fill(inset, inset, screenWidth - inset, nextInset, topColor)
             guiGraphics.fill(screenWidth - nextInset, inset, screenWidth - inset, screenHeight - inset, rightColor)
@@ -67,4 +71,7 @@ object MoondropVignetteOverlay {
     }
 
     private const val MAX_ALPHA = 58.0
+    private const val MIN_VISIBLE_INTENSITY = 0.012
+    private const val MIN_LAYERS = 32
+    private const val MAX_LAYERS = 96
 }
