@@ -10,13 +10,16 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.BlockParticleOption
 import net.minecraft.core.particles.ParticleOptions
 import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.level.block.state.BlockState
 import org.joml.Vector3d
+import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.BikeManager
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleSoundDefinition
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
@@ -29,9 +32,16 @@ object BikeClientEffects {
     private val telemetryByBodyId = HashMap<Long, TimedTelemetry>()
     private val vehicleTelemetryByBodyId = HashMap<Long, TimedVehicleTelemetry>()
     private val engineSoundsByBodyId = HashMap<Long, VehicleEngineSound>()
+    private val tireLeakSoundsByPart = HashMap<DamagePartKey, VehiclePartLoopSound>()
     private val lastEngineStateByBodyId = HashMap<Long, Boolean>()
+    private val lastEngineDestroyedByBodyId = HashMap<Long, Boolean>()
     private val lastGearByBodyId = HashMap<Long, Int>()
     private val lastParkingBrakeByBodyId = HashMap<Long, Boolean>()
+    private val tireLeakSoundIds = listOf(
+        ResourceLocation(SkyridersMod.MOD_ID, "tire_leak_1"),
+        ResourceLocation(SkyridersMod.MOD_ID, "tire_leak_2")
+    )
+    private val engineBreakSoundId = ResourceLocation(SkyridersMod.MOD_ID, "engine_break")
 
     fun updateTelemetry(packet: SkyridersNetwork.BikeDebugPacket) {
         telemetryByBodyId[packet.bodyId] = TimedTelemetry(
@@ -64,6 +74,7 @@ object BikeClientEffects {
         val bikes = vehicles.filterIsInstance<IBike>()
         val activeBodyIds = vehicles.mapTo(HashSet()) { it.bodyId }
         lastEngineStateByBodyId.keys.retainAll(activeBodyIds)
+        lastEngineDestroyedByBodyId.keys.retainAll(activeBodyIds)
         lastGearByBodyId.keys.retainAll(activeBodyIds)
         lastParkingBrakeByBodyId.keys.retainAll(activeBodyIds)
         engineSoundsByBodyId.entries.removeIf { entry ->
@@ -74,10 +85,19 @@ object BikeClientEffects {
                 false
             }
         }
+        tireLeakSoundsByPart.entries.removeIf { entry ->
+            if (entry.value.isStopped() || entry.key.bodyId !in activeBodyIds) {
+                entry.value.stopNow()
+                true
+            } else {
+                false
+            }
+        }
         vehicles.forEach { vehicle ->
             val vehicleTelemetry = vehicleTelemetryByBodyId[vehicle.bodyId]?.packet
             tickEngineSound(minecraft, vehicle, vehicleTelemetry)
             playVehicleControlTransitionSounds(minecraft, vehicle, vehicleTelemetry)
+            tickDamageEffects(minecraft, level, vehicle)
             if (vehicle !is IBike) {
                 spawnGenericVehicleEffects(level, vehicle, vehicleTelemetry)
             }
@@ -230,6 +250,124 @@ object BikeClientEffects {
         )
     }
 
+    private fun tickDamageEffects(minecraft: Minecraft, level: ClientLevel, vehicle: IVehicle) {
+        VehicleDamage.wheelPartIds(vehicle).forEach { wheelPartId ->
+            val key = DamagePartKey(vehicle.bodyId, wheelPartId)
+            val destroyed = VehicleDamage.isPartDestroyed(vehicle, wheelPartId)
+            val popped = VehicleDamage.isWheelPopped(vehicle, wheelPartId)
+            val position = VehicleDamage.partWorldPosition(vehicle, wheelPartId)
+            if (popped && !destroyed && position != null) {
+                spawnTireLeakParticles(level, position, VehicleDamage.damageFraction(vehicle, wheelPartId))
+                val sound = tireLeakSoundsByPart.getOrPut(key) {
+                    VehiclePartLoopSound(
+                        vehicle = vehicle,
+                        partId = wheelPartId,
+                        soundId = tireLeakSoundIds[level.random.nextInt(tireLeakSoundIds.size)],
+                        baseVolume = 0.42f + level.random.nextFloat() * 0.12f,
+                        basePitch = 0.92f + level.random.nextFloat() * 0.18f
+                    )
+                }
+                if (!minecraft.soundManager.isActive(sound)) {
+                    minecraft.soundManager.play(sound)
+                }
+            } else {
+                tireLeakSoundsByPart.remove(key)?.stopNow()
+            }
+        }
+
+        val enginePosition = VehicleDamage.partWorldPosition(vehicle, VehicleDamage.ENGINE_PART_ID) ?: return
+        val engineDamage = VehicleDamage.damageFraction(vehicle, VehicleDamage.ENGINE_PART_ID)
+        val engineDestroyed = VehicleDamage.isPartDestroyed(vehicle, VehicleDamage.ENGINE_PART_ID)
+        val previousEngineDestroyed = lastEngineDestroyedByBodyId.put(vehicle.bodyId, engineDestroyed)
+        if (previousEngineDestroyed == false && engineDestroyed) {
+            spawnEngineBreakBurst(level, enginePosition)
+            playPartOneShot(minecraft, enginePosition, engineBreakSoundId, volume = 0.72f, pitch = 1.0f)
+        }
+        if (engineDamage > 0.12) {
+            spawnEngineDamageParticles(level, enginePosition, engineDamage, engineDestroyed)
+        }
+    }
+
+    private fun spawnTireLeakParticles(level: ClientLevel, position: Vector3d, damageFraction: Double) {
+        val count = 1 + (damageFraction.coerceIn(0.0, 1.0) * 3.0).toInt()
+        repeat(count) {
+            if (level.random.nextDouble() > 0.72) return@repeat
+            level.addParticle(
+                ParticleTypes.CLOUD,
+                position.x + randomSpread(level, 0.08),
+                position.y + 0.03 + level.random.nextDouble() * 0.08,
+                position.z + randomSpread(level, 0.08),
+                randomSpread(level, 0.055),
+                0.012 + level.random.nextDouble() * 0.028,
+                randomSpread(level, 0.055)
+            )
+        }
+    }
+
+    private fun spawnEngineDamageParticles(
+        level: ClientLevel,
+        position: Vector3d,
+        damageFraction: Double,
+        destroyed: Boolean
+    ) {
+        val damage = damageFraction.coerceIn(0.0, 1.0)
+        val smokeChance = if (destroyed) 0.95 else (damage * 0.78).coerceIn(0.0, 0.78)
+        if (level.random.nextDouble() < smokeChance) {
+            val particle = when {
+                destroyed -> ParticleTypes.CAMPFIRE_COSY_SMOKE
+                damage > 0.68 -> ParticleTypes.LARGE_SMOKE
+                else -> ParticleTypes.SMOKE
+            }
+            level.addParticle(
+                particle,
+                position.x + randomSpread(level, 0.12),
+                position.y + 0.1 + level.random.nextDouble() * 0.08,
+                position.z + randomSpread(level, 0.12),
+                randomSpread(level, 0.018),
+                0.02 + damage * 0.035,
+                randomSpread(level, 0.018)
+            )
+        }
+
+        val sparkCount = (damage * 3.0).toInt() + if (level.random.nextDouble() < damage * 0.45) 1 else 0
+        repeat(sparkCount) {
+            level.addParticle(
+                ParticleTypes.ELECTRIC_SPARK,
+                position.x + randomSpread(level, 0.16),
+                position.y + 0.05 + level.random.nextDouble() * 0.16,
+                position.z + randomSpread(level, 0.16),
+                randomSpread(level, 0.07),
+                randomSpread(level, 0.05),
+                randomSpread(level, 0.07)
+            )
+        }
+    }
+
+    private fun spawnEngineBreakBurst(level: ClientLevel, position: Vector3d) {
+        repeat(18) {
+            level.addParticle(
+                ParticleTypes.ELECTRIC_SPARK,
+                position.x + randomSpread(level, 0.22),
+                position.y + 0.06 + level.random.nextDouble() * 0.24,
+                position.z + randomSpread(level, 0.22),
+                randomSpread(level, 0.15),
+                randomSpread(level, 0.12),
+                randomSpread(level, 0.15)
+            )
+        }
+        repeat(8) {
+            level.addParticle(
+                ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                position.x + randomSpread(level, 0.2),
+                position.y + 0.12 + level.random.nextDouble() * 0.16,
+                position.z + randomSpread(level, 0.2),
+                randomSpread(level, 0.035),
+                0.05 + level.random.nextDouble() * 0.035,
+                randomSpread(level, 0.035)
+            )
+        }
+    }
+
     private fun exhaustParticle(telemetry: SkyridersNetwork.VehicleTelemetryPacket?): ParticleOptions {
         if (telemetry?.drifting != true) return ParticleTypes.SMOKE
         return when {
@@ -378,6 +516,31 @@ object BikeClientEffects {
         )
     }
 
+    private fun playPartOneShot(
+        minecraft: Minecraft,
+        position: Vector3d,
+        soundId: ResourceLocation,
+        volume: Float,
+        pitch: Float
+    ) {
+        minecraft.soundManager.play(
+            SimpleSoundInstance(
+                soundId,
+                SoundSource.NEUTRAL,
+                volume,
+                pitch,
+                SoundInstance.createUnseededRandom(),
+                false,
+                0,
+                SoundInstance.Attenuation.LINEAR,
+                position.x,
+                position.y,
+                position.z,
+                false
+            )
+        )
+    }
+
     private fun wheelGroundParticleLocalPos(
         bike: IBike,
         front: Boolean
@@ -431,6 +594,65 @@ object BikeClientEffects {
         val packet: SkyridersNetwork.VehicleTelemetryPacket,
         val expireTick: Long
     )
+
+    private data class DamagePartKey(
+        val bodyId: Long,
+        val partId: String
+    )
+
+    private class VehiclePartLoopSound(
+        private val vehicle: IVehicle,
+        private val partId: String,
+        soundId: ResourceLocation,
+        private val baseVolume: Float,
+        private val basePitch: Float
+    ) : AbstractSoundInstance(
+        soundId,
+        SoundSource.NEUTRAL,
+        SoundInstance.createUnseededRandom()
+    ), TickableSoundInstance {
+        private var stopped = false
+
+        init {
+            looping = true
+            attenuation = SoundInstance.Attenuation.LINEAR
+            volume = 0.0f
+            pitch = basePitch
+        }
+
+        override fun tick() {
+            val currentVehicle = VehicleManager.getVehicle(vehicle.level, vehicle.bodyId)
+            if (stopped ||
+                currentVehicle == null ||
+                !VehicleDamage.isWheelPopped(currentVehicle, partId) ||
+                VehicleDamage.isPartDestroyed(currentVehicle, partId)
+            ) {
+                volume = 0.0f
+                stopNow()
+                return
+            }
+
+            val position = VehicleDamage.partWorldPosition(currentVehicle, partId)
+            if (position == null) {
+                volume = 0.0f
+                stopNow()
+                return
+            }
+            x = position.x
+            y = position.y
+            z = position.z
+            volume = baseVolume
+            pitch = basePitch
+        }
+
+        override fun isStopped(): Boolean {
+            return stopped
+        }
+
+        fun stopNow() {
+            stopped = true
+        }
+    }
 
     private class VehicleEngineSound(
         private val vehicle: IVehicle,

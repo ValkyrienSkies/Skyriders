@@ -20,6 +20,9 @@ object VehicleOpenModelRenderer {
 
     private val models = HashMap<ResourceLocation, OpenModel?>()
     private val faceNames = listOf("north", "east", "south", "west", "up", "down")
+    private val damageCrackRenderTypes = (0..9).map { stage ->
+        RenderType.entityTranslucent(ResourceLocation("textures/block/destroy_stage_$stage.png"))
+    }
 
     fun renderIfNeeded(
         modelLocation: ResourceLocation,
@@ -53,6 +56,56 @@ object VehicleOpenModelRenderer {
             }
         }
         return true
+    }
+
+    fun renderDamageCracksIfNeeded(
+        modelLocation: ResourceLocation,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        packedLight: Int,
+        zones: List<DamageCrackZone>,
+        modelOffset: Vector3d,
+        modelScale: Double,
+        modelYawRad: Double
+    ): Boolean {
+        if (zones.isEmpty()) return false
+        val model = getModel(modelLocation) ?: return false
+        val pose = poseStack.last()
+        var rendered = false
+        zones.forEach { zone ->
+            val stage = (zone.damageFraction.coerceIn(0.0, 1.0) * 9.0).toInt().coerceIn(0, 9)
+            val alpha = (0.28f + zone.damageFraction.toFloat() * 0.45f).coerceIn(0.28f, 0.73f)
+            val consumer = bufferSource.getBuffer(damageCrackRenderTypes[stage])
+            model.faces.forEach { face ->
+                if (!faceIntersectsZone(face, zone, modelOffset, modelScale, modelYawRad)) return@forEach
+                renderCrackFace(face, poseStack, consumer, pose, packedLight, alpha)
+                rendered = true
+            }
+        }
+        return rendered
+    }
+
+    fun renderWholeModelDamageCracksIfNeeded(
+        modelLocation: ResourceLocation,
+        poseStack: PoseStack,
+        bufferSource: MultiBufferSource,
+        packedLight: Int,
+        damageFraction: Double
+    ): Boolean {
+        if (damageFraction < MIN_CRACK_DAMAGE_FRACTION) return false
+        val model = getModel(modelLocation) ?: return false
+        val pose = poseStack.last()
+        val stage = (damageFraction.coerceIn(0.0, 1.0) * 9.0).toInt().coerceIn(0, 9)
+        val alpha = (0.28f + damageFraction.toFloat() * 0.45f).coerceIn(0.28f, 0.73f)
+        val consumer = bufferSource.getBuffer(damageCrackRenderTypes[stage])
+        model.faces.forEach { face ->
+            renderCrackFace(face, poseStack, consumer, pose, packedLight, alpha)
+        }
+        return model.faces.isNotEmpty()
+    }
+
+    fun endDamageCrackBatches(bufferSource: MultiBufferSource.BufferSource) {
+        damageCrackRenderTypes.forEach(bufferSource::endBatch)
     }
 
     fun renderTexturedIfNeeded(
@@ -89,6 +142,92 @@ object VehicleOpenModelRenderer {
         val horizontal = (1.0f - kotlin.math.abs(up)).coerceIn(0.0f, 1.0f)
         val sideDirection = (normal.x() * 0.35f + normal.z() * 0.18f).coerceIn(-0.35f, 0.35f)
         return (0.74f + up * 0.18f + horizontal * sideDirection).coerceIn(0.56f, 1.0f)
+    }
+
+    private fun renderCrackFace(
+        face: OpenFace,
+        poseStack: PoseStack,
+        consumer: com.mojang.blaze3d.vertex.VertexConsumer,
+        pose: PoseStack.Pose,
+        packedLight: Int,
+        alpha: Float
+    ) {
+        val uvs = crackUvs()
+        for (i in 0 until 4) {
+            val vertex = face.vertices[i]
+            val uv = uvs[i]
+            val offsetX = face.normal.x() * CRACK_SURFACE_OFFSET_MODEL_UNITS
+            val offsetY = face.normal.y() * CRACK_SURFACE_OFFSET_MODEL_UNITS
+            val offsetZ = face.normal.z() * CRACK_SURFACE_OFFSET_MODEL_UNITS
+            consumer.vertex(
+                pose.pose(),
+                (vertex.x() + offsetX) / 16.0f,
+                (vertex.y() + offsetY) / 16.0f,
+                (vertex.z() + offsetZ) / 16.0f
+            )
+                .color(1.0f, 1.0f, 1.0f, alpha)
+                .uv(uv.x(), uv.y())
+                .overlayCoords(OverlayTexture.NO_OVERLAY)
+                .uv2(packedLight)
+                .normal(pose.normal(), face.normal.x(), face.normal.y(), face.normal.z())
+                .endVertex()
+        }
+    }
+
+    private fun faceIntersectsZone(
+        face: OpenFace,
+        zone: DamageCrackZone,
+        modelOffset: Vector3d,
+        modelScale: Double,
+        modelYawRad: Double
+    ): Boolean {
+        if (face.vertices.any { vertex -> pointInsideZone(modelVertexToVehicleLocal(vertex, modelOffset, modelScale, modelYawRad), zone) }) {
+            return true
+        }
+        val center = Vector3d()
+        face.vertices.forEach { vertex ->
+            center.add(vertex.x().toDouble(), vertex.y().toDouble(), vertex.z().toDouble())
+        }
+        center.div(face.vertices.size.toDouble())
+        return pointInsideZone(modelVertexToVehicleLocal(Vector3f(center.x.toFloat(), center.y.toFloat(), center.z.toFloat()), modelOffset, modelScale, modelYawRad), zone)
+    }
+
+    private fun modelVertexToVehicleLocal(
+        vertex: Vector3f,
+        modelOffset: Vector3d,
+        modelScale: Double,
+        modelYawRad: Double
+    ): Vector3d {
+        val local = Vector3d(
+            vertex.x().toDouble() / 16.0 * modelScale + modelOffset.x,
+            vertex.y().toDouble() / 16.0 * modelScale + modelOffset.y,
+            vertex.z().toDouble() / 16.0 * modelScale + modelOffset.z
+        )
+        if (modelYawRad.isFinite() && modelYawRad != 0.0) {
+            local.rotateY(modelYawRad)
+        }
+        return local
+    }
+
+    private fun pointInsideZone(point: Vector3d, zone: DamageCrackZone): Boolean {
+        val halfX = zone.size.x * 0.5 + ZONE_MATCH_PADDING
+        val halfY = zone.size.y * 0.5 + ZONE_MATCH_PADDING
+        val halfZ = zone.size.z * 0.5 + ZONE_MATCH_PADDING
+        return point.x >= zone.center.x - halfX &&
+            point.x <= zone.center.x + halfX &&
+            point.y >= zone.center.y - halfY &&
+            point.y <= zone.center.y + halfY &&
+            point.z >= zone.center.z - halfZ &&
+            point.z <= zone.center.z + halfZ
+    }
+
+    private fun crackUvs(): Array<Vector3f> {
+        return arrayOf(
+            Vector3f(0.0f, 1.0f, 0.0f),
+            Vector3f(1.0f, 1.0f, 0.0f),
+            Vector3f(1.0f, 0.0f, 0.0f),
+            Vector3f(0.0f, 0.0f, 0.0f)
+        )
     }
 
     private fun getModel(modelLocation: ResourceLocation): OpenModel? {
@@ -347,4 +486,14 @@ object VehicleOpenModelRenderer {
             val degrees: Vector3d
         ) : ComponentTransform
     }
+
+    data class DamageCrackZone(
+        val center: Vector3d,
+        val size: Vector3d,
+        val damageFraction: Double
+    )
+
+    const val MIN_CRACK_DAMAGE_FRACTION = 0.08
+    private const val ZONE_MATCH_PADDING = 0.05
+    private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
 }

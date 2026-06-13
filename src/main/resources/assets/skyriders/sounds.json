@@ -373,5 +373,76 @@
       }
     ],
     "subtitle": "skyriders.subtitle.grabby_hand_grab"
+  },
+  "crash": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/crash_1",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:damage/crash_2",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:damage/crash_3",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:damage/crash_4",
+        "type": "file",
+        "attenuation_distance": 32
+      },
+      {
+        "name": "skyriders:damage/crash_5",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.crash"
+  },
+  "tire_pop": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/tire_pop",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.tire_pop"
+  },
+  "tire_leak_1": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/tire_leak_loop_1",
+
+        "type": "file",
+        "attenuation_distance": 16
+      }
+    ],
+    "subtitle": "skyriders.subtitle.tire_leak"
+  },
+  "tire_leak_2": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/tire_leak_loop_2",
+        "type": "file",
+        "attenuation_distance": 16
+      }
+    ],
+    "subtitle": "skyriders.subtitle.tire_leak"
+  },
+  "engine_break": {
+    "sounds": [
+      {
+        "name": "skyriders:damage/engine_break",
+        "type": "file",
+        "attenuation_distance": 32
+      }
+    ],
+    "subtitle": "skyriders.subtitle.engine_break"
   }
 }

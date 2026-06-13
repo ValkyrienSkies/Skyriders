@@ -21,9 +21,12 @@ import org.joml.Vector3d
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleInteractionDefinition
+import org.valkyrienskies.skyriders.content.VehicleInteractionActions
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleModelPartRenderDefinition
+import org.valkyrienskies.skyriders.content.VehiclePartTypes
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
 import org.valkyrienskies.skyriders.content.VehicleRefuelSources
 import org.valkyrienskies.skyriders.content.VehicleVisualRotationAxis
@@ -86,6 +89,7 @@ object BikeWorldRenderer {
         bufferSource.endBatch(VehicleOpenModelRenderer.BLOCK_ATLAS_NO_CULL_RENDER_TYPE)
         bufferSource.endBatch(RenderType.cutout())
         bufferSource.endBatch(RenderType.lines())
+        VehicleOpenModelRenderer.endDamageCrackBatches(bufferSource)
     }
 
     private fun renderVehicle(
@@ -144,6 +148,16 @@ object BikeWorldRenderer {
                 }
             }
         }
+        VehicleOpenModelRenderer.renderDamageCracksIfNeeded(
+            modelLocation = render.model,
+            poseStack = poseStack,
+            bufferSource = bufferSource,
+            packedLight = packedLight,
+            zones = damageCrackZones(vehicle, includeWheelParts = false),
+            modelOffset = render.modelOffset,
+            modelScale = render.modelScale,
+            modelYawRad = render.modelYawRad
+        )
 
         render.modelParts.forEach { modelPart ->
             val partModel = minecraft.modelManager.getModel(modelPart.model)
@@ -160,6 +174,10 @@ object BikeWorldRenderer {
         }
 
         render.resolvedWheelParts().forEach { wheelPart ->
+            val damagePartId = wheelDamagePartId(wheelPart.id)
+            if (damagePartId != null && VehicleDamage.isPartDestroyed(vehicle, damagePartId)) {
+                return@forEach
+            }
             val wheelModel = minecraft.modelManager.getModel(wheelPart.model)
                 .takeUnless { it === missingModel }
             val bike = vehicle as? IBike
@@ -190,7 +208,8 @@ object BikeWorldRenderer {
                     VehicleWheelSpinSource.REAR -> visualState.rearWheelSuspensionOffset
                     VehicleWheelSpinSource.NONE -> 0.0
                 },
-                packedLight = packedLight
+                packedLight = packedLight,
+                damageFraction = damagePartId?.let { VehicleDamage.damageFraction(vehicle, it) } ?: 0.0
             )
         }
 
@@ -428,6 +447,40 @@ object BikeWorldRenderer {
         }
     }
 
+    private fun wheelDamagePartId(renderPartId: String): String? {
+        return when (renderPartId) {
+            "front" -> VehicleDamage.FRONT_WHEEL_PART_ID
+            "rear" -> VehicleDamage.REAR_WHEEL_PART_ID
+            VehicleDamage.FRONT_WHEEL_PART_ID,
+            VehicleDamage.REAR_WHEEL_PART_ID,
+            "front_left_wheel",
+            "front_right_wheel",
+            "rear_left_wheel",
+            "rear_right_wheel" -> renderPartId
+            else -> null
+        }
+    }
+
+    private fun damageCrackZones(
+        vehicle: IVehicle,
+        includeWheelParts: Boolean
+    ): List<VehicleOpenModelRenderer.DamageCrackZone> {
+        return vehicle.vehicleDefinition.interactions.zones.mapNotNull { zone ->
+            val partId = zone.partId ?: return@mapNotNull null
+            if (VehicleInteractionActions.REPAIR !in zone.actions) return@mapNotNull null
+            if (!zone.center.isFinite() || !zone.size.isFinite()) return@mapNotNull null
+            val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return@mapNotNull null
+            if (!includeWheelParts && part.type == VehiclePartTypes.WHEEL) return@mapNotNull null
+            val damage = VehicleDamage.damageFraction(vehicle, partId)
+            if (damage < VehicleOpenModelRenderer.MIN_CRACK_DAMAGE_FRACTION) return@mapNotNull null
+            VehicleOpenModelRenderer.DamageCrackZone(
+                center = Vector3d(zone.center),
+                size = Vector3d(zone.size),
+                damageFraction = damage
+            )
+        }
+    }
+
     private fun renderWheelPart(
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
@@ -439,7 +492,8 @@ object BikeWorldRenderer {
         steerAxis: VehicleVisualRotationAxis,
         spinRad: Double,
         suspensionOffset: Double,
-        packedLight: Int
+        packedLight: Int,
+        damageFraction: Double
     ) {
         poseStack.pushPose()
         if (suspensionOffset.isFinite() && suspensionOffset != 0.0) {
@@ -459,6 +513,13 @@ object BikeWorldRenderer {
         if (!VehicleOpenModelRenderer.renderIfNeeded(modelLocation, poseStack, bufferSource, packedLight)) {
             model?.let { renderBakedModel(poseStack, bufferSource, it, packedLight) }
         }
+        VehicleOpenModelRenderer.renderWholeModelDamageCracksIfNeeded(
+            modelLocation = modelLocation,
+            poseStack = poseStack,
+            bufferSource = bufferSource,
+            packedLight = packedLight,
+            damageFraction = damageFraction
+        )
         poseStack.popPose()
     }
 

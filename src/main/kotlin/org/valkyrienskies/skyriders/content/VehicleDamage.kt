@@ -34,28 +34,30 @@ object VehicleDamage {
     private const val BODY_HEALTH = 120.0
     private const val ENGINE_HEALTH = 70.0
     private const val WHEEL_HEALTH = 28.0
+    private const val WHEEL_POP_FRACTION = 0.32
     private const val MIN_ENGINE_POWER_SCALE = 0.18
     private const val ENGINE_MALFUNCTION_START = 0.72
     private const val ENGINE_STALL_START = 0.38
     private const val ENGINE_STALL_CHANCE_PER_SECOND = 0.42
 
-    fun bodyPartDefinition(): VehiclePartDefinition = damageablePart(BODY_PART_ID, VehiclePartTypes.BODY, BODY_HEALTH)
+    fun bodyPartDefinition(bodyHealth: Double = BODY_HEALTH): VehiclePartDefinition = damageablePart(BODY_PART_ID, VehiclePartTypes.BODY, bodyHealth)
 
-    fun enginePartDefinition(): VehiclePartDefinition = damageablePart(ENGINE_PART_ID, VehiclePartTypes.ENGINE, ENGINE_HEALTH)
+    fun enginePartDefinition(engineHealth: Double = ENGINE_HEALTH): VehiclePartDefinition = damageablePart(ENGINE_PART_ID, VehiclePartTypes.ENGINE, engineHealth)
 
-    fun bikeWheelPartDefinitions(): List<VehiclePartDefinition> = listOf(
-        damageablePart(FRONT_WHEEL_PART_ID, VehiclePartTypes.WHEEL, WHEEL_HEALTH),
-        damageablePart(REAR_WHEEL_PART_ID, VehiclePartTypes.WHEEL, WHEEL_HEALTH)
+    fun bikeWheelPartDefinitions(wheelHealth: Double = WHEEL_HEALTH): List<VehiclePartDefinition> = listOf(
+        damageablePart(FRONT_WHEEL_PART_ID, VehiclePartTypes.WHEEL, wheelHealth),
+        damageablePart(REAR_WHEEL_PART_ID, VehiclePartTypes.WHEEL, wheelHealth)
     )
 
-    fun fourWheelPartDefinitions(): List<VehiclePartDefinition> = listOf(
-        damageablePart("front_left_wheel", VehiclePartTypes.WHEEL, WHEEL_HEALTH),
-        damageablePart("front_right_wheel", VehiclePartTypes.WHEEL, WHEEL_HEALTH),
-        damageablePart("rear_left_wheel", VehiclePartTypes.WHEEL, WHEEL_HEALTH),
-        damageablePart("rear_right_wheel", VehiclePartTypes.WHEEL, WHEEL_HEALTH)
+    fun fourWheelPartDefinitions(wheelHealth: Double = WHEEL_HEALTH): List<VehiclePartDefinition> = listOf(
+        damageablePart("front_left_wheel", VehiclePartTypes.WHEEL, wheelHealth),
+        damageablePart("front_right_wheel", VehiclePartTypes.WHEEL, wheelHealth),
+        damageablePart("rear_left_wheel", VehiclePartTypes.WHEEL, wheelHealth),
+        damageablePart("rear_right_wheel", VehiclePartTypes.WHEEL, wheelHealth)
     )
 
     fun bikePartZones(config: BikePhysicsConfig): List<VehicleInteractionZone> = listOf(
+        bodyRepairZone(config.collisionBoxOffset, config.collisionBoxSize),
         repairZone(FRONT_WHEEL_PART_ID, config.frontWheelLocalPos, wheelZoneSize(config.wheelRadius, config.wheelWidth)),
         repairZone(REAR_WHEEL_PART_ID, config.rearWheelLocalPos, wheelZoneSize(config.wheelRadius, config.wheelWidth)),
         repairZone(ENGINE_PART_ID, enginePosition(config.collisionBoxSize, config.collisionBoxOffset), Vector3d(0.5, 0.45, 0.55))
@@ -63,7 +65,8 @@ object VehicleDamage {
 
     fun kartPartZones(config: KartPhysicsConfig): List<VehicleInteractionZone> {
         val wheelIds = listOf("front_left_wheel", "front_right_wheel", "rear_left_wheel", "rear_right_wheel")
-        return config.wheelLocalPositions.zip(wheelIds).map { (localPos, id) ->
+        return listOf(bodyRepairZone(config.collisionBoxOffset, config.collisionBoxSize)) +
+            config.wheelLocalPositions.zip(wheelIds).map { (localPos, id) ->
             repairZone(id, localPos, wheelZoneSize(config.wheelRadius, config.wheelSampleWidth))
         } + repairZone(ENGINE_PART_ID, enginePosition(config.collisionBoxSize, config.collisionBoxOffset), Vector3d(0.55, 0.45, 0.65))
     }
@@ -83,7 +86,7 @@ object VehicleDamage {
                 )
             )
         }
-        return wheelZones + repairZone(
+        return listOf(bodyRepairZone(config.collisionBoxOffset, config.collisionBoxSize)) + wheelZones + repairZone(
             ENGINE_PART_ID,
             enginePosition(config.collisionBoxSize, config.collisionBoxOffset),
             Vector3d(0.72, 0.58, 0.82)
@@ -92,11 +95,12 @@ object VehicleDamage {
 
     fun damageCrash(level: ServerLevel, vehicle: IVehicle, severity: Double) {
         val damage = severity.takeIf { it.isFinite() && it > 0.0 } ?: return
-        damagePart(vehicle, BODY_PART_ID, damage * 0.85)
-        damagePart(vehicle, ENGINE_PART_ID, damage * 0.32)
+        damagePart(level, vehicle, BODY_PART_ID, damage * 0.85)
+        damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.32)
         wheelPartIds(vehicle).randomOrNull()?.let { wheelId ->
-            damagePart(vehicle, wheelId, damage * 0.48)
+            damagePart(level, vehicle, wheelId, damage * 0.48)
         }
+        playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.72f, randomPitch(0.9f, 1.08f))
         finishDamage(level, vehicle)
     }
 
@@ -113,11 +117,12 @@ object VehicleDamage {
             val directScale = if (vehicle.bodyId == directTarget?.bodyId) 1.45 else 1.0
             val falloff = (1.0 - distance / effectiveRadius).coerceIn(0.18, 1.0)
             val damage = baseDamage * falloff * directScale
-            damagePart(vehicle, BODY_PART_ID, damage * 0.75)
-            damagePart(vehicle, ENGINE_PART_ID, damage * 0.55)
+            damagePart(level, vehicle, BODY_PART_ID, damage * 0.75)
+            damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.55)
             worldToLocal(vehicle, origin)?.let { nearestWheelPart(vehicle, it) }?.let { wheelId ->
-                damagePart(vehicle, wheelId, damage * 0.85)
+                damagePart(level, vehicle, wheelId, damage * 0.85)
             }
+            playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.65f, randomPitch(0.84f, 1.02f))
             finishDamage(level, vehicle)
         }
     }
@@ -130,10 +135,11 @@ object VehicleDamage {
             partId == ENGINE_PART_ID -> safeAmount * 1.15
             else -> safeAmount
         }
-        damagePart(vehicle, partId, scaled)
+        damagePart(level, vehicle, partId, scaled)
         if (partId != BODY_PART_ID) {
-            damagePart(vehicle, BODY_PART_ID, scaled * 0.18)
+            damagePart(level, vehicle, BODY_PART_ID, scaled * 0.18)
         }
+        playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.38f, randomPitch(1.04f, 1.22f))
         finishDamage(level, vehicle)
     }
 
@@ -230,26 +236,60 @@ object VehicleDamage {
         return (health(state, part) / maxHealth).coerceIn(0.0, 1.0)
     }
 
+    fun damageFraction(vehicle: IVehicle, partId: String): Double {
+        return 1.0 - healthFraction(vehicle, partId)
+    }
+
+    fun wheelPartIds(vehicle: IVehicle): List<String> {
+        return vehicle.vehicleDefinition.parts
+            .filter { it.type == VehiclePartTypes.WHEEL }
+            .map { it.id }
+    }
+
     fun isWheelPopped(vehicle: IVehicle, partId: String): Boolean {
         val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
         if (part.type != VehiclePartTypes.WHEEL) return false
         val state = vehicle.vehicleState.partStates[partId]?.data ?: part.defaultState
-        return state.getBoolean(POPPED_KEY) || health(state, part) <= 0.0
+        return state.getBoolean(POPPED_KEY) || healthFraction(vehicle, partId) <= WHEEL_POP_FRACTION
     }
 
-    private fun damagePart(vehicle: IVehicle, partId: String, amount: Double) {
+    fun isPartDestroyed(vehicle: IVehicle, partId: String): Boolean {
+        return healthFraction(vehicle, partId) <= 0.0
+    }
+
+    fun partWorldPosition(vehicle: IVehicle, partId: String): Vector3d? {
+        val zone = vehicle.vehicleDefinition.interactions.zones.firstOrNull { it.partId == partId }
+            ?: return null
+        val transform = try {
+            vehicle.getRenderTransform()
+        } catch (_: IllegalStateException) {
+            null
+        } ?: return null
+        return transform.toWorld.transformPosition(Vector3d(zone.center)).takeIf { it.isFinite() }
+    }
+
+    private fun damagePart(level: ServerLevel, vehicle: IVehicle, partId: String, amount: Double) {
         val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return
         val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
         val stateMap = vehicle.vehicleState.partStates
         val state = stateMap[partId]?.data?.copy() ?: part.defaultState.copy()
         val maxHealth = maxHealth(state, part)
+        val before = health(state, part)
+        val wasPopped = part.type == VehiclePartTypes.WHEEL && before / maxHealth <= WHEEL_POP_FRACTION
+        val wasEngineBroken = part.id == ENGINE_PART_ID && before <= 0.0
         val next = (health(state, part) - safeAmount).coerceIn(0.0, maxHealth)
         state.putDouble(HEALTH_KEY, next)
         state.putDouble(MAX_HEALTH_KEY, maxHealth)
-        if (part.type == VehiclePartTypes.WHEEL && next <= 0.0) {
+        if (part.type == VehiclePartTypes.WHEEL && next / maxHealth <= WHEEL_POP_FRACTION) {
             state.putBoolean(POPPED_KEY, true)
         }
         stateMap[partId] = VehiclePartState(partId, state)
+        if (part.type == VehiclePartTypes.WHEEL && !wasPopped && next / maxHealth <= WHEEL_POP_FRACTION) {
+            playVehicleSound(level, vehicle, SkyridersSounds.TIRE_POP_SOUND.get(), 0.9f, randomPitch(0.92f, 1.08f), partId)
+        }
+        if (part.id == ENGINE_PART_ID && !wasEngineBroken && next <= 0.0) {
+            playVehicleSound(level, vehicle, SkyridersSounds.ENGINE_BREAK_SOUND.get(), 0.95f, randomPitch(0.94f, 1.06f), partId)
+        }
     }
 
     private fun finishDamage(level: ServerLevel, vehicle: IVehicle) {
@@ -282,6 +322,16 @@ object VehicleDamage {
             size = Vector3d(size),
             actions = setOf(VehicleInteractionActions.REPAIR, VehicleInteractionActions.PICK_UP),
             partId = id
+        )
+    }
+
+    private fun bodyRepairZone(center: Vector3d, size: Vector3d): VehicleInteractionZone {
+        return VehicleInteractionZone(
+            id = BODY_PART_ID,
+            center = Vector3d(center),
+            size = Vector3d(size),
+            actions = setOf(VehicleInteractionActions.REPAIR),
+            partId = BODY_PART_ID
         )
     }
 
@@ -363,12 +413,6 @@ object VehicleDamage {
         return vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId }?.type == VehiclePartTypes.WHEEL
     }
 
-    private fun wheelPartIds(vehicle: IVehicle): List<String> {
-        return vehicle.vehicleDefinition.parts
-            .filter { it.type == VehiclePartTypes.WHEEL }
-            .map { it.id }
-    }
-
     private fun maxHealth(state: CompoundTag, part: VehiclePartDefinition): Double {
         return state.getDouble(MAX_HEALTH_KEY)
             .takeIf { it.isFinite() && it > 0.0 }
@@ -435,8 +479,34 @@ object VehicleDamage {
         return partId.replace('_', ' ')
     }
 
+    private fun playVehicleSound(
+        level: ServerLevel,
+        vehicle: IVehicle,
+        sound: net.minecraft.sounds.SoundEvent,
+        volume: Float,
+        pitch: Float,
+        partId: String? = null
+    ) {
+        val position = partId?.let { partWorldPosition(vehicle, it) }
+            ?: try {
+                vehicle.getRenderTransform()?.toWorld?.transformPosition(Vector3d())
+            } catch (_: IllegalStateException) {
+                null
+            }
+            ?: return
+        level.playSound(null, position.x, position.y, position.z, sound, SoundSource.NEUTRAL, volume, pitch)
+    }
+
+    private fun randomPitch(min: Float, max: Float): Float {
+        return ThreadLocalRandom.current().nextDouble(min.toDouble(), max.toDouble()).toFloat()
+    }
+
     private fun vehicleRadius(vehicle: IVehicle): Double {
         val size = vehicle.vehicleDefinition.body.collisionBoxSize
         return sqrt(size.x * size.x + size.z * size.z) * 0.5
+    }
+
+    private fun Vector3d.isFinite(): Boolean {
+        return x.isFinite() && y.isFinite() && z.isFinite()
     }
 }

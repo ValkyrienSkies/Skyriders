@@ -78,6 +78,23 @@ object SkyridersSounds {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "truck_door_close"))
     }
 
+    //group damage
+    val CRASH_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("crash") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "crash"))
+    }
+    val TIRE_POP_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("tire_pop") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "tire_pop"))
+    }
+    val TIRE_LEAK_1_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("tire_leak_1") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "tire_leak_1"))
+    }
+    val TIRE_LEAK_2_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("tire_leak_2") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "tire_leak_2"))
+    }
+    val ENGINE_BREAK_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("engine_break") {
+        SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "engine_break"))
+    }
+
     //group racing
     val BOOST_SOUND: RegistryObject<SoundEvent> = SOUND_EVENTS.register("boost") {
         SoundEvent.createVariableRangeEvent(ResourceLocation(MOD_ID, "boost"))
