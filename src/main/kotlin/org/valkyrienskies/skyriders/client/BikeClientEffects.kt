@@ -291,7 +291,7 @@ object BikeClientEffects {
     private fun spawnTireLeakParticles(level: ClientLevel, position: Vector3d, damageFraction: Double) {
         val count = 1 + (damageFraction.coerceIn(0.0, 1.0) * 3.0).toInt()
         repeat(count) {
-            if (level.random.nextDouble() > 0.72) return@repeat
+            if (level.random.nextDouble() > 0.8) return@repeat
             level.addParticle(
                 ParticleTypes.CLOUD,
                 position.x + randomSpread(level, 0.08),

@@ -34,6 +34,7 @@ object VehicleHudOverlay {
     private const val MINI_CRT_SCREEN_RIGHT = 72
     private const val MINI_CRT_SCREEN_BOTTOM = 70
     private const val MINI_CRT_SCREEN_PADDING = 4
+    private const val MINI_CRT_DASHBOARD_OVERLAP = 12
     private const val DAMAGE_PART_MIN_PIXELS = 3
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
@@ -240,13 +241,13 @@ object VehicleHudOverlay {
 
     private fun renderDamageCrt(guiGraphics: GuiGraphics, screenHeight: Int, snapshot: VehicleHudSnapshot) {
         val x = 0
-        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE
+        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP
         guiGraphics.blitRegion(MINI_CRT_TEXTURE, MINI_CRT_BASE, x, y, MINI_CRT_TEXTURE_WIDTH, MINI_CRT_TEXTURE_HEIGHT)
 
         val screenX = x + MINI_CRT_SCREEN_X
         val screenY = y + MINI_CRT_SCREEN_Y
-        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X
-        val screenContentHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y
+        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X + 1
+        val screenContentHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y + 1
 
         val minecraft = Minecraft.getInstance()
         val level = minecraft.level ?: return
@@ -276,37 +277,31 @@ object VehicleHudOverlay {
         val spanX = (maxX - minX).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
         val spanZ = (maxZ - minZ).takeIf { it.isFinite() && it > 1.0e-4 } ?: 1.0
         val scale = minOf(contentWidth / spanX, contentHeight / spanZ)
-        val offsetX = screenX + MINI_CRT_SCREEN_PADDING + (contentWidth - spanX * scale) * 0.5
-        val offsetY = screenY + MINI_CRT_SCREEN_PADDING + (contentHeight - spanZ * scale) * 0.5
+        val screenCenterX = screenX + screenWidth * 0.5
+        val screenCenterY = screenY + screenHeight * 0.5
+        val contentCenterX = (minX + maxX) * 0.5
+        val contentCenterZ = (minZ + maxZ) * 0.5
 
         parts.sortedBy { it.drawOrder }.forEach { part ->
-            val left = (offsetX + (part.centerX - part.sizeX * 0.5 - minX) * scale).roundToInt()
-            val right = (offsetX + (part.centerX + part.sizeX * 0.5 - minX) * scale).roundToInt()
-            val top = (offsetY + (maxZ - (part.centerZ + part.sizeZ * 0.5)) * scale).roundToInt()
-            val bottom = (offsetY + (maxZ - (part.centerZ - part.sizeZ * 0.5)) * scale).roundToInt()
+            val left = (screenCenterX - (part.centerX + part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
+            val right = (screenCenterX - (part.centerX - part.sizeX * 0.5 - contentCenterX) * scale).roundToInt()
+            val top = (screenCenterY - (part.centerZ + part.sizeZ * 0.5 - contentCenterZ) * scale).roundToInt()
+            val bottom = (screenCenterY - (part.centerZ - part.sizeZ * 0.5 - contentCenterZ) * scale).roundToInt()
             val minWidth = if (part.type == VehiclePartTypes.WHEEL) DAMAGE_PART_MIN_PIXELS + 1 else DAMAGE_PART_MIN_PIXELS
             val drawLeft = left.coerceAtMost(right - minWidth)
             val drawTop = top.coerceAtMost(bottom - minWidth)
             val drawRight = right.coerceAtLeast(drawLeft + minWidth)
             val drawBottom = bottom.coerceAtLeast(drawTop + minWidth)
             val color = damageHudColor(part.healthFraction)
-            if (part.type == VehiclePartTypes.BODY) {
-                val outlineColor = (color and 0x00FFFFFF) or 0xEE000000.toInt()
-                drawRectOutline(guiGraphics, drawLeft, drawTop, drawRight, drawBottom, outlineColor)
-            } else {
-                val fillColor = (color and 0x00FFFFFF) or 0xDD000000.toInt()
-                guiGraphics.fill(drawLeft - 1, drawTop - 1, drawRight + 1, drawBottom + 1, 0xF0010803.toInt())
-                guiGraphics.fill(drawLeft, drawTop, drawRight, drawBottom, fillColor)
-                guiGraphics.fill(drawLeft, drawTop, drawRight, drawTop + 1, brightenColor(fillColor))
-            }
+            val fillAlpha = if (part.type == VehiclePartTypes.BODY) 0x76000000 else 0xB8000000.toInt()
+            val fillColor = (color and 0x00FFFFFF) or fillAlpha
+            val outlineColor = lightenColor((color and 0x00FFFFFF) or 0xCC000000.toInt())
+            guiGraphics.fill(drawLeft, drawTop, drawRight, drawBottom, fillColor)
+            drawRectOutline(guiGraphics, drawLeft, drawTop, drawRight, drawBottom, outlineColor)
         }
     }
 
     private fun drawRectOutline(guiGraphics: GuiGraphics, left: Int, top: Int, right: Int, bottom: Int, color: Int) {
-        guiGraphics.fill(left - 1, top - 1, right + 1, top, 0xF0010803.toInt())
-        guiGraphics.fill(left - 1, bottom, right + 1, bottom + 1, 0xF0010803.toInt())
-        guiGraphics.fill(left - 1, top, left, bottom, 0xF0010803.toInt())
-        guiGraphics.fill(right, top, right + 1, bottom, 0xF0010803.toInt())
         guiGraphics.fill(left, top, right, top + 1, color)
         guiGraphics.fill(left, bottom - 1, right, bottom, color)
         guiGraphics.fill(left, top, left + 1, bottom, color)
@@ -366,10 +361,10 @@ object VehicleHudOverlay {
         return 0xFF000000.toInt() or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
     }
 
-    private fun brightenColor(color: Int): Int {
-        val r = (((color ushr 16) and 0xFF) + 42).coerceAtMost(255)
-        val g = (((color ushr 8) and 0xFF) + 42).coerceAtMost(255)
-        val b = ((color and 0xFF) + 42).coerceAtMost(255)
+    private fun lightenColor(color: Int): Int {
+        val r = (((color ushr 16) and 0xFF) + 78).coerceAtMost(255)
+        val g = (((color ushr 8) and 0xFF) + 78).coerceAtMost(255)
+        val b = ((color and 0xFF) + 78).coerceAtMost(255)
         return (color and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
     }
 

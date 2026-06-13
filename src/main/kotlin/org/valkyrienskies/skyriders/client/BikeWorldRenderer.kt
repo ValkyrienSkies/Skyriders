@@ -452,11 +452,11 @@ object BikeWorldRenderer {
             "front" -> VehicleDamage.FRONT_WHEEL_PART_ID
             "rear" -> VehicleDamage.REAR_WHEEL_PART_ID
             VehicleDamage.FRONT_WHEEL_PART_ID,
-            VehicleDamage.REAR_WHEEL_PART_ID,
-            "front_left_wheel",
-            "front_right_wheel",
-            "rear_left_wheel",
-            "rear_right_wheel" -> renderPartId
+            VehicleDamage.REAR_WHEEL_PART_ID -> renderPartId
+            "front_left_wheel" -> "front_right_wheel"
+            "front_right_wheel" -> "front_left_wheel"
+            "rear_left_wheel" -> "rear_right_wheel"
+            "rear_right_wheel" -> "rear_left_wheel"
             else -> null
         }
     }
