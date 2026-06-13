@@ -538,7 +538,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         private const val MOTOR_DIRECTION_Y_KEY = "MotorDirectionY"
         private const val MOTOR_DIRECTION_Z_KEY = "MotorDirectionZ"
         private const val MAX_LIFETIME_TICKS = 20 * 14
-        private const val FUEL_TICKS = 20 * 3
+        private const val FUEL_TICKS = 20 * 1
         private const val LEGACY_FUEL_DISTANCE = 30.0
         private const val TICKS_PER_SECOND = 20.0
         private const val ROCKET_ACCELERATION = 0.16

@@ -253,7 +253,7 @@ object VehicleOpenModelRenderer {
         val loader = json.getString("loader")
         val components = json.getAsJsonArray("components") ?: json.getAsJsonArray("elements")
         if (loader != "framework:open_model" && (components == null || !json.has("format_version"))) return null
-
+        val frameworkOpenModel = loader == "framework:open_model"
         val textures = json.getAsJsonObject("textures") ?: return null
         val textureAliases = textures.entrySet().associate { (key, value) ->
             key to ResourceLocation(value.asString)
@@ -278,8 +278,8 @@ object VehicleOpenModelRenderer {
 
         val textureSize = json.getAsJsonArray("texture_size")
         return OpenModel(
-            textureWidth = textureSize?.get(0)?.asDouble ?: 16.0,
-            textureHeight = textureSize?.get(1)?.asDouble ?: 16.0,
+            textureWidth = if (frameworkOpenModel) textureSize?.get(0)?.asDouble ?: 16.0 else 16.0,
+            textureHeight = if (frameworkOpenModel) textureSize?.get(1)?.asDouble ?: 16.0 else 16.0,
             requiresCustomTransforms = requiresCustomTransforms,
             faces = faces
         )
