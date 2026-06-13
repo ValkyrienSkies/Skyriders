@@ -120,7 +120,7 @@ object MoondropVignetteOverlay {
         )
     }
 
-    private const val MAX_ALPHA = 58.0
+    private const val MAX_ALPHA = 78.0
     private const val MIN_VISIBLE_INTENSITY = 0.012
     private const val MIN_LAYERS = 32
     private const val MAX_LAYERS = 96

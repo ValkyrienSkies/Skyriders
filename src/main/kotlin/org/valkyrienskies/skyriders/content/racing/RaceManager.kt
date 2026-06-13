@@ -382,6 +382,7 @@ object RaceManager {
         if (marker.markerType == RaceMarkerTypes.CHECKPOINT) {
             if (!marker.isActiveForLap(racer.currentLap, race.totalLaps)) return
             if (marker.checkpointIndex != racer.nextCheckpointIndex) return
+            repairRacerVehicle(level, racer, 0.05)
             racer.crossedCheckpoints.add(marker.checkpointIndex)
             marker.line(level)?.let { line ->
                 racer.lastRecoveryTarget = Vector3d(line.center)
@@ -445,6 +446,11 @@ object RaceManager {
     private fun repairRacerVehicle(level: ServerLevel, racer: RacerState) {
         val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return
         VehicleDamage.repairAllPartsFully(level, vehicle)
+    }
+
+    private fun repairRacerVehicle(level: ServerLevel, racer: RacerState, amount: Double) {
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return
+        VehicleDamage.repairAllParts(level, vehicle, amount)
     }
 
     private fun stopRace(level: ServerLevel, race: ActiveRace) {

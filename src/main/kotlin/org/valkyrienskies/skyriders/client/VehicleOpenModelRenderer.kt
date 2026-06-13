@@ -209,9 +209,10 @@ object VehicleOpenModelRenderer {
         alphaScale: Float
     ) {
         val center = faceCenter(face)
+        val expansionAxes = faceExpansionAxes(face)
         for (i in 0 until 4) {
             val vertex = face.vertices[i]
-            val renderVertex = expandedRainbowVertex(vertex, center)
+            val renderVertex = expandedRainbowVertex(vertex, center, expansionAxes)
             val color = pastelRainbowColor(
                 phase +
                     vertex.x().toDouble() * 0.018 +
@@ -239,12 +240,31 @@ object VehicleOpenModelRenderer {
         return center
     }
 
-    private fun expandedRainbowVertex(vertex: Vector3f, center: Vector3f): Vector3f {
+    private fun faceExpansionAxes(face: OpenFace): Pair<Vector3f, Vector3f>? {
+        if (face.vertices.size < 3) return null
+        val axisU = Vector3f(face.vertices[1]).sub(face.vertices[0])
+        val axisV = Vector3f(face.vertices[2]).sub(face.vertices[1])
+        if (axisU.lengthSquared() <= 1.0e-8f || axisV.lengthSquared() <= 1.0e-8f) return null
+        axisU.normalize()
+        axisV.normalize()
+        return axisU to axisV
+    }
+
+    private fun expandedRainbowVertex(vertex: Vector3f, center: Vector3f, axes: Pair<Vector3f, Vector3f>?): Vector3f {
         val fromCenter = Vector3f(vertex).sub(center)
+        if (axes != null) {
+            val axisU = axes.first
+            val axisV = axes.second
+            return Vector3f(vertex)
+                .fma(expansionSign(fromCenter.dot(axisU)) * RAINBOW_EDGE_OVERHANG_MODEL_UNITS, axisU)
+                .fma(expansionSign(fromCenter.dot(axisV)) * RAINBOW_EDGE_OVERHANG_MODEL_UNITS, axisV)
+        }
         val distance = fromCenter.length()
         if (distance <= 1.0e-5f) return Vector3f(vertex)
         return fromCenter.mul((distance + RAINBOW_EDGE_OVERHANG_MODEL_UNITS) / distance).add(center)
     }
+
+    private fun expansionSign(value: Float): Float = if (value < 0.0f) -1.0f else 1.0f
 
     private fun faceIntersectsZone(
         face: OpenFace,
