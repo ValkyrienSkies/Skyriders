@@ -24,6 +24,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.common.toWorldCoordinates
 import org.valkyrienskies.skyriders.SkyridersMod.MOD_ID
 import org.valkyrienskies.skyriders.content.IVehicle
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleRaceParticipants
@@ -235,6 +236,13 @@ object RaceManager {
         )
     }
 
+    fun isVehicleInActiveRace(level: ServerLevel, bodyId: Long): Boolean {
+        val dimension = level.dimension().location().toString()
+        return racesByKey.values.any { race ->
+            race.active && race.dimension == dimension && race.racers.containsKey(bodyId)
+        }
+    }
+
     fun activeRaceColorSuggestions(level: ServerLevel): List<String> {
         val dimension = level.dimension().location().toString()
         return racesByKey.values
@@ -390,6 +398,7 @@ object RaceManager {
         if (marker.markerType == RaceMarkerTypes.START_FINISH) {
             if (!racer.isReadyForFinishLine(race)) return
             if (race.finishOrder.contains(racer.bodyId)) return
+            repairRacerVehicle(level, racer)
             if (racer.currentLap < race.totalLaps) {
                 racer.currentLap++
                 racer.lapStartedAtGameTime = level.gameTime
@@ -429,6 +438,11 @@ object RaceManager {
                 stopRace(level, race)
             }
         }
+    }
+
+    private fun repairRacerVehicle(level: ServerLevel, racer: RacerState) {
+        val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return
+        VehicleDamage.repairAllPartsFully(level, vehicle)
     }
 
     private fun stopRace(level: ServerLevel, race: ActiveRace) {

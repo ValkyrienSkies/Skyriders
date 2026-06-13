@@ -21,6 +21,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
@@ -94,6 +95,29 @@ class HoneyTankItem(properties: Properties) : RacingVehicleItem(properties) {
 
     private companion object {
         const val FUEL_FRACTION = 0.25
+    }
+}
+
+class RepairPakItem(properties: Properties) : RacingVehicleItem(properties) {
+    override fun useOnVehicle(level: ServerLevel, player: Player, vehicle: IVehicle, stack: ItemStack): Boolean {
+        val repaired = VehicleDamage.repairAllParts(level, vehicle, REPAIR_FRACTION)
+        if (repaired <= 0.0) return false
+        playItemUseSound(level, player)
+        level.playSound(
+            null,
+            player.x,
+            player.y,
+            player.z,
+            SoundEvents.ANVIL_USE,
+            SoundSource.PLAYERS,
+            0.42f,
+            1.55f
+        )
+        return true
+    }
+
+    private companion object {
+        const val REPAIR_FRACTION = 0.25
     }
 }
 

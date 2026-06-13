@@ -19,6 +19,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
+import org.valkyrienskies.skyriders.content.racing.RaceManager
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import java.util.concurrent.ThreadLocalRandom
@@ -36,9 +37,10 @@ object VehicleDamage {
     private const val MAX_HEALTH_KEY = "max_health"
     private const val POPPED_KEY = "popped"
 
-    private const val BODY_HEALTH = 120.0
-    private const val ENGINE_HEALTH = 70.0
-    private const val WHEEL_HEALTH = 28.0
+    private const val BODY_HEALTH = 150.0
+    private const val ENGINE_HEALTH = 90.0
+    private const val WHEEL_HEALTH = 36.0
+    private const val ACTIVE_RACE_DAMAGE_SCALE = 0.5
     private const val WHEEL_POP_FRACTION = 0.32
     private const val MIN_ENGINE_POWER_SCALE = 0.18
     private const val ENGINE_MALFUNCTION_START = 0.72
@@ -285,6 +287,39 @@ object VehicleDamage {
         return 1.0 - healthFraction(vehicle, partId)
     }
 
+    fun repairAllParts(level: ServerLevel, vehicle: IVehicle, fraction: Double): Double {
+        val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+        var totalRepaired = 0.0
+        vehicle.vehicleDefinition.parts
+            .filter(::isDamageablePart)
+            .forEach { part ->
+                val state = vehicle.vehicleState.partStates[part.id]?.data?.copy() ?: part.defaultState.copy()
+                val maxHealth = maxHealth(state, part)
+                val before = health(state, part)
+                val next = (before + maxHealth * safeFraction).coerceAtMost(maxHealth)
+                if (next <= before + 1.0e-4) return@forEach
+                state.putDouble(HEALTH_KEY, next)
+                state.putDouble(MAX_HEALTH_KEY, maxHealth)
+                if (part.type == VehiclePartTypes.WHEEL && next / maxHealth > WHEEL_POP_FRACTION) {
+                    state.putBoolean(POPPED_KEY, false)
+                }
+                vehicle.vehicleState.partStates[part.id] = VehiclePartState(part.id, state)
+                totalRepaired += next - before
+            }
+
+        if (totalRepaired > 1.0e-4) {
+            clearEngineDestroyedState(vehicle)
+            criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
+            BikeLifecycle.saveLevel(level)
+            BikeLifecycle.syncLevel(level)
+        }
+        return totalRepaired
+    }
+
+    fun repairAllPartsFully(level: ServerLevel, vehicle: IVehicle): Double {
+        return repairAllParts(level, vehicle, 1.0)
+    }
+
     fun wheelPartIds(vehicle: IVehicle): List<String> {
         return vehicle.vehicleDefinition.parts
             .filter { it.type == VehiclePartTypes.WHEEL }
@@ -316,13 +351,14 @@ object VehicleDamage {
     private fun damagePart(level: ServerLevel, vehicle: IVehicle, partId: String, amount: Double) {
         val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return
         val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
+        val effectiveAmount = safeAmount * damageScale(level, vehicle)
         val stateMap = vehicle.vehicleState.partStates
         val state = stateMap[partId]?.data?.copy() ?: part.defaultState.copy()
         val maxHealth = maxHealth(state, part)
         val before = health(state, part)
         val wasPopped = part.type == VehiclePartTypes.WHEEL && before / maxHealth <= WHEEL_POP_FRACTION
         val wasEngineBroken = part.id == ENGINE_PART_ID && before <= 0.0
-        val next = (health(state, part) - safeAmount).coerceIn(0.0, maxHealth)
+        val next = (before - effectiveAmount).coerceIn(0.0, maxHealth)
         state.putDouble(HEALTH_KEY, next)
         state.putDouble(MAX_HEALTH_KEY, maxHealth)
         if (part.type == VehiclePartTypes.WHEEL && next / maxHealth <= WHEEL_POP_FRACTION) {
@@ -562,19 +598,34 @@ object VehicleDamage {
         return vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId }?.type == VehiclePartTypes.WHEEL
     }
 
+    private fun isDamageablePart(part: VehiclePartDefinition): Boolean {
+        return part.type == VehiclePartTypes.BODY ||
+            part.type == VehiclePartTypes.ENGINE ||
+            part.type == VehiclePartTypes.WHEEL
+    }
+
+    private fun damageScale(level: ServerLevel, vehicle: IVehicle): Double {
+        return if (RaceManager.isVehicleInActiveRace(level, vehicle.bodyId)) ACTIVE_RACE_DAMAGE_SCALE else 1.0
+    }
+
     private fun maxHealth(state: CompoundTag, part: VehiclePartDefinition): Double {
-        return state.getDouble(MAX_HEALTH_KEY)
+        val storedMax = state.getDouble(MAX_HEALTH_KEY)
             .takeIf { it.isFinite() && it > 0.0 }
-            ?: part.defaultState.getDouble(MAX_HEALTH_KEY).takeIf { it.isFinite() && it > 0.0 }
-            ?: defaultMaxHealth(part.type)
+        val definitionMax = part.defaultState.getDouble(MAX_HEALTH_KEY).takeIf { it.isFinite() && it > 0.0 }
+        val currentBaseMax = defaultMaxHealth(part.type)
+        return max(storedMax ?: 0.0, max(definitionMax ?: 0.0, currentBaseMax))
     }
 
     private fun health(state: CompoundTag, part: VehiclePartDefinition): Double {
         val maxHealth = maxHealth(state, part)
-        return state.getDouble(HEALTH_KEY)
-            .takeIf { it.isFinite() }
-            ?.coerceIn(0.0, maxHealth)
-            ?: maxHealth
+        val storedHealth = state.getDouble(HEALTH_KEY).takeIf { it.isFinite() } ?: return maxHealth
+        val storedMax = state.getDouble(MAX_HEALTH_KEY).takeIf { it.isFinite() && it > 0.0 }
+        val scaledHealth = if (storedMax != null && storedMax < maxHealth) {
+            storedHealth.coerceIn(0.0, storedMax) / storedMax * maxHealth
+        } else {
+            storedHealth
+        }
+        return scaledHealth.coerceIn(0.0, maxHealth)
     }
 
     private fun defaultMaxHealth(type: net.minecraft.resources.ResourceLocation): Double {

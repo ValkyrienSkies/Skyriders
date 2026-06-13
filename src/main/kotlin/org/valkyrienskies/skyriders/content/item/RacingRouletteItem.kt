@@ -92,6 +92,7 @@ class RacingRouletteItem(properties: Properties) : Item(properties) {
                 SkyridersMod.HONEY_CANISTER.get(),
                 SkyridersMod.ROYAL_JELLY_CANISTER.get(),
                 SkyridersMod.HONEY_TANK.get(),
+                SkyridersMod.REPAIR_PAK.get(),
                 SkyridersMod.CAVENDISH.get(),
                 SkyridersMod.FAKE_ITEM_BOX.get(),
                 SkyridersMod.SUGAR_ROCKET.get(),
