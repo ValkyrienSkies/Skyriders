@@ -20,6 +20,7 @@ import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehiclePartTypes
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
+import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.exp
 import kotlin.math.max
@@ -50,6 +51,10 @@ object VehicleHudOverlay {
     private const val CRITICAL_CRT_SPARK_INTERVAL_MILLIS = 115L
     private const val CRITICAL_DASHBOARD_SMOKE_INTERVAL_MILLIS = 125L
     private const val BROKEN_ENGINE_DASHBOARD_SMOKE_INTERVAL_MILLIS = 420L
+    private const val DAMAGE_CRT_LINGER_MILLIS = 3500L
+    private const val DAMAGE_CRT_HIDDEN_MARGIN = 8
+    private const val DAMAGE_CRT_SHOW_RESPONSE = 22.0
+    private const val DAMAGE_CRT_HIDE_RESPONSE = 9.5
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
     private val METER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/meter_round.png")
@@ -181,6 +186,8 @@ object VehicleHudOverlay {
     private var lastWarningBeepCycle = Long.MIN_VALUE
     private var previousParticleBodyId: Long? = null
     private var previousDamageHealth = Double.NaN
+    private var damageCrtVisibility = 0.0
+    private var damageCrtVisibleUntilMillis = 0L
     private var lastCriticalSparkMillis = 0L
     private var lastCriticalSmokeMillis = 0L
     private val hudParticles = ArrayList<HudParticle>()
@@ -226,13 +233,24 @@ object VehicleHudOverlay {
         val vehicle = level?.let { VehicleManager.getVehicle(it, current.bodyId) }
         val criticalFailure = vehicle?.let(VehicleDamage::isCriticalFailure) == true
         val renderMillis = System.currentTimeMillis()
-        val crtOrigin = damageCrtOrigin(screenHeight, criticalFailure)
+        val baseCrtOrigin = damageCrtOrigin(screenHeight, criticalFailure)
+        val damageHealthChange = updateDamageCrtVisibility(
+            current = current,
+            vehicle = vehicle,
+            criticalFailure = criticalFailure,
+            repairPakHeld = holdingRepairPak(player),
+            now = renderMillis,
+            dt = dt
+        )
+        val crtOrigin = animatedDamageCrtOrigin(baseCrtOrigin, screenHeight)
         val dashboardOrigin = dashboardOrigin(screenHeight, criticalFailure)
         updateCriticalHudSounds(minecraft, current.bodyId, criticalFailure, renderMillis)
-        updateHudParticleEmitters(current, vehicle, criticalFailure, renderMillis, dt, crtOrigin, dashboardOrigin)
+        updateHudParticleEmitters(vehicle, criticalFailure, renderMillis, dt, baseCrtOrigin, crtOrigin, dashboardOrigin, damageHealthChange)
 
         renderHudParticles(guiGraphics, HudParticleType.SPARK)
-        renderDamageCrt(guiGraphics, current, vehicle, criticalFailure, renderMillis, crtOrigin)
+        if (damageCrtVisibility > 0.01 || criticalFailure) {
+            renderDamageCrt(guiGraphics, current, vehicle, criticalFailure, renderMillis, crtOrigin)
+        }
         renderDashboard(guiGraphics, current, dt, fuelSlosh, dashboardOrigin)
         renderHudParticles(guiGraphics, HudParticleType.SMOKE)
         renderMeters(guiGraphics, screenWidth, screenHeight, current, dt, criticalFailure)
@@ -312,33 +330,66 @@ object VehicleHudOverlay {
         guiGraphics.fill(left, top + barHeight + gap, left + block, top + barHeight + gap + block, CRITICAL_WARNING_COLOR)
     }
 
+    private fun updateDamageCrtVisibility(
+        current: VehicleHudSnapshot,
+        vehicle: IVehicle?,
+        criticalFailure: Boolean,
+        repairPakHeld: Boolean,
+        now: Long,
+        dt: Double
+    ): DamageHealthChange {
+        if (vehicle == null) {
+            previousParticleBodyId = null
+            previousDamageHealth = Double.NaN
+            damageCrtVisibleUntilMillis = 0L
+            damageCrtVisibility = approach(damageCrtVisibility, 0.0, dt, DAMAGE_CRT_HIDE_RESPONSE)
+            return DamageHealthChange.NONE
+        }
+
+        val health = damageHealthSignature(vehicle)
+        var changed = false
+        var decreased = false
+        if (previousParticleBodyId != current.bodyId) {
+            previousParticleBodyId = current.bodyId
+            previousDamageHealth = health
+            lastCriticalSparkMillis = 0L
+            lastCriticalSmokeMillis = 0L
+        } else if (health.isFinite() && previousDamageHealth.isFinite() && abs(health - previousDamageHealth) > 0.002) {
+            changed = true
+            decreased = health < previousDamageHealth
+            previousDamageHealth = health
+            damageCrtVisibleUntilMillis = now + DAMAGE_CRT_LINGER_MILLIS
+        } else if (health.isFinite() && (!previousDamageHealth.isFinite() || health > previousDamageHealth)) {
+            previousDamageHealth = health
+        }
+
+        if (criticalFailure || repairPakHeld) {
+            damageCrtVisibleUntilMillis = now + DAMAGE_CRT_LINGER_MILLIS
+        }
+
+        val target = if (criticalFailure || repairPakHeld || now <= damageCrtVisibleUntilMillis) 1.0 else 0.0
+        val response = if (target > damageCrtVisibility) DAMAGE_CRT_SHOW_RESPONSE else DAMAGE_CRT_HIDE_RESPONSE
+        damageCrtVisibility = approach(damageCrtVisibility, target, dt, response)
+        return DamageHealthChange(changed = changed, decreased = decreased)
+    }
+
     private fun updateHudParticleEmitters(
-        snapshot: VehicleHudSnapshot,
         vehicle: IVehicle?,
         criticalFailure: Boolean,
         now: Long,
         dt: Double,
+        baseCrtOrigin: HudPoint,
         crtOrigin: HudPoint,
-        dashboardOrigin: HudPoint
+        dashboardOrigin: HudPoint,
+        damageHealthChange: DamageHealthChange
     ) {
         updateHudParticles(dt)
         if (vehicle == null) {
-            previousParticleBodyId = null
-            previousDamageHealth = Double.NaN
             return
         }
 
-        val health = damageHealthSignature(vehicle)
-        if (previousParticleBodyId != snapshot.bodyId) {
-            previousParticleBodyId = snapshot.bodyId
-            previousDamageHealth = health
-            lastCriticalSparkMillis = 0L
-            lastCriticalSmokeMillis = 0L
-        } else if (health < previousDamageHealth - 0.002) {
-            spawnCrtSparks(crtOrigin, count = 14, force = 1.0)
-            previousDamageHealth = health
-        } else if (health > previousDamageHealth || previousDamageHealth.isNaN()) {
-            previousDamageHealth = health
+        if (damageHealthChange.decreased) {
+            spawnCrtSparks(baseCrtOrigin, count = 14, force = 1.0)
         }
 
         if (criticalFailure && now - lastCriticalSparkMillis >= CRITICAL_CRT_SPARK_INTERVAL_MILLIS) {
@@ -596,12 +647,38 @@ object VehicleHudOverlay {
         return HudPoint(shake.x, screenHeight - DASHBOARD_BASE.height + shake.y)
     }
 
+    private fun animatedDamageCrtOrigin(baseOrigin: HudPoint, screenHeight: Int): HudPoint {
+        val hiddenY = screenHeight + DAMAGE_CRT_HIDDEN_MARGIN
+        val eased = easeOutCubic(damageCrtVisibility)
+        return HudPoint(
+            baseOrigin.x,
+            (hiddenY + (baseOrigin.y - hiddenY) * eased).roundToInt()
+        )
+    }
+
     private fun damageCrtOrigin(screenHeight: Int, criticalFailure: Boolean): HudPoint {
         val shake = criticalTremble(criticalFailure, 2.2, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.FREE)
         return HudPoint(
             shake.x,
             screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP + shake.y
         )
+    }
+
+    private fun holdingRepairPak(player: net.minecraft.world.entity.player.Player): Boolean {
+        val repairPak = SkyridersMod.REPAIR_PAK.get()
+        return player.mainHandItem.item == repairPak || player.offhandItem.item == repairPak
+    }
+
+    private fun approach(current: Double, target: Double, dt: Double, response: Double): Double {
+        val safeDt = dt.coerceIn(0.0, 0.1)
+        val alpha = 1.0 - exp(-response * safeDt)
+        return current + (target - current) * alpha
+    }
+
+    private fun easeOutCubic(value: Double): Double {
+        val t = value.coerceIn(0.0, 1.0)
+        val inverse = 1.0 - t
+        return 1.0 - inverse * inverse * inverse
     }
 
     private fun damageHudColor(healthFraction: Double): Int {
@@ -687,6 +764,8 @@ object VehicleHudOverlay {
         lastWarningBeepCycle = Long.MIN_VALUE
         previousParticleBodyId = null
         previousDamageHealth = Double.NaN
+        damageCrtVisibility = 0.0
+        damageCrtVisibleUntilMillis = 0L
         lastCriticalSparkMillis = 0L
         lastCriticalSmokeMillis = 0L
         hudParticles.clear()
@@ -1096,6 +1175,15 @@ object VehicleHudOverlay {
         val alpha: Double,
         val drag: Double
     )
+
+    private data class DamageHealthChange(
+        val changed: Boolean,
+        val decreased: Boolean
+    ) {
+        companion object {
+            val NONE = DamageHealthChange(changed = false, decreased = false)
+        }
+    }
 
     private enum class EdgeShake {
         NONE,
