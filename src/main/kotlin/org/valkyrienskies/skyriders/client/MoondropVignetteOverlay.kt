@@ -15,7 +15,8 @@ object MoondropVignetteOverlay {
         val player = minecraft.player ?: return
         val seat = player.vehicle as? BikeSeatEntity ?: return
         val vehicle = VehicleManager.getVehicle(player.level().dimensionId, seat.bodyId) ?: return
-        if (!VehicleStatusEffects.isMoondropActive(vehicle)) return
+        val intensity = VehicleStatusEffects.moondropVisualIntensity(vehicle).coerceIn(0.0, 1.0)
+        if (intensity <= 0.0) return
 
         val layers = 9
         val maxInset = (minOf(screenWidth, screenHeight) * 0.16).roundToInt().coerceAtLeast(layers)
@@ -24,7 +25,7 @@ object MoondropVignetteOverlay {
         for (layer in 0 until layers) {
             val inset = layer * layerSize
             val nextInset = ((layer + 1) * layerSize).coerceAtMost(maxInset)
-            val alpha = ((1.0 - layer.toDouble() / layers.toDouble()) * MAX_ALPHA).roundToInt().coerceIn(0, 255)
+            val alpha = ((1.0 - layer.toDouble() / layers.toDouble()) * MAX_ALPHA * intensity).roundToInt().coerceIn(0, 255)
             if (alpha <= 0) continue
 
             val topColor = colorInt(pastelRainbow(phase + layer * 0.035), alpha)

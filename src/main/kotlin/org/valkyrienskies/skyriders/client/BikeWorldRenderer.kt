@@ -121,7 +121,7 @@ object BikeWorldRenderer {
         val model = minecraft.modelManager.getModel(render.model)
             .takeUnless { it === missingModel }
         val visualState = updateRenderVisualState(vehicle)
-        val moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
+        val moondropIntensity = VehicleStatusEffects.moondropVisualIntensity(vehicle)
         val moondropPhase = System.nanoTime() / 1_000_000_000.0 * MOONDROP_OVERLAY_SCROLL_SPEED
 
         val packedLight = LevelRenderer.getLightColor(
@@ -163,13 +163,14 @@ object BikeWorldRenderer {
             modelScale = render.modelScale,
             modelYawRad = render.modelYawRad
         )
-        if (moondropActive) {
+        if (moondropIntensity > 0.0) {
             VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
                 modelLocation = render.model,
                 poseStack = poseStack,
                 bufferSource = bufferSource,
                 packedLight = packedLight,
-                phase = moondropPhase
+                phase = moondropPhase,
+                intensity = moondropIntensity
             )
         }
 
@@ -184,7 +185,7 @@ object BikeWorldRenderer {
                 model = partModel,
                 visualState = visualState,
                 packedLight = packedLight,
-                moondropActive = moondropActive,
+                moondropIntensity = moondropIntensity,
                 moondropPhase = moondropPhase
             )
         }
@@ -226,7 +227,7 @@ object BikeWorldRenderer {
                 },
                 packedLight = packedLight,
                 damageFraction = damagePartId?.let { VehicleDamage.damageFraction(vehicle, it) } ?: 0.0,
-                moondropActive = moondropActive,
+                moondropIntensity = moondropIntensity,
                 moondropPhase = moondropPhase
             )
         }
@@ -242,7 +243,7 @@ object BikeWorldRenderer {
         model: BakedModel?,
         visualState: RenderVisualState,
         packedLight: Int,
-        moondropActive: Boolean,
+        moondropIntensity: Double,
         moondropPhase: Double
     ) {
         val openAmount = modelPartOpenAmount(vehicle, modelPart, visualState)
@@ -279,13 +280,14 @@ object BikeWorldRenderer {
                 )
             }
         }
-        if (moondropActive) {
+        if (moondropIntensity > 0.0) {
             VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
                 modelLocation = modelPart.model,
                 poseStack = poseStack,
                 bufferSource = bufferSource,
                 packedLight = packedLight,
-                phase = moondropPhase
+                phase = moondropPhase,
+                intensity = moondropIntensity
             )
         }
         poseStack.popPose()
@@ -523,7 +525,7 @@ object BikeWorldRenderer {
         suspensionOffset: Double,
         packedLight: Int,
         damageFraction: Double,
-        moondropActive: Boolean,
+        moondropIntensity: Double,
         moondropPhase: Double
     ) {
         poseStack.pushPose()
@@ -551,13 +553,14 @@ object BikeWorldRenderer {
             packedLight = packedLight,
             damageFraction = damageFraction
         )
-        if (moondropActive) {
+        if (moondropIntensity > 0.0) {
             VehicleOpenModelRenderer.renderRainbowOverlayIfNeeded(
                 modelLocation = modelLocation,
                 poseStack = poseStack,
                 bufferSource = bufferSource,
                 packedLight = packedLight,
-                phase = moondropPhase
+                phase = moondropPhase,
+                intensity = moondropIntensity
             )
         }
         poseStack.popPose()

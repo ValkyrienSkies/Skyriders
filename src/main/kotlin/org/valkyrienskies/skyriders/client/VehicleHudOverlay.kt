@@ -319,7 +319,7 @@ object VehicleHudOverlay {
             screenContentHeight,
             damageParts,
             sideView = vehicle is IBike,
-            moondropActive = VehicleStatusEffects.isMoondropActive(vehicle),
+            moondropIntensity = VehicleStatusEffects.moondropVisualIntensity(vehicle),
             renderMillis = renderMillis
         )
         if (criticalFailure) {
@@ -552,7 +552,7 @@ object VehicleHudOverlay {
         screenHeight: Int,
         parts: List<DamageHudPart>,
         sideView: Boolean,
-        moondropActive: Boolean,
+        moondropIntensity: Double,
         renderMillis: Long
     ) {
         val minX = parts.minOf { if (sideView) it.centerZ - it.sizeZ * 0.5 else it.centerX - it.sizeX * 0.5 }
@@ -590,10 +590,15 @@ object VehicleHudOverlay {
             val drawTop = top.coerceAtMost(bottom - minWidth)
             val drawRight = right.coerceAtLeast(drawLeft + minWidth)
             val drawBottom = bottom.coerceAtLeast(drawTop + minWidth)
-            val color = if (moondropActive) {
-                moondropDamageHudColor(renderMillis, part.drawOrder, part.centerX + part.centerY + part.centerZ)
+            val baseColor = damageHudColor(part.healthFraction)
+            val color = if (moondropIntensity > 0.0) {
+                lerpColor(
+                    baseColor,
+                    moondropDamageHudColor(renderMillis, part.drawOrder, part.centerX + part.centerY + part.centerZ),
+                    moondropIntensity
+                )
             } else {
-                damageHudColor(part.healthFraction)
+                baseColor
             }
             val fillAlpha = if (part.type == VehiclePartTypes.BODY) 0x76000000 else 0xB8000000.toInt()
             val fillColor = (color and 0x00FFFFFF) or fillAlpha

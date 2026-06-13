@@ -45,6 +45,7 @@ object VehicleStatusEffects {
     private const val MOONDROP_REPAIR_FRACTION = 0.04
     private const val MOONDROP_TRAIL_INTERVAL_TICKS = 2L
     private const val MOONDROP_TRAIL_MIN_SPEED = 0.45
+    private const val MOONDROP_VISUAL_FADE_MILLIS = 1800L
 
     private val WORLD_UP = Vector3d(0.0, 1.0, 0.0)
     private val LOCAL_FORWARD = Vector3d(0.0, 0.0, 1.0)
@@ -164,7 +165,7 @@ object VehicleStatusEffects {
 
     fun isMoondropActive(vehicle: IVehicle): Boolean {
         val state = states[key(vehicle)] ?: return false
-        return state.moondropTimeRemaining > 0.0 || (vehicle.level.isClientSide && state.moondropVisualActive)
+        return state.moondropTimeRemaining > 0.0 || (vehicle.level.isClientSide && state.moondropVisualIntensity() > 0.0)
     }
 
     fun isMoondropActive(dimensionId: DimensionId, bodyId: BodyId): Boolean {
@@ -179,10 +180,29 @@ object VehicleStatusEffects {
     fun setClientMoondropVisual(dimensionId: DimensionId, bodyId: BodyId, active: Boolean) {
         val key = VehicleKey(dimensionId, bodyId)
         val state = states.getOrPut(key) { RuntimeState() }
-        state.moondropVisualActive = active
+        val now = System.currentTimeMillis()
+        if (active) {
+            state.moondropVisualActive = true
+            state.moondropVisualFadeStartedMillis = 0L
+            state.moondropVisualFadeUntilMillis = 0L
+        } else if (state.moondropVisualActive || state.moondropVisualIntensity(now) > 0.0) {
+            state.moondropVisualActive = false
+            state.moondropVisualFadeStartedMillis = now
+            state.moondropVisualFadeUntilMillis = now + MOONDROP_VISUAL_FADE_MILLIS
+        } else {
+            state.moondropVisualActive = false
+            state.moondropVisualFadeStartedMillis = 0L
+            state.moondropVisualFadeUntilMillis = 0L
+        }
         if (!active && state.isIdle()) {
             states.remove(key, state)
         }
+    }
+
+    fun moondropVisualIntensity(vehicle: IVehicle): Double {
+        val state = states[key(vehicle)] ?: return 0.0
+        if (!vehicle.level.isClientSide) return if (state.moondropTimeRemaining > 0.0) 1.0 else 0.0
+        return state.moondropVisualIntensity()
     }
 
     fun tractionScale(dimensionId: DimensionId, bodyId: BodyId): Double {
@@ -473,8 +493,19 @@ object VehicleStatusEffects {
         var moondropDuration: Double = 0.0
         var moondropEndGameTick: Long = Long.MIN_VALUE
         var moondropVisualActive: Boolean = false
+        var moondropVisualFadeStartedMillis: Long = 0L
+        var moondropVisualFadeUntilMillis: Long = 0L
         var moondropLastRepairTick: Long = Long.MIN_VALUE / 4
         var moondropLastTrailTick: Long = Long.MIN_VALUE / 4
+
+        fun moondropVisualIntensity(now: Long = System.currentTimeMillis()): Double {
+            if (moondropVisualActive) return 1.0
+            val fadeUntil = moondropVisualFadeUntilMillis
+            if (fadeUntil <= 0L || now >= fadeUntil) return 0.0
+            val fadeStart = moondropVisualFadeStartedMillis
+            val duration = (fadeUntil - fadeStart).coerceAtLeast(1L)
+            return ((fadeUntil - now).toDouble() / duration.toDouble()).coerceIn(0.0, 1.0)
+        }
 
         fun isIdle(): Boolean {
             return spinOutTimeRemaining <= 0.0 &&
@@ -483,7 +514,8 @@ object VehicleStatusEffects {
                 pullTimeRemaining <= 0.0 &&
                 carryTimeRemaining <= 0.0 &&
                 slipperyTimeRemaining <= 0.0 &&
-                moondropTimeRemaining <= 0.0
+                moondropTimeRemaining <= 0.0 &&
+                moondropVisualIntensity() <= 0.0
         }
     }
 }

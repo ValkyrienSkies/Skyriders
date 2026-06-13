@@ -112,8 +112,11 @@ object VehicleOpenModelRenderer {
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
         packedLight: Int,
-        phase: Double
+        phase: Double,
+        intensity: Double
     ): Boolean {
+        val alphaScale = intensity.coerceIn(0.0, 1.0).toFloat()
+        if (alphaScale <= 0.0f) return false
         val model = getModel(modelLocation) ?: return false
         val minecraft = Minecraft.getInstance()
         val spriteLookup = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
@@ -121,7 +124,7 @@ object VehicleOpenModelRenderer {
         val pose = poseStack.last()
         model.faces.forEach { face ->
             val sprite = spriteLookup.apply(face.texture)
-            renderRainbowFace(face, sprite, consumer, pose, packedLight, phase)
+            renderRainbowFace(face, sprite, consumer, pose, packedLight, phase, alphaScale)
         }
         return model.faces.isNotEmpty()
     }
@@ -205,7 +208,8 @@ object VehicleOpenModelRenderer {
         consumer: com.mojang.blaze3d.vertex.VertexConsumer,
         pose: PoseStack.Pose,
         packedLight: Int,
-        phase: Double
+        phase: Double,
+        alphaScale: Float
     ) {
         for (i in 0 until 4) {
             val vertex = face.vertices[i]
@@ -225,7 +229,7 @@ object VehicleOpenModelRenderer {
                 (vertex.y() + offsetY) / 16.0f,
                 (vertex.z() + offsetZ) / 16.0f
             )
-                .color(color.x(), color.y(), color.z(), RAINBOW_OVERLAY_ALPHA)
+                .color(color.x(), color.y(), color.z(), RAINBOW_OVERLAY_ALPHA * alphaScale)
                 .uv(sprite.getU(uv.x.toDouble()), sprite.getV(uv.y.toDouble()))
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(LightTexture.FULL_BRIGHT)
