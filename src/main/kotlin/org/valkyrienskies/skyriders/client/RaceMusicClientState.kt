@@ -92,7 +92,7 @@ object RaceMusicClientState {
             looping = true
             attenuation = SoundInstance.Attenuation.NONE
             relative = true
-            volume = MIN_START_VOLUME
+            volume = 1.0f
             pitch = 1.0f
         }
 

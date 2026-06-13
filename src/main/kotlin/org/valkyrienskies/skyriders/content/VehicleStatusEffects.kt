@@ -164,12 +164,12 @@ object VehicleStatusEffects {
 
     fun isMoondropActive(vehicle: IVehicle): Boolean {
         val state = states[key(vehicle)] ?: return false
-        return state.moondropTimeRemaining > 0.0 || state.moondropVisualActive
+        return state.moondropTimeRemaining > 0.0 || (vehicle.level.isClientSide && state.moondropVisualActive)
     }
 
     fun isMoondropActive(dimensionId: DimensionId, bodyId: BodyId): Boolean {
         val state = states[VehicleKey(dimensionId, bodyId)] ?: return false
-        return state.moondropTimeRemaining > 0.0 || state.moondropVisualActive
+        return state.moondropTimeRemaining > 0.0
     }
 
     fun topSpeedMultiplier(dimensionId: DimensionId, bodyId: BodyId): Double {
@@ -483,8 +483,7 @@ object VehicleStatusEffects {
                 pullTimeRemaining <= 0.0 &&
                 carryTimeRemaining <= 0.0 &&
                 slipperyTimeRemaining <= 0.0 &&
-                moondropTimeRemaining <= 0.0 &&
-                !moondropVisualActive
+                moondropTimeRemaining <= 0.0
         }
     }
 }

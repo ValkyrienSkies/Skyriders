@@ -585,7 +585,7 @@ object VehicleOpenModelRenderer {
     const val MIN_CRACK_DAMAGE_FRACTION = 0.08
     private const val ZONE_MATCH_PADDING = 0.05
     private const val CRACK_SURFACE_OFFSET_MODEL_UNITS = 0.035f
-    private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.075f
-    private const val RAINBOW_OVERLAY_ALPHA = 0.74f
+    private const val RAINBOW_SURFACE_OFFSET_MODEL_UNITS = 0.14f
+    private const val RAINBOW_OVERLAY_ALPHA = 0.9f
     private const val CRACK_TEXTURE_MODEL_UNITS = 16.0f
 }
