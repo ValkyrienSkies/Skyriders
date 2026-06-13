@@ -24,6 +24,7 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import java.util.concurrent.ThreadLocalRandom
 
 object VehicleHudOverlay {
     private const val STALE_AFTER_MILLIS = 750L
@@ -44,6 +45,10 @@ object VehicleHudOverlay {
     private const val CRITICAL_WARNING_COLOR = 0xB8B54CFF.toInt()
     private const val CRITICAL_TREMBLE_PIXELS = 3
     private const val CRITICAL_WARNING_FLASH_MILLIS = 85L
+    private const val HUD_PARTICLE_MAX_COUNT = 160
+    private const val CRITICAL_CRT_SPARK_INTERVAL_MILLIS = 115L
+    private const val CRITICAL_DASHBOARD_SMOKE_INTERVAL_MILLIS = 125L
+    private const val BROKEN_ENGINE_DASHBOARD_SMOKE_INTERVAL_MILLIS = 420L
 
     private val DASHBOARD_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/dashboard.png")
     private val METER_TEXTURE = ResourceLocation(SkyridersMod.MOD_ID, "textures/gui/meter_round.png")
@@ -173,6 +178,11 @@ object VehicleHudOverlay {
     private var previousCriticalBodyId: Long? = null
     private var previousCriticalFailure = false
     private var lastWarningBeepCycle = Long.MIN_VALUE
+    private var previousParticleBodyId: Long? = null
+    private var previousDamageHealth = Double.NaN
+    private var lastCriticalSparkMillis = 0L
+    private var lastCriticalSmokeMillis = 0L
+    private val hudParticles = ArrayList<HudParticle>()
     private val visualMeterValues = HashMap<String, Double>()
 
     fun updateVehicle(packet: SkyridersNetwork.VehicleTelemetryPacket) {
@@ -215,26 +225,28 @@ object VehicleHudOverlay {
         val vehicle = level?.let { VehicleManager.getVehicle(it, current.bodyId) }
         val criticalFailure = vehicle?.let(VehicleDamage::isCriticalFailure) == true
         val renderMillis = System.currentTimeMillis()
+        val crtOrigin = damageCrtOrigin(screenHeight, criticalFailure)
+        val dashboardOrigin = dashboardOrigin(screenHeight, criticalFailure)
         updateCriticalHudSounds(minecraft, current.bodyId, criticalFailure, renderMillis)
+        updateHudParticleEmitters(current, vehicle, criticalFailure, renderMillis, dt, crtOrigin, dashboardOrigin)
 
-        renderDamageCrt(guiGraphics, screenHeight, current, vehicle, criticalFailure, renderMillis)
-        renderDashboard(guiGraphics, screenWidth, screenHeight, current, dt, fuelSlosh, criticalFailure)
+        renderHudParticles(guiGraphics, HudParticleType.SPARK)
+        renderDamageCrt(guiGraphics, current, vehicle, criticalFailure, renderMillis, crtOrigin)
+        renderDashboard(guiGraphics, current, dt, fuelSlosh, dashboardOrigin)
+        renderHudParticles(guiGraphics, HudParticleType.SMOKE)
         renderMeters(guiGraphics, screenWidth, screenHeight, current, dt, criticalFailure)
         renderRacePlacement(guiGraphics, screenWidth, current)
     }
 
     private fun renderDashboard(
         guiGraphics: GuiGraphics,
-        screenWidth: Int,
-        screenHeight: Int,
         snapshot: VehicleHudSnapshot,
         dt: Double,
         fuelSlosh: FuelSloshState,
-        criticalFailure: Boolean
+        origin: HudPoint
     ) {
-        val shake = criticalTremble(criticalFailure, 0.15, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.OUT_POSITIVE)
-        val x = shake.x
-        val y = screenHeight - DASHBOARD_BASE.height + shake.y
+        val x = origin.x
+        val y = origin.y
         val steeringDegrees = updateVisualSteeringDegrees(snapshot.steer, dt)
         drawFuelTank(guiGraphics, x + 117, y + 8, 44, 22, snapshot.fuel, fuelSlosh)
         guiGraphics.blitRegion(DASHBOARD_TEXTURE, DASHBOARD_BASE, x, y, DASHBOARD_TEXTURE_WIDTH, DASHBOARD_TEXTURE_HEIGHT)
@@ -259,15 +271,14 @@ object VehicleHudOverlay {
 
     private fun renderDamageCrt(
         guiGraphics: GuiGraphics,
-        screenHeight: Int,
         snapshot: VehicleHudSnapshot,
         vehicle: IVehicle?,
         criticalFailure: Boolean,
-        renderMillis: Long
+        renderMillis: Long,
+        origin: HudPoint
     ) {
-        val shake = criticalTremble(criticalFailure, 2.2, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.FREE)
-        val x = shake.x
-        val y = screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP + shake.y
+        val x = origin.x
+        val y = origin.y
         guiGraphics.blitRegion(MINI_CRT_TEXTURE, MINI_CRT_BASE, x, y, MINI_CRT_TEXTURE_WIDTH, MINI_CRT_TEXTURE_HEIGHT)
 
         val screenX = x + MINI_CRT_SCREEN_X
@@ -298,6 +309,182 @@ object VehicleHudOverlay {
         val top = centerY - barHeight / 2 - gap
         guiGraphics.fill(left, top, left + block, top + barHeight, CRITICAL_WARNING_COLOR)
         guiGraphics.fill(left, top + barHeight + gap, left + block, top + barHeight + gap + block, CRITICAL_WARNING_COLOR)
+    }
+
+    private fun updateHudParticleEmitters(
+        snapshot: VehicleHudSnapshot,
+        vehicle: IVehicle?,
+        criticalFailure: Boolean,
+        now: Long,
+        dt: Double,
+        crtOrigin: HudPoint,
+        dashboardOrigin: HudPoint
+    ) {
+        updateHudParticles(dt)
+        if (vehicle == null) {
+            previousParticleBodyId = null
+            previousDamageHealth = Double.NaN
+            return
+        }
+
+        val health = damageHealthSignature(vehicle)
+        if (previousParticleBodyId != snapshot.bodyId) {
+            previousParticleBodyId = snapshot.bodyId
+            previousDamageHealth = health
+            lastCriticalSparkMillis = 0L
+            lastCriticalSmokeMillis = 0L
+        } else if (health < previousDamageHealth - 0.002) {
+            spawnCrtSparks(crtOrigin, count = 14, force = 1.0)
+            previousDamageHealth = health
+        } else if (health > previousDamageHealth || previousDamageHealth.isNaN()) {
+            previousDamageHealth = health
+        }
+
+        if (criticalFailure && now - lastCriticalSparkMillis >= CRITICAL_CRT_SPARK_INTERVAL_MILLIS) {
+            spawnCrtSparks(crtOrigin, count = 4, force = 0.72)
+            lastCriticalSparkMillis = now
+        }
+        val engineBroken = VehicleDamage.healthFraction(vehicle, VehicleDamage.ENGINE_PART_ID) <= 0.0
+        val smokeInterval = if (criticalFailure) {
+            CRITICAL_DASHBOARD_SMOKE_INTERVAL_MILLIS
+        } else {
+            BROKEN_ENGINE_DASHBOARD_SMOKE_INTERVAL_MILLIS
+        }
+        if (engineBroken && now - lastCriticalSmokeMillis >= smokeInterval) {
+            spawnDashboardSmoke(dashboardOrigin, critical = criticalFailure)
+            lastCriticalSmokeMillis = now
+        }
+    }
+
+    private fun updateHudParticles(dt: Double) {
+        val safeDt = dt.coerceIn(0.0, 0.1)
+        val iterator = hudParticles.iterator()
+        while (iterator.hasNext()) {
+            val particle = iterator.next()
+            particle.age += safeDt
+            if (particle.age >= particle.lifetime) {
+                iterator.remove()
+                continue
+            }
+            particle.x += particle.vx * safeDt
+            particle.y += particle.vy * safeDt
+            particle.vx *= particle.drag
+            particle.vy *= particle.drag
+            if (particle.type == HudParticleType.SPARK) {
+                particle.vy += 32.0 * safeDt
+            }
+        }
+    }
+
+    private fun renderHudParticles(guiGraphics: GuiGraphics, type: HudParticleType) {
+        hudParticles.forEach { particle ->
+            if (particle.type != type) return@forEach
+            val t = (particle.age / particle.lifetime).coerceIn(0.0, 1.0)
+            val alpha = (particle.alpha * (1.0 - t) * 255.0).roundToInt().coerceIn(0, 255)
+            if (alpha <= 0) return@forEach
+            val size = (particle.size + particle.grow * t).roundToInt().coerceAtLeast(1)
+            val color = (alpha shl 24) or (particle.color and 0x00FFFFFF)
+            val x = particle.x.roundToInt()
+            val y = particle.y.roundToInt()
+            if (particle.type == HudParticleType.SPARK) {
+                guiGraphics.fill(x, y, x + size + 1, y + size, color)
+                if (size <= 2) {
+                    guiGraphics.fill(x + 1, y - 1, x + 2, y + size + 1, color)
+                }
+            } else {
+                guiGraphics.fill(x, y, x + size, y + size, color)
+                if (size > 2) {
+                    val softColor = ((alpha * 0.45).roundToInt().coerceIn(0, 255) shl 24) or (particle.color and 0x00FFFFFF)
+                    guiGraphics.fill(x + 1, y - 1, x + size - 1, y + size + 1, softColor)
+                }
+            }
+        }
+    }
+
+    private fun spawnCrtSparks(origin: HudPoint, count: Int, force: Double) {
+        val random = ThreadLocalRandom.current()
+        val screenX = origin.x + MINI_CRT_SCREEN_X
+        val screenY = origin.y + MINI_CRT_SCREEN_Y
+        val screenWidth = MINI_CRT_SCREEN_RIGHT - MINI_CRT_SCREEN_X + 1
+        val screenHeight = MINI_CRT_SCREEN_BOTTOM - MINI_CRT_SCREEN_Y + 1
+        repeat(count) {
+            val edge = random.nextInt(4)
+            val spawnX: Double
+            val spawnY: Double
+            val velocityX: Double
+            val velocityY: Double
+            when (edge) {
+                0 -> {
+                    spawnX = screenX + random.nextDouble(2.0, screenWidth - 2.0)
+                    spawnY = screenY + random.nextDouble(0.0, 3.0)
+                    velocityX = random.nextDouble(-24.0, 24.0)
+                    velocityY = random.nextDouble(-92.0, -32.0)
+                }
+                1 -> {
+                    spawnX = screenX + screenWidth - random.nextDouble(0.0, 3.0)
+                    spawnY = screenY + random.nextDouble(2.0, screenHeight - 2.0)
+                    velocityX = random.nextDouble(42.0, 94.0)
+                    velocityY = random.nextDouble(-46.0, 20.0)
+                }
+                2 -> {
+                    spawnX = screenX + random.nextDouble(2.0, screenWidth - 2.0)
+                    spawnY = screenY + screenHeight - random.nextDouble(0.0, 3.0)
+                    velocityX = random.nextDouble(-26.0, 26.0)
+                    velocityY = random.nextDouble(24.0, 74.0)
+                }
+                else -> {
+                    spawnX = screenX + random.nextDouble(0.0, 3.0)
+                    spawnY = screenY + random.nextDouble(2.0, screenHeight - 2.0)
+                    velocityX = random.nextDouble(-94.0, -42.0)
+                    velocityY = random.nextDouble(-46.0, 20.0)
+                }
+            }
+            val color = if (random.nextBoolean()) 0xFFFFEA62.toInt() else 0xFFFFB000.toInt()
+            addHudParticle(
+                HudParticle(
+                    type = HudParticleType.SPARK,
+                    x = spawnX,
+                    y = spawnY,
+                    vx = velocityX * force,
+                    vy = velocityY * force,
+                    lifetime = random.nextDouble(0.16, 0.36),
+                    size = random.nextDouble(1.0, 2.2),
+                    grow = 0.0,
+                    color = color,
+                    alpha = random.nextDouble(0.72, 1.0),
+                    drag = 0.82
+                )
+            )
+        }
+    }
+
+    private fun spawnDashboardSmoke(origin: HudPoint, critical: Boolean) {
+        val random = ThreadLocalRandom.current()
+        val count = if (critical) 3 else 1
+        repeat(count) {
+            addHudParticle(
+                HudParticle(
+                    type = HudParticleType.SMOKE,
+                    x = origin.x + random.nextDouble(34.0, 158.0),
+                    y = origin.y + random.nextDouble(4.0, 20.0),
+                    vx = random.nextDouble(-7.0, 7.0),
+                    vy = random.nextDouble(-20.0, -10.0),
+                    lifetime = random.nextDouble(1.05, 1.75),
+                    size = random.nextDouble(4.0, if (critical) 7.5 else 6.0),
+                    grow = random.nextDouble(9.0, if (critical) 17.0 else 12.0),
+                    color = 0xFFAAA3AD.toInt(),
+                    alpha = if (critical) random.nextDouble(0.28, 0.46) else random.nextDouble(0.18, 0.3),
+                    drag = 0.96
+                )
+            )
+        }
+    }
+
+    private fun addHudParticle(particle: HudParticle) {
+        hudParticles.add(particle)
+        if (hudParticles.size > HUD_PARTICLE_MAX_COUNT) {
+            hudParticles.subList(0, hudParticles.size - HUD_PARTICLE_MAX_COUNT).clear()
+        }
     }
 
     private fun drawDamageHudParts(
@@ -382,6 +569,30 @@ object VehicleHudOverlay {
         )
     }
 
+    private fun damageHealthSignature(vehicle: IVehicle): Double {
+        return vehicle.vehicleDefinition.parts
+            .asSequence()
+            .filter { part ->
+                part.type == VehiclePartTypes.BODY ||
+                    part.type == VehiclePartTypes.ENGINE ||
+                    part.type == VehiclePartTypes.WHEEL
+            }
+            .sumOf { part -> VehicleDamage.healthFraction(vehicle, part.id) }
+    }
+
+    private fun dashboardOrigin(screenHeight: Int, criticalFailure: Boolean): HudPoint {
+        val shake = criticalTremble(criticalFailure, 0.15, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.OUT_POSITIVE)
+        return HudPoint(shake.x, screenHeight - DASHBOARD_BASE.height + shake.y)
+    }
+
+    private fun damageCrtOrigin(screenHeight: Int, criticalFailure: Boolean): HudPoint {
+        val shake = criticalTremble(criticalFailure, 2.2, horizontal = EdgeShake.OUT_NEGATIVE, vertical = EdgeShake.FREE)
+        return HudPoint(
+            shake.x,
+            screenHeight - DASHBOARD_BASE.height - MINI_CRT_WIDGET_SIZE + MINI_CRT_DASHBOARD_OVERLAP + shake.y
+        )
+    }
+
     private fun damageHudColor(healthFraction: Double): Int {
         val health = healthFraction.coerceIn(0.0, 1.0)
         return if (health <= 0.0) {
@@ -463,6 +674,11 @@ object VehicleHudOverlay {
         previousCriticalBodyId = null
         previousCriticalFailure = false
         lastWarningBeepCycle = Long.MIN_VALUE
+        previousParticleBodyId = null
+        previousDamageHealth = Double.NaN
+        lastCriticalSparkMillis = 0L
+        lastCriticalSmokeMillis = 0L
+        hudParticles.clear()
         visualMeterValues.clear()
     }
 
@@ -842,6 +1058,31 @@ object VehicleHudOverlay {
             val ZERO = HudShakeOffset(0, 0)
         }
     }
+
+    private data class HudPoint(
+        val x: Int,
+        val y: Int
+    )
+
+    private enum class HudParticleType {
+        SPARK,
+        SMOKE
+    }
+
+    private data class HudParticle(
+        val type: HudParticleType,
+        var x: Double,
+        var y: Double,
+        var vx: Double,
+        var vy: Double,
+        var age: Double = 0.0,
+        val lifetime: Double,
+        val size: Double,
+        val grow: Double,
+        val color: Int,
+        val alpha: Double,
+        val drag: Double
+    )
 
     private enum class EdgeShake {
         NONE,

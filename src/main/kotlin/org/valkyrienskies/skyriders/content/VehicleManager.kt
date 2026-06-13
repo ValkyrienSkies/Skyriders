@@ -10,6 +10,7 @@ import net.minecraft.sounds.SoundSource
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.minecraftforge.registries.ForgeRegistries
+import org.apache.logging.log4j.LogManager
 import org.joml.Matrix3d
 import org.joml.Quaterniond
 import org.joml.Vector3d
@@ -36,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap
  * enough runtime and networking state to replace them directly.
  */
 object VehicleManager {
+    private val LOGGER = LogManager.getLogger()
+
     private const val VEHICLES_KEY = "vehicles"
     private const val LEGACY_BIKES_KEY = "bikes"
     private const val HORN_COOLDOWN_TICKS = 10L
@@ -484,7 +487,13 @@ object VehicleManager {
             val shipWorld = requireNotNull(vsApi.getServerShipWorld(level.server)) {
                 "Cannot delete vehicle body before VS server ship world is available"
             }
-            shipWorld.allBodies.getById(bodyId)?.let(shipWorld::deleteBody)
+            shipWorld.allBodies.getById(bodyId)?.let { body ->
+                try {
+                    shipWorld.deleteBody(body)
+                } catch (exception: IllegalArgumentException) {
+                    LOGGER.warn("Vehicle body {} was already missing while removing vehicle.", bodyId, exception)
+                }
+            }
         }
         if (vehicle != null) {
             BikeLifecycle.saveLevel(level)
