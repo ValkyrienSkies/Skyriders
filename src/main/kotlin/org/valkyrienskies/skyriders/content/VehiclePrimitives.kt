@@ -301,6 +301,7 @@ object VehicleInteractionActions {
     val PICK_UP = ResourceLocation(SkyridersMod.MOD_ID, "pick_up")
     val OPEN_DOOR = ResourceLocation(SkyridersMod.MOD_ID, "open_door")
     val REFUEL = ResourceLocation(SkyridersMod.MOD_ID, "refuel")
+    val REPAIR = ResourceLocation(SkyridersMod.MOD_ID, "repair")
     val STORAGE = ResourceLocation(SkyridersMod.MOD_ID, "storage")
     val ENGINE_TOGGLE = ResourceLocation(SkyridersMod.MOD_ID, "engine_toggle")
     val TOGGLE = ResourceLocation(SkyridersMod.MOD_ID, "toggle")
@@ -340,6 +341,9 @@ fun VehicleDefinition.initialPartStates(savedStates: Map<String, VehiclePartStat
 object VehiclePartTypes {
     val DOOR = ResourceLocation(SkyridersMod.MOD_ID, "door")
     val FUEL_CAP = ResourceLocation(SkyridersMod.MOD_ID, "fuel_cap")
+    val BODY = ResourceLocation(SkyridersMod.MOD_ID, "body")
+    val ENGINE = ResourceLocation(SkyridersMod.MOD_ID, "engine")
+    val WHEEL = ResourceLocation(SkyridersMod.MOD_ID, "wheel")
     val STORAGE = ResourceLocation(SkyridersMod.MOD_ID, "storage")
     val JUKEBOX = ResourceLocation(SkyridersMod.MOD_ID, "jukebox")
 }
@@ -585,13 +589,15 @@ fun BikeDefinition.toVehicleDefinition(): VehicleDefinition = VehicleDefinition(
             interactionZone = VehicleInteractionDefinition.SEAT
         )
     ),
-    interactions = interactions.toVehicleInteractionDefinition(),
+    interactions = interactions.toVehicleInteractionDefinition(config),
     behavior = BikeVehicleBehaviorDefinition(config),
-    parts = if (interactions.zones.any { it.id == BikeInteractionDefinition.FUEL_CAP }) {
-        listOf(fuelCapPartDefinition())
-    } else {
-        emptyList()
-    }
+    parts = listOf(VehicleDamage.bodyPartDefinition(), VehicleDamage.enginePartDefinition()) +
+        VehicleDamage.bikeWheelPartDefinitions() +
+        if (interactions.zones.any { it.id == BikeInteractionDefinition.FUEL_CAP }) {
+            listOf(fuelCapPartDefinition())
+        } else {
+            emptyList()
+        }
 )
 
 fun BikeRenderDefinition.toVehicleRenderDefinition(): VehicleRenderDefinition = VehicleRenderDefinition(
@@ -640,7 +646,7 @@ fun BikeSoundDefinition.toVehicleSoundDefinition(): VehicleSoundDefinition = Veh
     referenceSpeed = referenceSpeed
 )
 
-fun BikeInteractionDefinition.toVehicleInteractionDefinition(): VehicleInteractionDefinition =
+fun BikeInteractionDefinition.toVehicleInteractionDefinition(config: BikePhysicsConfig): VehicleInteractionDefinition =
     VehicleInteractionDefinition(
         zones = zones.map { zone ->
             VehicleInteractionZone(
@@ -655,5 +661,5 @@ fun BikeInteractionDefinition.toVehicleInteractionDefinition(): VehicleInteracti
                 },
                 partId = zone.id.takeIf { it == BikeInteractionDefinition.FUEL_CAP }
             )
-        }
+        } + VehicleDamage.bikePartZones(config)
     )

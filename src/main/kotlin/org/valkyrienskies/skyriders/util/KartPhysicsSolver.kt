@@ -6,6 +6,7 @@ import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.content.KartPhysicsConfig
 import org.valkyrienskies.skyriders.content.KartRuntimeState
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleInput
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.VehicleTransmissionConfig
@@ -43,7 +44,8 @@ object KartPhysicsSolver {
         val right = VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
         val up = VehiclePhysicsMath.transformDirection(body, LOCAL_UP, LOCAL_UP)
         val activeInput = if (input.riderPresent) input else VehicleInput.EMPTY
-        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id)
+        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id) *
+            VehicleDamage.tractionScale(physLevel.dimension, body.id)
         val forwardSpeed = VehiclePhysicsMath.safeDot(body.kinematics.velocity, forward)
         val contactUp = VehiclePhysicsMath.safeNormalize(state.smoothedGroundNormal, WORLD_UP)
         val driftSpeed = planarSpeed(body, contactUp)

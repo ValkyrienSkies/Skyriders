@@ -40,6 +40,7 @@ import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
+import org.valkyrienskies.skyriders.content.VehicleDamageEvents
 import org.valkyrienskies.skyriders.content.block.BoostPadBlock
 import org.valkyrienskies.skyriders.content.entity.BadExplosionEntity
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
@@ -405,6 +406,7 @@ object SkyridersMod {
         modEventBus.addListener(::init)
         MinecraftForge.EVENT_BUS.register(BikeLifecycle)
         MinecraftForge.EVENT_BUS.register(VehicleInteractionHandler)
+        MinecraftForge.EVENT_BUS.register(VehicleDamageEvents)
         MinecraftForge.EVENT_BUS.addListener { event: RegisterCommandsEvent -> SkyridersCommands.register(event) }
         MinecraftForge.EVENT_BUS.addListener(::onLivingDrops)
         if (FMLEnvironment.dist.isClient) {

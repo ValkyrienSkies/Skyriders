@@ -260,7 +260,7 @@ object VehicleStatusEffects {
     }
 
     private fun finishSpinOut(vehicle: IVehicle, state: RuntimeState) {
-        if (state.spinOutEngineWasOn && VehicleFuel.canStart(vehicle)) {
+        if (state.spinOutEngineWasOn && VehicleFuel.canStart(vehicle) && VehicleDamage.canEngineStart(vehicle)) {
             setEngineOn(vehicle, true)
         }
         state.spinOutEngineWasOn = false

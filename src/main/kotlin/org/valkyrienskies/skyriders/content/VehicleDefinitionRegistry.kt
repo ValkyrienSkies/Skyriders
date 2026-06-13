@@ -139,10 +139,12 @@ object KartDefinitions {
                     actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
                     partId = VehicleInteractionDefinition.FUEL_CAP
                 )
-            )
+            ) + VehicleDamage.kartPartZones(physics)
         ),
         behavior = KartVehicleBehaviorDefinition(physics),
-        parts = listOf(fuelCapPartDefinition())
+        parts = listOf(VehicleDamage.bodyPartDefinition(), VehicleDamage.enginePartDefinition()) +
+            VehicleDamage.fourWheelPartDefinitions() +
+            fuelCapPartDefinition()
     )
 
     private fun debugKartRender(): VehicleRenderDefinition {
@@ -371,10 +373,12 @@ object WheeledVehicleDefinitions {
                     actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
                     partId = VehicleInteractionDefinition.FUEL_CAP
                 )
-            )
+            ) + VehicleDamage.wheeledPartZones(physics)
         ),
         behavior = WheeledVehicleBehaviorDefinition(physics),
-        parts = listOf(fuelCapPartDefinition())
+        parts = listOf(VehicleDamage.bodyPartDefinition(), VehicleDamage.enginePartDefinition()) +
+            VehicleDamage.fourWheelPartDefinitions() +
+            fuelCapPartDefinition()
     )
 
     private fun pickupTruckDefinition(): VehicleDefinition {
@@ -536,7 +540,7 @@ object WheeledVehicleDefinitions {
                         actions = setOf(VehicleInteractionActions.REFUEL, VehicleInteractionActions.TOGGLE),
                         partId = VehicleInteractionDefinition.FUEL_CAP
                     )
-                )
+                ) + VehicleDamage.wheeledPartZones(physics)
             ),
             behavior = WheeledVehicleBehaviorDefinition(physics),
             fuel = VehicleFuelDefinition(
@@ -548,6 +552,9 @@ object WheeledVehicleDefinitions {
                 stepAssistUsePerWorkSecond = 0.014
             ),
             parts = listOf(
+                VehicleDamage.bodyPartDefinition(),
+                VehicleDamage.enginePartDefinition(),
+                *VehicleDamage.fourWheelPartDefinitions().toTypedArray(),
                 fuelCapPartDefinition(),
                 doorPartDefinition(leftDoor),
                 doorPartDefinition(rightDoor),

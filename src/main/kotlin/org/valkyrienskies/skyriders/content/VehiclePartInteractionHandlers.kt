@@ -30,6 +30,9 @@ object VehiclePartInteractionHandlers {
         register(VehicleInteractionActions.REFUEL) { player, vehicle, zone, _ ->
             refuelWithJerryCan(player, vehicle, zone)
         }
+        register(VehicleInteractionActions.REPAIR) { player, vehicle, zone, _ ->
+            VehicleDamage.handleRepair(player, vehicle, zone)
+        }
     }
 
     fun register(action: ResourceLocation, handler: VehiclePartInteractionHandler) {

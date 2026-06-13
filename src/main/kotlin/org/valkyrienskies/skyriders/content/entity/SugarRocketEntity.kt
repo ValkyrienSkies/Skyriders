@@ -24,6 +24,7 @@ import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.skyriders.SkyridersMod
 import org.valkyrienskies.skyriders.content.IVehicle
 import org.valkyrienskies.skyriders.content.SkyridersSounds
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.network.SkyridersNetwork
@@ -313,6 +314,13 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
 
         val shipWorld = level.shipWorld
         val explosionPos = Vector3d(position.x, position.y, position.z)
+        VehicleDamage.damageExplosion(
+            level = level,
+            origin = position,
+            baseDamage = if (directTarget != null) 42.0 else 30.0,
+            radius = BLAST_RADIUS,
+            directTarget = directTarget
+        )
         VehicleManager.getVehicles(level).forEach { vehicle ->
             if (vehicle.bodyId == ownerBodyId) return@forEach
             val body = shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach

@@ -287,7 +287,7 @@ object VehicleManager {
         }
         val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return null
         val enabled = !vehicle.vehicleState.engineOn
-        if (enabled && !VehicleFuel.canStart(vehicle)) {
+        if (enabled && (!VehicleFuel.canStart(vehicle) || !VehicleDamage.canEngineStart(vehicle))) {
             VehicleEngineSounds.playStartFail(level, vehicle)
             return false
         }
@@ -464,7 +464,11 @@ object VehicleManager {
         BikeManager.physTick(physLevel, dt)
         serverVehiclesByDimension[physLevel.dimension]?.values?.forEach { vehicle ->
             val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
-            val input = VehicleStatusEffects.modifyInput(vehicle, getInput(physLevel.dimension, vehicle.bodyId))
+            VehicleDamage.physTick(vehicle, dt)
+            val input = VehicleDamage.modifyInput(
+                vehicle,
+                VehicleStatusEffects.modifyInput(vehicle, getInput(physLevel.dimension, vehicle.bodyId))
+            )
             VehicleFuel.consume(vehicle, body, input, dt)
             vehicle.physTick(physLevel, body, input, dt)
             VehicleStatusEffects.physTick(vehicle, body, dt)

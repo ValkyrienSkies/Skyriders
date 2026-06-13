@@ -7,6 +7,7 @@ import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.skyriders.content.BikeInput
 import org.valkyrienskies.skyriders.content.BikePhysicsConfig
 import org.valkyrienskies.skyriders.content.BikeRuntimeState
+import org.valkyrienskies.skyriders.content.VehicleDamage
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
 import org.valkyrienskies.skyriders.content.WheelContact
 import kotlin.math.abs
@@ -93,7 +94,8 @@ object BikePhysicsSolver {
         applySuspension(body, frontContact, config)
         applySuspension(body, rearContact, config)
         applyLandingDamping(body, terrainUp, state, config, dt)
-        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id)
+        val tractionScale = VehicleStatusEffects.tractionScale(physLevel.dimension, body.id) *
+            VehicleDamage.tractionScale(physLevel.dimension, body.id)
         applyTireForces(body, frontContact, true, drifting, config, tractionScale)
         applyTireForces(body, rearContact, false, drifting, config, tractionScale)
         if (riderPresent) {

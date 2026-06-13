@@ -21,8 +21,11 @@ object VehicleImpactDamageHandler {
     private const val DAMAGE_PER_SPEED_OVER_THRESHOLD = 1.15
     private const val MAX_DAMAGE = 20.0
     private const val ENTITY_VELOCITY_TICKS_PER_SECOND = 20.0
+    private const val MIN_CRASH_DELTA_SPEED = 3.0
+    private const val VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS = 12L
 
     private val lastDamageTickByImpact = HashMap<ImpactKey, Long>()
+    private val lastCrashDamageTickByVehicle = HashMap<Long, Long>()
 
     fun tick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
         val shipWorld = level.shipWorld ?: return
@@ -33,6 +36,7 @@ object VehicleImpactDamageHandler {
             val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: continue
             val velocity = body.kinematics.velocity
             val vehicleSpeed = planarLength(velocity)
+            applyCrashDamage(level, vehicle, velocity, body.prevTickKinematics.velocity, now)
             if (vehicleSpeed < MIN_DAMAGE_SPEED) continue
 
             val bodyDef = vehicle.vehicleDefinition.body
@@ -63,10 +67,32 @@ object VehicleImpactDamageHandler {
 
                 if (target.hurt(SkyridersDamageTypes.vehicleImpact(level, driver), damage.toFloat())) {
                     lastDamageTickByImpact[ImpactKey(vehicle.bodyId, target.id)] = now
+                    VehicleDamage.damageCrash(level, vehicle, damage * 0.16)
                     pushTarget(target, relativeVelocity, relativeSpeed, damage)
                 }
             }
         }
+    }
+
+    private fun applyCrashDamage(
+        level: ServerLevel,
+        vehicle: IVehicle,
+        velocity: Vector3dc,
+        previousVelocity: Vector3dc,
+        now: Long
+    ) {
+        val lastTick = lastCrashDamageTickByVehicle[vehicle.bodyId]
+        if (lastTick != null && now - lastTick < VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS) return
+
+        val previousSpeed = planarLength(previousVelocity)
+        if (previousSpeed < MIN_DAMAGE_SPEED) return
+        val deltaSpeed = planarLength(Vector3d(previousVelocity).sub(velocity))
+        if (deltaSpeed < MIN_CRASH_DELTA_SPEED) return
+
+        val massScale = sqrt(vehicle.vehicleDefinition.body.mass / 300.0).coerceIn(0.65, 2.4)
+        val severity = (deltaSpeed - MIN_CRASH_DELTA_SPEED) * massScale * 2.1
+        VehicleDamage.damageCrash(level, vehicle, severity)
+        lastCrashDamageTickByVehicle[vehicle.bodyId] = now
     }
 
     private fun impactDamage(vehicle: IVehicle, relativeSpeed: Double, driver: LivingEntity?): Double {
@@ -164,6 +190,9 @@ object VehicleImpactDamageHandler {
     private fun cleanupOldCooldowns(now: Long) {
         lastDamageTickByImpact.entries.removeIf { (_, tick) ->
             now - tick > DAMAGE_COOLDOWN_TICKS * 4
+        }
+        lastCrashDamageTickByVehicle.entries.removeIf { (_, tick) ->
+            now - tick > VEHICLE_CRASH_DAMAGE_COOLDOWN_TICKS * 4
         }
     }
 
