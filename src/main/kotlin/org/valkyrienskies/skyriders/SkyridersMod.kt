@@ -38,6 +38,7 @@ import org.valkyrienskies.skyriders.content.BikeLifecycle
 import org.valkyrienskies.skyriders.content.SkyridersDamageTypes
 import org.valkyrienskies.skyriders.content.SkyridersSounds
 import org.valkyrienskies.skyriders.content.VehicleImpairmentEffects
+import org.valkyrienskies.skyriders.content.VehicleImpactDamageHandler
 import org.valkyrienskies.skyriders.content.VehicleInteractionHandler
 import org.valkyrienskies.skyriders.content.VehicleManager
 import org.valkyrienskies.skyriders.content.VehicleDamageEvents
@@ -424,6 +425,7 @@ object SkyridersMod {
         event.enqueueWork {
             SkyridersNetwork.register()
             RacingDispenserBehaviors.register()
+            vsApi.collisionStartEvent.on(VehicleImpactDamageHandler::onCollisionStart)
             vsApi.physTickEvent.on { physTickEvent ->
                 VehicleManager.physTick(physTickEvent.world, physTickEvent.delta)
                 VehicleInteractionHandler.physTick(physTickEvent.world, physTickEvent.delta)
