@@ -38,7 +38,10 @@ sourceSets {
 kotlin.target.compilations.getByName('gameTest').associateWith(kotlin.target.compilations.getByName('main'))
 
 legacyForge {
-    version = "${minecraft_version}-${forge_version}"
+    enable {
+        forgeVersion = "${minecraft_version}-${forge_version}"
+        disableRecompilation = false
+    }
 
     // Validate AT files and raise errors when they have invalid targets
     // This option is false by default, but turning it on is recommended

@@ -84,5 +84,22 @@
       "file": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
       "sha256": "AD13D0E03A1551700FC365F3C03D7479912DD6DCB4064082A2CE8E028951DB64"
     }
-  ]
+  ],
+  "linuxJUnit": {
+    "tests": 67,
+    "passed": 67,
+    "skipped": 0,
+    "failures": 0,
+    "runner": "JUnit console 1.10.2; published Linux native"
+  },
+  "ciModeValidation": {
+    "CI": "true",
+    "disableRecompilation": false,
+    "tests": 67,
+    "passed": 67,
+    "requiredGameTestsPassed": 11,
+    "traversalLanesPassed": 12,
+    "beforeFix": "JUnit discovery failed with SHA-384 digest error for IForgeFriendlyByteBuf",
+    "afterFix": "BUILD SUCCESSFUL"
+  }
 }
