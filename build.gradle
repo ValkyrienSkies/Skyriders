@@ -97,8 +97,7 @@ sourceSets.test.runtimeClasspath = configurations.nativePhysicsTest + sourceSets
 
 repositories {
     //Add any repositories to fetch dependencies from here.
-    //Most dependencies are mirrored to the VS Maven, so by default only it is included alongside mavenLocal and KFF.
-    mavenLocal()
+    //Most dependencies are mirrored to the VS Maven, so by default only it is included alongside KFF.
     maven {
         name = "Valkyrien Skies Internal"
         url = project.vs_maven_url ?: 'https://maven.valkyrienskies.org'

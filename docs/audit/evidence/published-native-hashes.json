@@ -1,0 +1,127 @@
+[
+  {
+    "Jar": "bridge.jar",
+    "Native": "libKrunchJni64.dylib",
+    "SHA256": "0981CE52DC01D5AE3C8A1B600DFC635E0C36AC3CDA49DECF8E254554072BEADB"
+  },
+  {
+    "Jar": "bridge.jar",
+    "Native": "libKrunchJni64.so",
+    "SHA256": "6717C8C08BEBA826A499482F65951F9748FF855C3DC4A22D5990413889955F12"
+  },
+  {
+    "Jar": "bridge.jar",
+    "Native": "libKrunchJniarm64.so",
+    "SHA256": "2162B7B6973BFFDC7E9A721C9AA515694D60159A9D5E07C8AD5475A94704F4AC"
+  },
+  {
+    "Jar": "bridge.jar",
+    "Native": "KrunchJni64.dll",
+    "SHA256": "64B2D30799C11065F812B122067A2339398CF51B33B1245D04CD0CAD490B5B56"
+  },
+  {
+    "Jar": "bridge.jar",
+    "Native": "libKrunchJniarm64.dylib",
+    "SHA256": "660BE4D416F2073AEE5C0FCF2EACEBE3E569FCD585D109162E2014779A7BA30D"
+  },
+  {
+    "Jar": "core-impl.jar",
+    "Native": "KrunchJni64.dll",
+    "SHA256": "64B2D30799C11065F812B122067A2339398CF51B33B1245D04CD0CAD490B5B56"
+  },
+  {
+    "Jar": "core-impl.jar",
+    "Native": "libKrunchJni64.dylib",
+    "SHA256": "0981CE52DC01D5AE3C8A1B600DFC635E0C36AC3CDA49DECF8E254554072BEADB"
+  },
+  {
+    "Jar": "core-impl.jar",
+    "Native": "libKrunchJni64.so",
+    "SHA256": "6717C8C08BEBA826A499482F65951F9748FF855C3DC4A22D5990413889955F12"
+  },
+  {
+    "Jar": "core-impl.jar",
+    "Native": "libKrunchJniarm64.dylib",
+    "SHA256": "660BE4D416F2073AEE5C0FCF2EACEBE3E569FCD585D109162E2014779A7BA30D"
+  },
+  {
+    "Jar": "core-impl.jar",
+    "Native": "libKrunchJniarm64.so",
+    "SHA256": "2162B7B6973BFFDC7E9A721C9AA515694D60159A9D5E07C8AD5475A94704F4AC"
+  },
+  {
+    "Jar": "vs-forge.jar",
+    "Native": "KrunchJni64.dll",
+    "SHA256": "64B2D30799C11065F812B122067A2339398CF51B33B1245D04CD0CAD490B5B56"
+  },
+  {
+    "Jar": "vs-forge.jar",
+    "Native": "libKrunchJni64.dylib",
+    "SHA256": "0981CE52DC01D5AE3C8A1B600DFC635E0C36AC3CDA49DECF8E254554072BEADB"
+  },
+  {
+    "Jar": "vs-forge.jar",
+    "Native": "libKrunchJni64.so",
+    "SHA256": "6717C8C08BEBA826A499482F65951F9748FF855C3DC4A22D5990413889955F12"
+  },
+  {
+    "Jar": "vs-forge.jar",
+    "Native": "libKrunchJniarm64.dylib",
+    "SHA256": "660BE4D416F2073AEE5C0FCF2EACEBE3E569FCD585D109162E2014779A7BA30D"
+  },
+  {
+    "Jar": "vs-forge.jar",
+    "Native": "libKrunchJniarm64.so",
+    "SHA256": "2162B7B6973BFFDC7E9A721C9AA515694D60159A9D5E07C8AD5475A94704F4AC"
+  },
+  {
+    "Jar": "vs-fabric.jar",
+    "Native": "KrunchJni64.dll",
+    "SHA256": "64B2D30799C11065F812B122067A2339398CF51B33B1245D04CD0CAD490B5B56"
+  },
+  {
+    "Jar": "vs-fabric.jar",
+    "Native": "libKrunchJni64.dylib",
+    "SHA256": "0981CE52DC01D5AE3C8A1B600DFC635E0C36AC3CDA49DECF8E254554072BEADB"
+  },
+  {
+    "Jar": "vs-fabric.jar",
+    "Native": "libKrunchJni64.so",
+    "SHA256": "6717C8C08BEBA826A499482F65951F9748FF855C3DC4A22D5990413889955F12"
+  },
+  {
+    "Jar": "vs-fabric.jar",
+    "Native": "libKrunchJniarm64.dylib",
+    "SHA256": "660BE4D416F2073AEE5C0FCF2EACEBE3E569FCD585D109162E2014779A7BA30D"
+  },
+  {
+    "Jar": "vs-fabric.jar",
+    "Native": "libKrunchJniarm64.so",
+    "SHA256": "2162B7B6973BFFDC7E9A721C9AA515694D60159A9D5E07C8AD5475A94704F4AC"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+    "Native": "KrunchJni64.dll",
+    "SHA256": "64B2D30799C11065F812B122067A2339398CF51B33B1245D04CD0CAD490B5B56"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+    "Native": "libKrunchJni64.dylib",
+    "SHA256": "0981CE52DC01D5AE3C8A1B600DFC635E0C36AC3CDA49DECF8E254554072BEADB"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+    "Native": "libKrunchJni64.so",
+    "SHA256": "6717C8C08BEBA826A499482F65951F9748FF855C3DC4A22D5990413889955F12"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+    "Native": "libKrunchJniarm64.dylib",
+    "SHA256": "660BE4D416F2073AEE5C0FCF2EACEBE3E569FCD585D109162E2014779A7BA30D"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+    "Native": "libKrunchJniarm64.so",
+    "SHA256": "2162B7B6973BFFDC7E9A721C9AA515694D60159A9D5E07C8AD5475A94704F4AC"
+  }
+]

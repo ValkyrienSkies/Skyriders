@@ -1,0 +1,88 @@
+{
+  "vs": "2.4.13+0c5e8c2295",
+  "core": "1.1.0+be9704fbe6",
+  "bridge": "1.0.0+58c6481a6f",
+  "physicsApi": "1.0.0+fd590ee052",
+  "nativeCommit": "121ad50902a0465ffa5c1a056b7028040b53638f",
+  "junit": [
+    {
+      "suite": "org.valkyrienskies.skyriders.ControlRegressionTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.ImpactRegressionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.MovementRegressionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.NativeTraversalEdgeTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.NativeTraversalTest",
+      "tests": 41,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.PacketValidationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.RaceCrossingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.VehicleCollisionSweepTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.valkyrienskies.skyriders.WheelContactRegressionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "requiredGameTestsPassed": 11,
+  "traversalLanesPassed": 12,
+  "runtimeArtifacts": [
+    {
+      "file": "framework-549225-7573740.jar",
+      "sha256": "37C267F46D8B8DFA81BAE8C9FA9FA6467E456CADECAE10722EE91B43437F25A0"
+    },
+    {
+      "file": "kotlinforforge-4.11.0-all.jar",
+      "sha256": "2BA4B35536EF2A08A8585D5A7384E637FB538D7D2A99A5E5A4D81E9B5660A850"
+    },
+    {
+      "file": "valkyrienskies-120-forge-2.4.13+0c5e8c2295.jar",
+      "sha256": "AD13D0E03A1551700FC365F3C03D7479912DD6DCB4064082A2CE8E028951DB64"
+    }
+  ]
+}
