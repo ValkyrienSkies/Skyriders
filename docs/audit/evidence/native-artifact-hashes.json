@@ -1,0 +1,32 @@
+[
+  {
+    "Jar": "physics_api_krunch-1.0.0+49253d03a0-skyriders-audit.1.jar",
+    "Entry": "KrunchJni64.dll",
+    "SHA256": "D1CD28B9D0CDC5ABD18376E79CB8777C566153AE790F0735E08261ED5C80BCD7"
+  },
+  {
+    "Jar": "physics_api_krunch-1.0.0+49253d03a0-skyriders-audit.1.jar",
+    "Entry": "libKrunchJni64.so",
+    "SHA256": "BA7F3F339FDF38AE950F91F98CC9E435EAC8C93190DBDC8E3384D169C6659639"
+  },
+  {
+    "Jar": "impl-1.1.0+1973c1a4d4-skyriders-audit.1.jar",
+    "Entry": "KrunchJni64.dll",
+    "SHA256": "D1CD28B9D0CDC5ABD18376E79CB8777C566153AE790F0735E08261ED5C80BCD7"
+  },
+  {
+    "Jar": "impl-1.1.0+1973c1a4d4-skyriders-audit.1.jar",
+    "Entry": "libKrunchJni64.so",
+    "SHA256": "BA7F3F339FDF38AE950F91F98CC9E435EAC8C93190DBDC8E3384D169C6659639"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+165e534538-skyriders-audit.1.jar",
+    "Entry": "KrunchJni64.dll",
+    "SHA256": "D1CD28B9D0CDC5ABD18376E79CB8777C566153AE790F0735E08261ED5C80BCD7"
+  },
+  {
+    "Jar": "valkyrienskies-120-forge-2.4.13+165e534538-skyriders-audit.1.jar",
+    "Entry": "libKrunchJni64.so",
+    "SHA256": "BA7F3F339FDF38AE950F91F98CC9E435EAC8C93190DBDC8E3384D169C6659639"
+  }
+]

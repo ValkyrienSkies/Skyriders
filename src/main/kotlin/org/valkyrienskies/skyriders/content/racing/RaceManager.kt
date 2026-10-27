@@ -138,9 +138,8 @@ object RaceManager {
         racesByKey.values
             .filter { it.active && it.dimension == dimension }
             .forEach { race ->
-                activeMarkersForRace(level, race).forEach { marker ->
-                    tickCrossings(level, marker, race)
-                }
+                tickCrossings(level, race)
+                if (!race.active) return@forEach
                 tickDangerBlocks(level, race)
                 if (level.gameTime % 40L == 0L) {
                     ensureRaceMarkerChunksLoaded(level, race)
@@ -325,7 +324,7 @@ object RaceManager {
             racer.nextTarget = nextTarget(level, racer, race)
             activeMarkersForRace(level, race).forEach { marker ->
                 marker.line(level)?.let { markerLine ->
-                    racer.previousDistances[marker.blockPos.asLong()] = markerLine.signedDistance(racer.position)
+                    racer.crossingTrackers[marker.blockPos.asLong()] = RaceCrossingTracker(markerLine, racer.position)
                 }
             }
         }
@@ -357,22 +356,53 @@ object RaceManager {
         )
     }
 
-    private fun tickCrossings(level: ServerLevel, marker: RaceMarkerSnapshot, race: ActiveRace) {
-        val line = marker.line(level) ?: return
+    private fun tickCrossings(level: ServerLevel, race: ActiveRace) {
+        val markers = activeMarkersForRace(level, race).mapNotNull { marker ->
+            marker.line(level)?.let { marker to it }
+        }
         race.racers.values.toList().forEach { racer ->
-            val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId) ?: return@forEach
-            val body = level.shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
+            val vehicle = VehicleManager.getVehicle(level.dimensionId, racer.bodyId)
+            val body = vehicle?.let { level.shipWorld?.allBodies?.getById(it.bodyId) }
+            if (body == null) {
+                val missingSince = racer.missingSinceGameTime ?: level.gameTime.also { racer.missingSinceGameTime = it }
+                if (level.gameTime - missingSince >= 200L) retireRacer(level, race, racer)
+                return@forEach
+            }
+            racer.missingSinceGameTime = null
             val currentPosition = Vector3d(body.kinematics.position)
+            val crossings = markers.mapNotNull { (marker, line) ->
+                val tracker = racer.crossingTrackers.getOrPut(marker.blockPos.asLong()) {
+                    RaceCrossingTracker(line, racer.position)
+                }
+                tracker.update(line, currentPosition)?.let { marker to it }
+            }.sortedBy { it.second.fraction }
             racer.position = currentPosition
             racer.nextTarget = nextTarget(level, racer, race)
-            val markerKey = marker.blockPos.asLong()
-            val previous = racer.previousDistances.put(markerKey, line.signedDistance(currentPosition)) ?: return@forEach
-            val current = racer.previousDistances[markerKey] ?: return@forEach
-            if (!crossed(previous, current) || !line.containsCrossing(currentPosition)) return@forEach
-            handleCrossing(level, marker, race, racer, currentPosition)
+            for ((marker, crossing) in crossings) {
+                if (!race.active || racer.bodyId !in race.racers) break
+                handleCrossing(level, marker, race, racer, crossing.position)
+            }
         }
     }
 
+    fun onVehicleRemoved(level: ServerLevel, bodyId: Long) {
+        racesByKey.values.filter { it.active && it.dimension == level.dimension().location().toString() }
+            .toList().forEach { race -> race.racers[bodyId]?.let { retireRacer(level, race, it) } }
+    }
+
+    private fun retireRacer(level: ServerLevel, race: ActiveRace, racer: RacerState) {
+        race.racers.remove(racer.bodyId)
+        playerForRacer(level, racer)?.let { player ->
+            player.sendTitle("Did not finish", fadeIn = 4, stay = 42, fadeOut = 12)
+            SkyridersNetwork.sendRaceCompassTarget(player, null)
+            SkyridersNetwork.sendRaceHudClear(player)
+            SkyridersNetwork.sendRaceMusicStop(player)
+        }
+        if (race.racers.isEmpty()) {
+            sendRaceResultsToFinishers(level, race)
+            stopRace(level, race)
+        }
+    }
     private fun handleCrossing(
         level: ServerLevel,
         marker: RaceMarkerSnapshot,
@@ -651,10 +681,10 @@ object RaceManager {
     }
 
     private fun resetRacerLineDistances(level: ServerLevel, racer: RacerState, race: ActiveRace, position: Vector3d) {
-        racer.previousDistances.clear()
+        racer.crossingTrackers.clear()
         activeMarkersForRace(level, race).forEach { marker ->
             marker.line(level)?.let { line ->
-                racer.previousDistances[marker.blockPos.asLong()] = line.signedDistance(position)
+                racer.crossingTrackers[marker.blockPos.asLong()] = RaceCrossingTracker(line, position)
             }
         }
     }
@@ -1045,12 +1075,6 @@ object RaceManager {
         return tracks[level.random.nextInt(tracks.size)].get().location
     }
 
-    private fun crossed(previous: Double, current: Double): Boolean {
-        if (!previous.isFinite() || !current.isFinite()) return false
-        if (abs(previous) < 1.0E-4 || abs(current) < 1.0E-4) return false
-        return previous < 0.0 && current > 0.0 || previous > 0.0 && current < 0.0
-    }
-
     private fun ordinal(value: Int): String {
         val mod100 = value % 100
         val suffix = if (mod100 in 11..13) {
@@ -1107,7 +1131,8 @@ object RaceManager {
         var lapStartedAtGameTime: Long = 0L,
         var nextCheckpointIndex: Int = 0,
         val crossedCheckpoints: MutableSet<Int> = HashSet(),
-        val previousDistances: MutableMap<Long, Double> = HashMap(),
+        val crossingTrackers: MutableMap<Long, RaceCrossingTracker> = HashMap(),
+        var missingSinceGameTime: Long? = null,
         var nextTarget: Vector3d? = null,
         var lastRecoveryTarget: Vector3d? = null,
         var lastRecoveryMarkerPos: BlockPos? = null,

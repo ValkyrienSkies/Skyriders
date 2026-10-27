@@ -1,5 +1,8 @@
 package org.valkyrienskies.skyriders.content.vehicles
 
+import org.valkyrienskies.skyriders.content.withVehicleState
+import org.valkyrienskies.skyriders.content.snapshotParts
+
 import net.minecraft.world.level.Level
 import net.minecraft.nbt.CompoundTag
 import org.valkyrienskies.core.api.bodies.ClientVsBody
@@ -45,11 +48,11 @@ class KartVehicle(
 
     override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: VehicleInput, dt: Double) {
         val behavior = vehicleDefinition.behavior as? KartVehicleBehaviorDefinition ?: return
-        val activeInput = if (kartState.engineOn) input else VehicleInput.EMPTY.copy(riderPresent = input.riderPresent)
+        val activeInput = input.withEngineState(kartState.engineOn)
         KartPhysicsSolver.updateKartPhysics(body, physLevel, activeInput, behavior.physics, kartState, dt)
     }
 
-    override fun toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
+    override fun toVehicleSaveRecord(): VehicleSaveRecord = withVehicleState(this) { VehicleSaveRecord(
         bodyId = bodyId,
         vehicleType = id,
         engineOn = kartState.engineOn,
@@ -64,7 +67,7 @@ class KartVehicle(
             putDouble("front_wheel_angular_velocity", kartState.frontWheelAngularVelocity)
             putDouble("rear_wheel_angular_velocity", kartState.rearWheelAngularVelocity)
         },
-        partStates = kartState.partStates
-    )
+        partStates = kartState.partStates.snapshotParts()
+    ) }
 
 }

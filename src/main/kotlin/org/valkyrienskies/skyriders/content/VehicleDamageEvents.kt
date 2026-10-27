@@ -29,6 +29,11 @@ object VehicleDamageEvents {
     private val lastMeleeDamageTickByPlayer = HashMap<UUID, Long>()
     private val lastProjectileDamageTickByProjectile = HashMap<UUID, Long>()
 
+    fun clear() {
+        lastMeleeDamageTickByPlayer.clear()
+        lastProjectileDamageTickByProjectile.clear()
+    }
+
     @SubscribeEvent
     fun onExplosion(event: ExplosionEvent.Detonate) {
         val level = event.level as? ServerLevel ?: return
@@ -77,7 +82,7 @@ object VehicleDamageEvents {
         level.allEntities.forEach { entity ->
             val projectile = entity as? Projectile ?: return@forEach
             if (!projectile.isAlive) return@forEach
-            if (lastProjectileDamageTickByProjectile[projectile.uuid]?.let { now - it < PROJECTILE_DAMAGE_COOLDOWN_TICKS } == true) {
+            if (lastProjectileDamageTickByProjectile[projectile.uuid]?.let { now >= it && now - it < PROJECTILE_DAMAGE_COOLDOWN_TICKS } == true) {
                 return@forEach
             }
             val start = Vec3(projectile.xo, projectile.yo, projectile.zo)
@@ -96,8 +101,10 @@ object VehicleDamageEvents {
         val player = event.entity as? ServerPlayer ?: return
         val level = player.level() as? ServerLevel ?: return
         val seat = event.target as? BikeSeatEntity ?: return
-        val vehicle = VehicleManager.getVehicle(level.dimensionId, seat.bodyId) ?: return
-        damageMelee(player, vehicle, player.eyePosition.add(player.lookAngle.scale(2.0)))
+        val start = player.eyePosition
+        val target = findDamageTargetOnRay(level, start, start.add(player.lookAngle.scale(MELEE_RANGE))) ?: return
+        if (target.vehicle.bodyId != seat.bodyId) return
+        damageMelee(player, target.vehicle, hitPoint(start, start.add(player.lookAngle.scale(MELEE_RANGE)), target.hit.distanceSqr))
     }
 
     @SubscribeEvent
@@ -124,7 +131,7 @@ object VehicleDamageEvents {
 
     private fun damageMelee(player: ServerPlayer, vehicle: IVehicle, hitPos: Vec3) {
         val now = player.level().gameTime
-        if (lastMeleeDamageTickByPlayer[player.uuid]?.let { now - it < MELEE_DAMAGE_COOLDOWN_TICKS } == true) return
+        if (lastMeleeDamageTickByPlayer[player.uuid]?.let { now >= it && now - it < MELEE_DAMAGE_COOLDOWN_TICKS } == true) return
         val level = player.level() as? ServerLevel ?: return
         VehicleDamage.damageAt(level, vehicle, hitPos, meleeDamage(player))
         lastMeleeDamageTickByPlayer[player.uuid] = now
@@ -136,10 +143,11 @@ object VehicleDamageEvents {
         end: Vec3,
         ignoredBodyId: Long? = null
     ): DamageRayTarget? {
+        val visibleEnd = VehicleInteractionPicker.unobstructedEnd(level, start, end)
         return VehicleManager.getVehicles(level)
             .asSequence()
             .filter { vehicle -> ignoredBodyId == null || vehicle.bodyId != ignoredBodyId }
-            .flatMap { vehicle -> VehicleInteractionPicker.hitVehicleInteractionZones(vehicle, start, end).asSequence() }
+            .flatMap { vehicle -> VehicleInteractionPicker.hitVehicleInteractionZones(vehicle, start, visibleEnd).asSequence() }
             .filter { hit -> isDamageablePart(hit.vehicle, hit.zone.partId) }
             .groupBy { it.vehicle.bodyId }
             .values

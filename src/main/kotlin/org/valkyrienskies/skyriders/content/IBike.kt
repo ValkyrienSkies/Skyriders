@@ -41,11 +41,11 @@ interface IBike : IVehicle {
         physTick(physLevel, body, input.toBikeInput(), dt)
     }
 
-    override fun toVehicleSaveRecord(): VehicleSaveRecord = toSaveRecord().toVehicleSaveRecord().copy(
-        partStates = state.partStates
-    )
+    override fun toVehicleSaveRecord(): VehicleSaveRecord = withVehicleState(this) {
+        toSaveRecord().toVehicleSaveRecord().copy(partStates = state.partStates.snapshotParts())
+    }
 
-    fun toSaveRecord(): BikeSaveRecord = BikeSaveRecord(
+    fun toSaveRecord(): BikeSaveRecord = withVehicleState(this) { BikeSaveRecord(
         bodyId = bodyId,
         bikeType = id,
         engineOn = state.engineOn,
@@ -57,6 +57,6 @@ interface IBike : IVehicle {
         rearWheelSpin = state.rearWheelSpin,
         frontWheelAngularVelocity = state.frontWheelAngularVelocity,
         rearWheelAngularVelocity = state.rearWheelAngularVelocity,
-        partStates = state.partStates
-    )
+        partStates = state.partStates.snapshotParts()
+    ) }
 }

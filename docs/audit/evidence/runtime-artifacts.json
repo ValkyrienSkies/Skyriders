@@ -1,0 +1,22 @@
+[
+  {
+    "file": "skyriders.jar",
+    "bytes": 16868232,
+    "sha256": "F277C485149180108849610276A8C1CE5AC9EE18FDDC4E22664271460FFCBD6D"
+  },
+  {
+    "file": "framework-549225-7573740.jar",
+    "bytes": 383868,
+    "sha256": "37C267F46D8B8DFA81BAE8C9FA9FA6467E456CADECAE10722EE91B43437F25A0"
+  },
+  {
+    "file": "kotlinforforge-4.11.0-all.jar",
+    "bytes": 7140810,
+    "sha256": "2BA4B35536EF2A08A8585D5A7384E637FB538D7D2A99A5E5A4D81E9B5660A850"
+  },
+  {
+    "file": "valkyrienskies-120-forge-2.4.13+165e534538-skyriders-audit.1.jar",
+    "bytes": 24759313,
+    "sha256": "98E33DB9D07A78AF51E393DE7C836B94A3269AF7A1082BA676C57B2550C2FD92"
+  }
+]

@@ -1,0 +1,1331 @@
+{
+  "nativeRevision": "752759167158c419ff3e98494ca1191862256909",
+  "windowsFirst": {
+    "baselineSeconds": 53.005,
+    "patchedSeconds": 56.167,
+    "tests": 54,
+    "failures": 0,
+    "cases": [
+      {
+        "Name": "PhysicsWorldPerformanceTests.LodVoxelOnLodVoxelTest",
+        "Before": 0.036,
+        "After": 0.04,
+        "Ratio": 1.111
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolveCollisionConstraintTest",
+        "Before": 0.038,
+        "After": 0.037,
+        "Ratio": 0.974
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonSmall",
+        "Before": 0.628,
+        "After": 0.634,
+        "Ratio": 1.01
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonLarge",
+        "Before": 0.861,
+        "After": 0.853,
+        "Ratio": 0.991
+      },
+      {
+        "Name": "BoxShapePerformanceTests.getSignedDistanceAndNormalTest",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000BodiesKrunchClassic",
+        "Before": 2.592,
+        "After": 3.127,
+        "Ratio": 1.206
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000SingleBlocksOnVoxelGroundKrunchClassic",
+        "Before": 1.796,
+        "After": 3.718,
+        "Ratio": 2.07
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Clusters100x10VoxelBodiesKrunchClassic",
+        "Before": 3.573,
+        "After": 3.496,
+        "Ratio": 0.978
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.MixedIslandMessyKrunchClassic",
+        "Before": 1.023,
+        "After": 0.878,
+        "Ratio": 0.858
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.LargeShipsCollidingKrunchClassic",
+        "Before": 0.267,
+        "After": 0.199,
+        "Ratio": 0.745
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Box1000SingleBodiesOnPlaneVsKrunchClassic",
+        "Before": 0.688,
+        "After": 0.698,
+        "Ratio": 1.015
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectManySmallVoxelPairsNoLod",
+        "Before": 0.009,
+        "After": 0.009,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectLargeVoxelFaceOverlapNoLod",
+        "Before": 0.0,
+        "After": 0.0,
+        "Ratio": null
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectOldLodVsNoLodSolidColliderAB",
+        "Before": 0.436,
+        "After": 0.458,
+        "Ratio": 1.05
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectPathologicalOldLodVsNoLodSolidColliderAB",
+        "Before": 28.913,
+        "After": 30.096,
+        "Ratio": 1.041
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldManyScaledSmallVoxelBodiesNoLodKrunchClassic",
+        "Before": 0.023,
+        "After": 0.025,
+        "Ratio": 1.087
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldScaledHighCurvatureSlotNoLodKrunchClassic",
+        "Before": 0.049,
+        "After": 0.05,
+        "Ratio": 1.02
+      },
+      {
+        "Name": "StaticOneThousandBodiesBenchmarkTests.AllBackends",
+        "Before": 0.041,
+        "After": 0.044,
+        "Ratio": 1.073
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.DirectOldLodVsNoLodFluidColliderAB",
+        "Before": 0.107,
+        "After": 0.106,
+        "Ratio": 0.991
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.Bodies50InWaterPoolKrunchClassic",
+        "Before": 0.075,
+        "After": 0.078,
+        "Ratio": 1.04
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.SmallBodies200InWaterPoolKrunchClassic",
+        "Before": 0.071,
+        "After": 0.08,
+        "Ratio": 1.127
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWaterKrunchClassicDragOff",
+        "Before": 0.113,
+        "After": 0.112,
+        "Ratio": 0.991
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWorldWaterKrunchClassicDragOff",
+        "Before": 0.065,
+        "After": 0.068,
+        "Ratio": 1.046
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.LargeShip15x15x15_Lod16_KrunchClassic",
+        "Before": 0.026,
+        "After": 0.014,
+        "Ratio": 0.538
+      },
+      {
+        "Name": "BVHBenchmark.Build_100",
+        "Before": 0.022,
+        "After": 0.018,
+        "Ratio": 0.818
+      },
+      {
+        "Name": "BVHBenchmark.Build_1000",
+        "Before": 0.066,
+        "After": 0.07,
+        "Ratio": 1.061
+      },
+      {
+        "Name": "BVHBenchmark.Refit_1000",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Refit_10000",
+        "Before": 0.008,
+        "After": 0.008,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Build_10000",
+        "Before": 0.093,
+        "After": 0.096,
+        "Ratio": 1.032
+      },
+      {
+        "Name": "BVHBenchmark.Build_Clustered_1000",
+        "Before": 0.062,
+        "After": 0.07,
+        "Ratio": 1.129
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_SmallQuery",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_LargeQuery",
+        "Before": 0.002,
+        "After": 0.002,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_10000_SmallQuery",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_500",
+        "Before": 0.001,
+        "After": 0.001,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_2000",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_Clustered_1000",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.FullBroadphase_1000",
+        "Before": 0.023,
+        "After": 0.023,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall100Bodies",
+        "Before": 0.035,
+        "After": 0.036,
+        "Ratio": 1.029
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall1000Bodies",
+        "Before": 0.046,
+        "After": 0.049,
+        "Ratio": 1.065
+      },
+      {
+        "Name": "AvbdBenchmarkTests.StackedBoxes16Tall",
+        "Before": 0.026,
+        "After": 0.028,
+        "Ratio": 1.077
+      },
+      {
+        "Name": "AvbdBenchmarkTests.DirectContactPatchFloor",
+        "Before": 0.132,
+        "After": 0.135,
+        "Ratio": 1.023
+      },
+      {
+        "Name": "AvbdBenchmarkTests.PackedVoxelBlockNative",
+        "Before": 8.862,
+        "After": 8.797,
+        "Ratio": 0.993
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Solid",
+        "Before": 0.094,
+        "After": 0.086,
+        "Ratio": 0.915
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Hollow",
+        "Before": 0.05,
+        "After": 0.035,
+        "Ratio": 0.7
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_CornerCut",
+        "Before": 0.089,
+        "After": 0.073,
+        "Ratio": 0.82
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Channels",
+        "Before": 0.087,
+        "After": 0.075,
+        "Ratio": 0.862
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Solid",
+        "Before": 0.106,
+        "After": 0.1,
+        "Ratio": 0.943
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Hollow",
+        "Before": 0.043,
+        "After": 0.042,
+        "Ratio": 0.977
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_CornerCut",
+        "Before": 0.111,
+        "After": 0.107,
+        "Ratio": 0.964
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Channels",
+        "Before": 0.126,
+        "After": 0.104,
+        "Ratio": 0.825
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Solid",
+        "Before": 0.421,
+        "After": 0.43,
+        "Ratio": 1.021
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Hollow",
+        "Before": 0.093,
+        "After": 0.086,
+        "Ratio": 0.925
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_CornerCut",
+        "Before": 0.466,
+        "After": 0.41,
+        "Ratio": 0.88
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Channels",
+        "Before": 0.467,
+        "After": 0.425,
+        "Ratio": 0.91
+      }
+    ]
+  },
+  "windowsRepeat": {
+    "baselineSeconds": 53.005,
+    "patchedSeconds": 59.001,
+    "tests": 54,
+    "failures": 0,
+    "cases": [
+      {
+        "Name": "PhysicsWorldPerformanceTests.LodVoxelOnLodVoxelTest",
+        "Before": 0.036,
+        "After": 0.034,
+        "Ratio": 0.944
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolveCollisionConstraintTest",
+        "Before": 0.038,
+        "After": 0.036,
+        "Ratio": 0.947
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonSmall",
+        "Before": 0.628,
+        "After": 0.747,
+        "Ratio": 1.189
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonLarge",
+        "Before": 0.861,
+        "After": 0.839,
+        "Ratio": 0.974
+      },
+      {
+        "Name": "BoxShapePerformanceTests.getSignedDistanceAndNormalTest",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000BodiesKrunchClassic",
+        "Before": 2.592,
+        "After": 2.59,
+        "Ratio": 0.999
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000SingleBlocksOnVoxelGroundKrunchClassic",
+        "Before": 1.796,
+        "After": 1.406,
+        "Ratio": 0.783
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Clusters100x10VoxelBodiesKrunchClassic",
+        "Before": 3.573,
+        "After": 3.098,
+        "Ratio": 0.867
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.MixedIslandMessyKrunchClassic",
+        "Before": 1.023,
+        "After": 0.748,
+        "Ratio": 0.731
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.LargeShipsCollidingKrunchClassic",
+        "Before": 0.267,
+        "After": 0.187,
+        "Ratio": 0.7
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Box1000SingleBodiesOnPlaneVsKrunchClassic",
+        "Before": 0.688,
+        "After": 0.572,
+        "Ratio": 0.831
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectManySmallVoxelPairsNoLod",
+        "Before": 0.009,
+        "After": 0.006,
+        "Ratio": 0.667
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectLargeVoxelFaceOverlapNoLod",
+        "Before": 0.0,
+        "After": 0.0,
+        "Ratio": null
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectOldLodVsNoLodSolidColliderAB",
+        "Before": 0.436,
+        "After": 0.378,
+        "Ratio": 0.867
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectPathologicalOldLodVsNoLodSolidColliderAB",
+        "Before": 28.913,
+        "After": 34.888,
+        "Ratio": 1.207
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldManyScaledSmallVoxelBodiesNoLodKrunchClassic",
+        "Before": 0.023,
+        "After": 0.021,
+        "Ratio": 0.913
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldScaledHighCurvatureSlotNoLodKrunchClassic",
+        "Before": 0.049,
+        "After": 0.048,
+        "Ratio": 0.98
+      },
+      {
+        "Name": "StaticOneThousandBodiesBenchmarkTests.AllBackends",
+        "Before": 0.041,
+        "After": 0.04,
+        "Ratio": 0.976
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.DirectOldLodVsNoLodFluidColliderAB",
+        "Before": 0.107,
+        "After": 0.101,
+        "Ratio": 0.944
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.Bodies50InWaterPoolKrunchClassic",
+        "Before": 0.075,
+        "After": 0.072,
+        "Ratio": 0.96
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.SmallBodies200InWaterPoolKrunchClassic",
+        "Before": 0.071,
+        "After": 0.066,
+        "Ratio": 0.93
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWaterKrunchClassicDragOff",
+        "Before": 0.113,
+        "After": 0.113,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWorldWaterKrunchClassicDragOff",
+        "Before": 0.065,
+        "After": 0.064,
+        "Ratio": 0.985
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.LargeShip15x15x15_Lod16_KrunchClassic",
+        "Before": 0.026,
+        "After": 0.024,
+        "Ratio": 0.923
+      },
+      {
+        "Name": "BVHBenchmark.Build_100",
+        "Before": 0.022,
+        "After": 0.022,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Build_1000",
+        "Before": 0.066,
+        "After": 0.064,
+        "Ratio": 0.97
+      },
+      {
+        "Name": "BVHBenchmark.Refit_1000",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Refit_10000",
+        "Before": 0.008,
+        "After": 0.007,
+        "Ratio": 0.875
+      },
+      {
+        "Name": "BVHBenchmark.Build_10000",
+        "Before": 0.093,
+        "After": 0.089,
+        "Ratio": 0.957
+      },
+      {
+        "Name": "BVHBenchmark.Build_Clustered_1000",
+        "Before": 0.062,
+        "After": 0.053,
+        "Ratio": 0.855
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_SmallQuery",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_LargeQuery",
+        "Before": 0.002,
+        "After": 0.002,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_10000_SmallQuery",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_500",
+        "Before": 0.001,
+        "After": 0.002,
+        "Ratio": 2.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_2000",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_Clustered_1000",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.FullBroadphase_1000",
+        "Before": 0.023,
+        "After": 0.022,
+        "Ratio": 0.957
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall100Bodies",
+        "Before": 0.035,
+        "After": 0.036,
+        "Ratio": 1.029
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall1000Bodies",
+        "Before": 0.046,
+        "After": 0.048,
+        "Ratio": 1.043
+      },
+      {
+        "Name": "AvbdBenchmarkTests.StackedBoxes16Tall",
+        "Before": 0.026,
+        "After": 0.025,
+        "Ratio": 0.962
+      },
+      {
+        "Name": "AvbdBenchmarkTests.DirectContactPatchFloor",
+        "Before": 0.132,
+        "After": 0.13,
+        "Ratio": 0.985
+      },
+      {
+        "Name": "AvbdBenchmarkTests.PackedVoxelBlockNative",
+        "Before": 8.862,
+        "After": 8.596,
+        "Ratio": 0.97
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Solid",
+        "Before": 0.094,
+        "After": 0.134,
+        "Ratio": 1.426
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Hollow",
+        "Before": 0.05,
+        "After": 0.081,
+        "Ratio": 1.62
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_CornerCut",
+        "Before": 0.089,
+        "After": 0.144,
+        "Ratio": 1.618
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Channels",
+        "Before": 0.087,
+        "After": 0.138,
+        "Ratio": 1.586
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Solid",
+        "Before": 0.106,
+        "After": 0.193,
+        "Ratio": 1.821
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Hollow",
+        "Before": 0.043,
+        "After": 0.079,
+        "Ratio": 1.837
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_CornerCut",
+        "Before": 0.111,
+        "After": 0.204,
+        "Ratio": 1.838
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Channels",
+        "Before": 0.126,
+        "After": 0.206,
+        "Ratio": 1.635
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Solid",
+        "Before": 0.421,
+        "After": 0.833,
+        "Ratio": 1.979
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Hollow",
+        "Before": 0.093,
+        "After": 0.172,
+        "Ratio": 1.849
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_CornerCut",
+        "Before": 0.466,
+        "After": 0.786,
+        "Ratio": 1.687
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Channels",
+        "Before": 0.467,
+        "After": 0.814,
+        "Ratio": 1.743
+      }
+    ]
+  },
+  "windowsFinal": {
+    "baselineSeconds": 53.005,
+    "patchedSeconds": 52.513,
+    "tests": 54,
+    "failures": 0,
+    "cases": [
+      {
+        "Name": "PhysicsWorldPerformanceTests.LodVoxelOnLodVoxelTest",
+        "Before": 0.036,
+        "After": 0.038,
+        "Ratio": 1.056
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolveCollisionConstraintTest",
+        "Before": 0.038,
+        "After": 0.038,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonSmall",
+        "Before": 0.628,
+        "After": 0.634,
+        "Ratio": 1.01
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonLarge",
+        "Before": 0.861,
+        "After": 0.827,
+        "Ratio": 0.961
+      },
+      {
+        "Name": "BoxShapePerformanceTests.getSignedDistanceAndNormalTest",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000BodiesKrunchClassic",
+        "Before": 2.592,
+        "After": 2.792,
+        "Ratio": 1.077
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000SingleBlocksOnVoxelGroundKrunchClassic",
+        "Before": 1.796,
+        "After": 1.417,
+        "Ratio": 0.789
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Clusters100x10VoxelBodiesKrunchClassic",
+        "Before": 3.573,
+        "After": 3.151,
+        "Ratio": 0.882
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.MixedIslandMessyKrunchClassic",
+        "Before": 1.023,
+        "After": 0.841,
+        "Ratio": 0.822
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.LargeShipsCollidingKrunchClassic",
+        "Before": 0.267,
+        "After": 0.239,
+        "Ratio": 0.895
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Box1000SingleBodiesOnPlaneVsKrunchClassic",
+        "Before": 0.688,
+        "After": 0.817,
+        "Ratio": 1.188
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectManySmallVoxelPairsNoLod",
+        "Before": 0.009,
+        "After": 0.009,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectLargeVoxelFaceOverlapNoLod",
+        "Before": 0.0,
+        "After": 0.0,
+        "Ratio": null
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectOldLodVsNoLodSolidColliderAB",
+        "Before": 0.436,
+        "After": 0.476,
+        "Ratio": 1.092
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectPathologicalOldLodVsNoLodSolidColliderAB",
+        "Before": 28.913,
+        "After": 30.709,
+        "Ratio": 1.062
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldManyScaledSmallVoxelBodiesNoLodKrunchClassic",
+        "Before": 0.023,
+        "After": 0.023,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldScaledHighCurvatureSlotNoLodKrunchClassic",
+        "Before": 0.049,
+        "After": 0.049,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "StaticOneThousandBodiesBenchmarkTests.AllBackends",
+        "Before": 0.041,
+        "After": 0.04,
+        "Ratio": 0.976
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.DirectOldLodVsNoLodFluidColliderAB",
+        "Before": 0.107,
+        "After": 0.103,
+        "Ratio": 0.963
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.Bodies50InWaterPoolKrunchClassic",
+        "Before": 0.075,
+        "After": 0.074,
+        "Ratio": 0.987
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.SmallBodies200InWaterPoolKrunchClassic",
+        "Before": 0.071,
+        "After": 0.077,
+        "Ratio": 1.085
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWaterKrunchClassicDragOff",
+        "Before": 0.113,
+        "After": 0.101,
+        "Ratio": 0.894
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWorldWaterKrunchClassicDragOff",
+        "Before": 0.065,
+        "After": 0.065,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.LargeShip15x15x15_Lod16_KrunchClassic",
+        "Before": 0.026,
+        "After": 0.013,
+        "Ratio": 0.5
+      },
+      {
+        "Name": "BVHBenchmark.Build_100",
+        "Before": 0.022,
+        "After": 0.018,
+        "Ratio": 0.818
+      },
+      {
+        "Name": "BVHBenchmark.Build_1000",
+        "Before": 0.066,
+        "After": 0.068,
+        "Ratio": 1.03
+      },
+      {
+        "Name": "BVHBenchmark.Refit_1000",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Refit_10000",
+        "Before": 0.008,
+        "After": 0.007,
+        "Ratio": 0.875
+      },
+      {
+        "Name": "BVHBenchmark.Build_10000",
+        "Before": 0.093,
+        "After": 0.092,
+        "Ratio": 0.989
+      },
+      {
+        "Name": "BVHBenchmark.Build_Clustered_1000",
+        "Before": 0.062,
+        "After": 0.057,
+        "Ratio": 0.919
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_SmallQuery",
+        "Before": 0.001,
+        "After": 0.0,
+        "Ratio": 0.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_LargeQuery",
+        "Before": 0.002,
+        "After": 0.002,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_10000_SmallQuery",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_500",
+        "Before": 0.001,
+        "After": 0.002,
+        "Ratio": 2.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_2000",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_Clustered_1000",
+        "Before": 0.004,
+        "After": 0.004,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.FullBroadphase_1000",
+        "Before": 0.023,
+        "After": 0.023,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall100Bodies",
+        "Before": 0.035,
+        "After": 0.039,
+        "Ratio": 1.114
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall1000Bodies",
+        "Before": 0.046,
+        "After": 0.043,
+        "Ratio": 0.935
+      },
+      {
+        "Name": "AvbdBenchmarkTests.StackedBoxes16Tall",
+        "Before": 0.026,
+        "After": 0.025,
+        "Ratio": 0.962
+      },
+      {
+        "Name": "AvbdBenchmarkTests.DirectContactPatchFloor",
+        "Before": 0.132,
+        "After": 0.133,
+        "Ratio": 1.008
+      },
+      {
+        "Name": "AvbdBenchmarkTests.PackedVoxelBlockNative",
+        "Before": 8.862,
+        "After": 7.432,
+        "Ratio": 0.839
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Solid",
+        "Before": 0.094,
+        "After": 0.079,
+        "Ratio": 0.84
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Hollow",
+        "Before": 0.05,
+        "After": 0.036,
+        "Ratio": 0.72
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_CornerCut",
+        "Before": 0.089,
+        "After": 0.083,
+        "Ratio": 0.933
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Channels",
+        "Before": 0.087,
+        "After": 0.076,
+        "Ratio": 0.874
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Solid",
+        "Before": 0.106,
+        "After": 0.099,
+        "Ratio": 0.934
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Hollow",
+        "Before": 0.043,
+        "After": 0.041,
+        "Ratio": 0.953
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_CornerCut",
+        "Before": 0.111,
+        "After": 0.108,
+        "Ratio": 0.973
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Channels",
+        "Before": 0.126,
+        "After": 0.11,
+        "Ratio": 0.873
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Solid",
+        "Before": 0.421,
+        "After": 0.437,
+        "Ratio": 1.038
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Hollow",
+        "Before": 0.093,
+        "After": 0.088,
+        "Ratio": 0.946
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_CornerCut",
+        "Before": 0.466,
+        "After": 0.422,
+        "Ratio": 0.906
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Channels",
+        "Before": 0.467,
+        "After": 0.417,
+        "Ratio": 0.893
+      }
+    ]
+  },
+  "linux": {
+    "baselineSeconds": 48.337,
+    "patchedSeconds": 47.012,
+    "tests": 54,
+    "failures": 0,
+    "cases": [
+      {
+        "Name": "PhysicsWorldPerformanceTests.LodVoxelOnLodVoxelTest",
+        "Before": 0.051,
+        "After": 0.05,
+        "Ratio": 0.98
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolveCollisionConstraintTest",
+        "Before": 0.029,
+        "After": 0.027,
+        "Ratio": 0.931
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonSmall",
+        "Before": 1.59,
+        "After": 1.513,
+        "Ratio": 0.952
+      },
+      {
+        "Name": "TwoBodyConstraintPerformanceTests.SolverComparisonLarge",
+        "Before": 2.059,
+        "After": 1.992,
+        "Ratio": 0.967
+      },
+      {
+        "Name": "BoxShapePerformanceTests.getSignedDistanceAndNormalTest",
+        "Before": 0.003,
+        "After": 0.005,
+        "Ratio": 1.667
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000BodiesKrunchClassic",
+        "Before": 2.872,
+        "After": 2.772,
+        "Ratio": 0.965
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Voxel1000SingleBlocksOnVoxelGroundKrunchClassic",
+        "Before": 1.259,
+        "After": 1.259,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Clusters100x10VoxelBodiesKrunchClassic",
+        "Before": 2.458,
+        "After": 2.497,
+        "Ratio": 1.016
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.MixedIslandMessyKrunchClassic",
+        "Before": 0.723,
+        "After": 0.698,
+        "Ratio": 0.965
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.LargeShipsCollidingKrunchClassic",
+        "Before": 0.198,
+        "After": 0.197,
+        "Ratio": 0.995
+      },
+      {
+        "Name": "VoxelCollisionBenchmarkTests.Box1000SingleBodiesOnPlaneVsKrunchClassic",
+        "Before": 0.662,
+        "After": 0.619,
+        "Ratio": 0.935
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectManySmallVoxelPairsNoLod",
+        "Before": 0.006,
+        "After": 0.006,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectLargeVoxelFaceOverlapNoLod",
+        "Before": 0.0,
+        "After": 0.0,
+        "Ratio": null
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectOldLodVsNoLodSolidColliderAB",
+        "Before": 0.408,
+        "After": 0.394,
+        "Ratio": 0.966
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.DirectPathologicalOldLodVsNoLodSolidColliderAB",
+        "Before": 26.445,
+        "After": 25.325,
+        "Ratio": 0.958
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldManyScaledSmallVoxelBodiesNoLodKrunchClassic",
+        "Before": 0.022,
+        "After": 0.025,
+        "Ratio": 1.136
+      },
+      {
+        "Name": "VoxelColliderBenchmarkTests.WorldScaledHighCurvatureSlotNoLodKrunchClassic",
+        "Before": 0.052,
+        "After": 0.052,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "StaticOneThousandBodiesBenchmarkTests.AllBackends",
+        "Before": 0.053,
+        "After": 0.054,
+        "Ratio": 1.019
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.DirectOldLodVsNoLodFluidColliderAB",
+        "Before": 0.145,
+        "After": 0.145,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.Bodies50InWaterPoolKrunchClassic",
+        "Before": 0.101,
+        "After": 0.102,
+        "Ratio": 1.01
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.SmallBodies200InWaterPoolKrunchClassic",
+        "Before": 0.074,
+        "After": 0.069,
+        "Ratio": 0.932
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWaterKrunchClassicDragOff",
+        "Before": 0.112,
+        "After": 0.11,
+        "Ratio": 0.982
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.OneBlockShips125DropIntoWorldWaterKrunchClassicDragOff",
+        "Before": 0.08,
+        "After": 0.076,
+        "Ratio": 0.95
+      },
+      {
+        "Name": "FluidCollisionBenchmarkTests.LargeShip15x15x15_Lod16_KrunchClassic",
+        "Before": 0.013,
+        "After": 0.015,
+        "Ratio": 1.154
+      },
+      {
+        "Name": "BVHBenchmark.Build_100",
+        "Before": 0.017,
+        "After": 0.016,
+        "Ratio": 0.941
+      },
+      {
+        "Name": "BVHBenchmark.Build_1000",
+        "Before": 0.062,
+        "After": 0.062,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Refit_1000",
+        "Before": 0.001,
+        "After": 0.001,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Refit_10000",
+        "Before": 0.011,
+        "After": 0.011,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Build_10000",
+        "Before": 0.091,
+        "After": 0.099,
+        "Ratio": 1.088
+      },
+      {
+        "Name": "BVHBenchmark.Build_Clustered_1000",
+        "Before": 0.056,
+        "After": 0.054,
+        "Ratio": 0.964
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_SmallQuery",
+        "Before": 0.001,
+        "After": 0.001,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_1000_LargeQuery",
+        "Before": 0.001,
+        "After": 0.001,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.Query_10000_SmallQuery",
+        "Before": 0.007,
+        "After": 0.007,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_500",
+        "Before": 0.001,
+        "After": 0.001,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_2000",
+        "Before": 0.003,
+        "After": 0.004,
+        "Ratio": 1.333
+      },
+      {
+        "Name": "BVHBenchmark.AllPairsQuery_Clustered_1000",
+        "Before": 0.003,
+        "After": 0.003,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "BVHBenchmark.FullBroadphase_1000",
+        "Before": 0.021,
+        "After": 0.021,
+        "Ratio": 1.0
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall100Bodies",
+        "Before": 0.04,
+        "After": 0.041,
+        "Ratio": 1.025
+      },
+      {
+        "Name": "AvbdBenchmarkTests.FreeFall1000Bodies",
+        "Before": 0.039,
+        "After": 0.036,
+        "Ratio": 0.923
+      },
+      {
+        "Name": "AvbdBenchmarkTests.StackedBoxes16Tall",
+        "Before": 0.028,
+        "After": 0.033,
+        "Ratio": 1.179
+      },
+      {
+        "Name": "AvbdBenchmarkTests.DirectContactPatchFloor",
+        "Before": 0.19,
+        "After": 0.188,
+        "Ratio": 0.989
+      },
+      {
+        "Name": "AvbdBenchmarkTests.PackedVoxelBlockNative",
+        "Before": 6.317,
+        "After": 6.469,
+        "Ratio": 1.024
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Solid",
+        "Before": 0.074,
+        "After": 0.07,
+        "Ratio": 0.946
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Hollow",
+        "Before": 0.038,
+        "After": 0.036,
+        "Ratio": 0.947
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_CornerCut",
+        "Before": 0.081,
+        "After": 0.075,
+        "Ratio": 0.926
+      },
+      {
+        "Name": "Ship15x15x15/LargeShipFluidBenchmark.Lod16InWaterPool/Size15_Channels",
+        "Before": 0.082,
+        "After": 0.077,
+        "Ratio": 0.939
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Solid",
+        "Before": 0.105,
+        "After": 0.1,
+        "Ratio": 0.952
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Hollow",
+        "Before": 0.046,
+        "After": 0.043,
+        "Ratio": 0.935
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_CornerCut",
+        "Before": 0.115,
+        "After": 0.109,
+        "Ratio": 0.948
+      },
+      {
+        "Name": "Ship17x17x17/LargeShipFluidBenchmark.Lod16InWaterPool/Size17_Channels",
+        "Before": 0.116,
+        "After": 0.113,
+        "Ratio": 0.974
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Solid",
+        "Before": 0.407,
+        "After": 0.397,
+        "Ratio": 0.975
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Hollow",
+        "Before": 0.094,
+        "After": 0.089,
+        "Ratio": 0.947
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_CornerCut",
+        "Before": 0.412,
+        "After": 0.392,
+        "Ratio": 0.951
+      },
+      {
+        "Name": "Ship25x25x25/LargeShipFluidBenchmark.Lod16InWaterPool/Size25_Channels",
+        "Before": 0.413,
+        "After": 0.386,
+        "Ratio": 0.935
+      }
+    ]
+  }
+}

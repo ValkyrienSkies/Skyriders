@@ -38,6 +38,19 @@ object BikeClientEffects {
     private val lastEngineDestroyedByBodyId = HashMap<Long, Boolean>()
     private val lastGearByBodyId = HashMap<Long, Int>()
     private val lastParkingBrakeByBodyId = HashMap<Long, Boolean>()
+
+    fun clear() {
+        engineSoundsByBodyId.values.forEach { it.stopNow() }
+        tireLeakSoundsByPart.values.forEach { it.stopNow() }
+        engineSoundsByBodyId.clear()
+        tireLeakSoundsByPart.clear()
+        telemetryByBodyId.clear()
+        vehicleTelemetryByBodyId.clear()
+        lastEngineStateByBodyId.clear()
+        lastEngineDestroyedByBodyId.clear()
+        lastGearByBodyId.clear()
+        lastParkingBrakeByBodyId.clear()
+    }
     private val tireLeakSoundIds = listOf(
         ResourceLocation(SkyridersMod.MOD_ID, "tire_leak_1"),
         ResourceLocation(SkyridersMod.MOD_ID, "tire_leak_2")

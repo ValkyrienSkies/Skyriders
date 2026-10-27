@@ -27,7 +27,7 @@ object BoostPadHandler {
     private const val SHIP_SAMPLE_RADIUS = 0.35
     private const val SOUND_COOLDOWN_TICKS = 20L
     private val boostPadsByDimension = ConcurrentHashMap<DimensionId, MutableSet<Long>>()
-    private val nextSoundTickByBody = ConcurrentHashMap<Long, Long>()
+    private val nextSoundTickByBody = ConcurrentHashMap<Pair<DimensionId, Long>, Long>()
 
     fun physTick(physLevel: PhysLevel, vehicles: Iterable<IVehicle>, dt: Double) {
         vehicles.forEach { vehicle ->
@@ -59,6 +59,7 @@ object BoostPadHandler {
     fun clear(level: Level) {
         if (level.isClientSide) return
         boostPadsByDimension.remove(level.dimensionId)
+        nextSoundTickByBody.keys.removeIf { it.first == level.dimensionId }
     }
 
     private fun applyBoostIfOnPad(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
@@ -83,7 +84,8 @@ object BoostPadHandler {
         if (!isOnCachedBoostPad(vehicle, body) || !isMovingFastEnoughForBoost(body)) return
 
         val now = level.gameTime
-        val nextSoundTick = nextSoundTickByBody[vehicle.bodyId] ?: 0L
+        val key = level.dimensionId to vehicle.bodyId
+        val nextSoundTick = nextSoundTickByBody[key] ?: 0L
         if (now < nextSoundTick) return
 
         val position = body.kinematics.position
@@ -97,7 +99,7 @@ object BoostPadHandler {
             0.75f,
             1.0f
         )
-        nextSoundTickByBody[vehicle.bodyId] = now + SOUND_COOLDOWN_TICKS
+        nextSoundTickByBody[key] = now + SOUND_COOLDOWN_TICKS
     }
 
     private fun isMovingFastEnoughForBoost(body: VsBody): Boolean {

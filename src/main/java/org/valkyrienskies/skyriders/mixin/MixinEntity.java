@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.valkyrienskies.skyriders.content.VehicleEntityCollision;
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity;
+import org.valkyrienskies.skyriders.util.VehicleMovementSubsteps;
 
 @Mixin(Entity.class)
 public abstract class MixinEntity {
@@ -39,23 +40,13 @@ public abstract class MixinEntity {
     )
     private Vec3 skyriders$collideWithVehicleBodies(final Entity entity, Vec3 movement, final Operation<Vec3> collide) {
         final AABB box = this.getBoundingBox();
-        final int subdivisions = (int) (movement.length() / 0.5) + 1;
-        final Vec3 substep = movement.scale(1.0 / subdivisions);
-
-        for (int i = 0; i < subdivisions; i++) {
-            final Vec3 previousMovement = substep.scale(i);
-            final Vec3 partialResult = VehicleEntityCollision.adjustEntityMovementForVehicleBodyCollisions(
+        final Vec3 adjusted = VehicleMovementSubsteps.resolve(movement, (offset, substep) ->
+            VehicleEntityCollision.adjustEntityMovementForVehicleBodyCollisions(
                 entity,
                 substep,
-                box.move(previousMovement),
+                box.move(offset),
                 this.level
-            );
-            if (partialResult.distanceToSqr(substep) > 1.0e-12) {
-                movement = previousMovement.add(partialResult);
-                break;
-            }
-        }
-
-        return collide.call(entity, movement);
+            ));
+        return collide.call(entity, adjusted);
     }
 }

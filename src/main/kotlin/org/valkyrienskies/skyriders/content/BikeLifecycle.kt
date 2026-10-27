@@ -5,6 +5,8 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraftforge.event.TickEvent
 import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.event.level.LevelEvent
+import net.minecraftforge.event.server.ServerStoppingEvent
+import net.minecraftforge.event.server.ServerStoppedEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.joml.Vector3d
 import org.valkyrienskies.mod.api.dimensionId
@@ -23,6 +25,23 @@ object BikeLifecycle {
     private const val ACTIVE_LINEAR_SPEED_SQUARED = 0.04
     private const val ACTIVE_ANGULAR_SPEED_SQUARED = 0.01
     private val pendingRestoreLevels = mutableSetOf<ServerLevel>()
+    private val pendingRecords = mutableMapOf<ServerLevel, List<VehicleSaveRecord>>()
+
+    @SubscribeEvent
+    fun onServerStopping(event: ServerStoppingEvent) {
+        BikeInteractionHandler.releaseAll()
+    }
+
+    @SubscribeEvent
+    fun onServerStopped(event: ServerStoppedEvent) {
+        BikeInteractionHandler.clear()
+        VehicleDamageEvents.clear()
+        pendingRestoreLevels.clear()
+        pendingRecords.clear()
+    }
+
+    fun unresolvedRecords(level: ServerLevel): List<VehicleSaveRecord> =
+        pendingRecords[level] ?: if (level in pendingRestoreLevels) BikeSavedData.get(level).records.toList() else emptyList()
 
     @SubscribeEvent
     fun onLevelLoad(event: LevelEvent.Load) {
@@ -41,8 +60,16 @@ object BikeLifecycle {
     fun onLevelUnload(event: LevelEvent.Unload) {
         val level = event.level as? ServerLevel ?: return
         pendingRestoreLevels.remove(level)
+        pendingRecords.remove(level)
+        BikeInteractionHandler.unloadLevel(level.dimensionId)
         RaceManager.unloadLevel(level)
         BoostPadHandler.clear(level)
+        VehicleImpactDamageHandler.clear(level)
+        VehicleImpairmentEffects.clear(level)
+        VehicleDamage.clear(level)
+        BikeManager.clearBikes(level)
+        VehicleManager.clearVehicles(level)
+        VehicleStatusEffects.clear(level.dimensionId)
     }
 
     @SubscribeEvent
@@ -54,13 +81,23 @@ object BikeLifecycle {
             while (iterator.hasNext()) {
                 val level = iterator.next()
                 RaceManager.loadLevel(level)
-                VehicleManager.restoreVehicles(level, BikeSavedData.get(level).records)
+                val records = BikeSavedData.get(level).records.toList()
+                VehicleManager.restoreVehicles(level, records)
+                pendingRecords[level] = records.filter { VehicleManager.getVehicle(level, it.bodyId) == null }
                 syncLevel(level)
                 iterator.remove()
             }
         }
 
         event.server.allLevels.forEach { level ->
+            pendingRecords[level]?.let { records ->
+                var restored = false
+                pendingRecords[level] = records.filter {
+                    if (!VehicleManager.isKnownType(it.vehicleType)) true
+                    else (VehicleManager.restoreVehicle(level, it) == null).also { pending -> if (!pending) restored = true }
+                }
+                if (restored) syncLevel(level)
+            }
             VehicleManager.tick(level.dimensionId)
             val vehicles = VehicleManager.getVehicles(level.dimensionId)
             BoostPadHandler.gameTick(level, vehicles)
@@ -142,12 +179,12 @@ object BikeLifecycle {
     }
 
     private fun isVehicleEngineOn(vehicle: IVehicle): Boolean {
-        return when (vehicle) {
+        return withVehicleState(vehicle) { when (vehicle) {
             is IBike -> vehicle.state.engineOn
             is KartVehicle -> vehicle.kartState.engineOn
             is WheeledVehicle -> vehicle.wheeledState.engineOn
             else -> vehicle.vehicleState.engineOn
-        }
+        } }
     }
 
     private fun Vector3d.isFinite(): Boolean {

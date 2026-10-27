@@ -42,6 +42,34 @@ object BikeInteractionHandler {
     private val hoistedPlayersByBody = ConcurrentHashMap<BodyId, UUID>()
     private val pendingReleases = ConcurrentHashMap<BodyId, ReleasePose>()
     private val pendingTosses = ConcurrentHashMap<BodyId, PendingToss>()
+    private const val CARRY_STATIC_KEY = "carry_original_static"
+
+    fun saveCarryState(dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId, record: VehicleSaveRecord): VehicleSaveRecord {
+        val hoisted = hoistedPlayersByBody[record.bodyId]?.let(hoistedByPlayer::get)
+            ?.takeIf { it.dimensionId == dimensionId }
+        val release = pendingReleases[record.bodyId]?.takeIf { it.dimensionId == dimensionId }
+        val wasStatic = hoisted?.wasStatic ?: release?.wasStatic ?: return record
+        return record.copy(behaviorTag = record.behaviorTag.copy().apply { putBoolean(CARRY_STATIC_KEY, wasStatic) })
+    }
+
+    fun restoreCarryState(level: net.minecraft.world.level.Level, record: VehicleSaveRecord) {
+        if (level !is ServerLevel || !record.behaviorTag.contains(CARRY_STATIC_KEY)) return
+        val body = getServerBody(level, record.bodyId) ?: return
+        val pose = body.kinematics
+        pendingReleases[record.bodyId] = ReleasePose(level.dimensionId, Vector3d(pose.position),
+            Quaterniond(pose.rotation), Vector3d(pose.scaling), record.behaviorTag.getBoolean(CARRY_STATIC_KEY))
+    }
+
+    fun releaseAll() {
+        hoistedByPlayer.keys.toList().forEach(::releaseOnExit)
+    }
+
+    fun clear() {
+        hoistedByPlayer.clear()
+        hoistedPlayersByBody.clear()
+        pendingReleases.clear()
+        pendingTosses.clear()
+    }
 
     fun handleUse(player: ServerPlayer, shiftDownOverride: Boolean? = null) {
         val level = player.level() as? ServerLevel ?: return
@@ -262,7 +290,7 @@ object BikeInteractionHandler {
             val body = physLevel.getBodyById(hoisted.bodyId) ?: return@forEach
             val pose = hoisted.pose
             body.isStatic = true
-            body.setTransform(pose.position, pose.rotation, Vector3d(1.0, 1.0, 1.0))
+            body.setTransform(pose.position, pose.rotation, hoisted.scaling)
         }
 
         val releaseIterator = pendingReleases.entries.iterator()
@@ -273,10 +301,10 @@ object BikeInteractionHandler {
 
             val body = physLevel.getBodyById(entry.key)
             if (body != null) {
-                body.setTransform(release.position, release.rotation, Vector3d(1.0, 1.0, 1.0))
-                body.isStatic = false
+                body.setTransform(release.position, release.rotation, release.scaling)
+                body.isStatic = release.wasStatic
+                pendingReleases.remove(entry.key, release)
             }
-            releaseIterator.remove()
         }
 
         val iterator = pendingTosses.entries.iterator()
@@ -302,14 +330,16 @@ object BikeInteractionHandler {
 
     private fun startHoisting(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone? = null) {
         if (player.vehicle is BikeSeatEntity) return
-        if (hoistedPlayersByBody.containsKey(vehicle.bodyId)) return
+        if (hoistedPlayersByBody.containsKey(vehicle.bodyId) || pendingReleases.containsKey(vehicle.bodyId)) return
 
         val level = player.level() as? ServerLevel ?: return
         val body = getServerBody(level, vehicle.bodyId) ?: return
-        body.isStatic = true
         VehicleManager.clearInput(level.dimensionId, vehicle.bodyId)
 
-        hoistedByPlayer[player.uuid] = HoistedBike(level.dimensionId, vehicle.bodyId)
+        hoistedByPlayer[player.uuid] = HoistedBike(
+            level.dimensionId, vehicle.bodyId, body.isStatic, Vector3d(body.kinematics.scaling),
+            CarryPose(Vector3d(body.kinematics.position), Quaterniond(body.kinematics.rotation))
+        )
         hoistedPlayersByBody[vehicle.bodyId] = player.uuid
         SkyridersNetwork.sendBikeHoistState(player, true, vehicle.bodyId)
         zone?.let { VehicleInteractionSounds.play(player, vehicle, it, VehicleInteractionActions.PICK_UP) }
@@ -321,6 +351,7 @@ object BikeInteractionHandler {
         val level = player.level() as? ServerLevel ?: return clearHoist(player.uuid, hoisted.bodyId)
         if (level.dimensionId != hoisted.dimensionId || player.isRemoved || player.isDeadOrDying) {
             clearHoist(player.uuid, hoisted.bodyId)
+            SkyridersNetwork.sendBikeHoistState(player, false)
             return
         }
 
@@ -348,7 +379,7 @@ object BikeInteractionHandler {
                 loc.y + normal.y * 0.25 + PLACE_UP_OFFSET,
                 loc.z + normal.z * 0.25
             )
-            pendingReleases[hoisted.bodyId] = ReleasePose(level.dimensionId, pos, carriedRotation(player))
+            pendingReleases[hoisted.bodyId] = ReleasePose(hoisted.dimensionId, pos, carriedRotation(player), hoisted.scaling, hoisted.wasStatic)
         } else {
             val eye = player.eyePosition
             val look = player.lookAngle.normalize()
@@ -357,7 +388,7 @@ object BikeInteractionHandler {
                 eye.y - 0.2 + look.y * 0.5,
                 eye.z + look.z * 1.15
             )
-            pendingReleases[hoisted.bodyId] = ReleasePose(level.dimensionId, pos, carriedRotation(player))
+            pendingReleases[hoisted.bodyId] = ReleasePose(hoisted.dimensionId, pos, carriedRotation(player), hoisted.scaling, hoisted.wasStatic)
             val mass = vehicle?.vehicleDefinition?.body?.mass ?: 250.0
             val direction = Vector3d(look.x, max(look.y, 0.0) + 0.18, look.z).normalize()
             pendingTosses[hoisted.bodyId] = PendingToss(
@@ -373,8 +404,34 @@ object BikeInteractionHandler {
     }
 
     private fun clearHoist(playerId: UUID, bodyId: BodyId) {
-        hoistedByPlayer.remove(playerId)
+        val hoisted = hoistedByPlayer.remove(playerId)
         hoistedPlayersByBody.remove(bodyId)
+        if (hoisted != null) {
+            val pose = hoisted.pose
+            pendingReleases.putIfAbsent(bodyId, ReleasePose(hoisted.dimensionId, pose.position, pose.rotation, hoisted.scaling, hoisted.wasStatic))
+        }
+    }
+
+    fun releaseOnExit(playerId: UUID) {
+        val hoisted = hoistedByPlayer[playerId] ?: return
+        pendingTosses.remove(hoisted.bodyId)
+        clearHoist(playerId, hoisted.bodyId)
+    }
+
+    fun forgetVehicle(dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId, bodyId: BodyId) {
+        hoistedPlayersByBody[bodyId]?.let { playerId ->
+            hoistedByPlayer[playerId]?.takeIf { it.dimensionId == dimensionId }?.let {
+                hoistedByPlayer.remove(playerId, it)
+                hoistedPlayersByBody.remove(bodyId, playerId)
+            }
+        }
+        pendingReleases[bodyId]?.takeIf { it.dimensionId == dimensionId }?.let { pendingReleases.remove(bodyId, it) }
+        pendingTosses[bodyId]?.takeIf { it.dimensionId == dimensionId }?.let { pendingTosses.remove(bodyId, it) }
+    }
+
+    fun unloadLevel(dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId) {
+        hoistedByPlayer.entries.filter { it.value.dimensionId == dimensionId }.forEach { releaseOnExit(it.key) }
+        pendingTosses.entries.removeIf { it.value.dimensionId == dimensionId }
     }
 
     private fun carriedRotation(player: ServerPlayer): Quaterniond {
@@ -405,7 +462,9 @@ object BikeInteractionHandler {
     private data class HoistedBike(
         val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,
         val bodyId: BodyId,
-        @Volatile var pose: CarryPose = CarryPose(Vector3d(), Quaterniond())
+        val wasStatic: Boolean,
+        val scaling: Vector3dc,
+        @Volatile var pose: CarryPose
     )
 
     private data class CarryPose(
@@ -416,7 +475,9 @@ object BikeInteractionHandler {
     private data class ReleasePose(
         val dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId,
         val position: Vector3dc,
-        val rotation: org.joml.Quaterniondc
+        val rotation: org.joml.Quaterniondc,
+        val scaling: Vector3dc,
+        val wasStatic: Boolean
     )
 
     private data class PendingToss(

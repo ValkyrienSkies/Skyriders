@@ -123,7 +123,7 @@ class BikeSeatEntity(type: EntityType<BikeSeatEntity>, level: Level) : Entity(ty
     private fun cleanupSeat() {
         if (cleanedUp) return
         cleanedUp = true
-        if (!level().isClientSide) {
+        if (!level().isClientSide && isDriverSeat()) {
             VehicleManager.clearInput(level().dimensionId, bodyId)
             (level() as? ServerLevel)?.let { VehicleImpairmentEffects.clear(it, bodyId) }
         }

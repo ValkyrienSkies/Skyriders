@@ -1,5 +1,10 @@
 package org.valkyrienskies.skyriders.content.vehicles
 
+import org.valkyrienskies.skyriders.content.withVehicleState
+import org.valkyrienskies.skyriders.content.snapshotParts
+import org.valkyrienskies.skyriders.content.finiteDouble
+import org.valkyrienskies.skyriders.content.transmissionGear
+
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.level.Level
 import org.valkyrienskies.core.api.bodies.ClientVsBody
@@ -26,6 +31,7 @@ class WheeledVehicle(
     override val vehicleDefinition: VehicleDefinition,
     val wheeledState: WheeledVehicleRuntimeState = WheeledVehicleRuntimeState()
 ) : IVehicle {
+    private val collisionBoxes = vehicleDefinition.body.resolvedCollisionBoxes()
     override val id: String
         get() = vehicleDefinition.id.toString()
 
@@ -48,11 +54,11 @@ class WheeledVehicle(
 
     override fun physTick(physLevel: PhysLevel, body: PhysVsBody, input: VehicleInput, dt: Double) {
         val behavior = vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition ?: return
-        val activeInput = if (wheeledState.engineOn) input else VehicleInput.EMPTY.copy(riderPresent = input.riderPresent)
-        WheeledVehiclePhysicsSolver.updatePhysics(body, physLevel, activeInput, behavior.physics, wheeledState, dt)
+        val activeInput = input.withEngineState(wheeledState.engineOn)
+        WheeledVehiclePhysicsSolver.updatePhysics(body, physLevel, activeInput, behavior.physics, wheeledState, dt, collisionBoxes)
     }
 
-    override fun toVehicleSaveRecord(): VehicleSaveRecord = VehicleSaveRecord(
+    override fun toVehicleSaveRecord(): VehicleSaveRecord = withVehicleState(this) { VehicleSaveRecord(
         bodyId = bodyId,
         vehicleType = id,
         engineOn = wheeledState.engineOn,
@@ -79,8 +85,8 @@ class WheeledVehicle(
             put("wheel_angular_velocity_by_id", wheelAngularVelocity)
             put("visual_wheel_angular_velocity_by_id", visualWheelAngularVelocity)
         },
-        partStates = wheeledState.partStates
-    )
+        partStates = wheeledState.partStates.snapshotParts()
+    ) }
 
 }
 
@@ -93,30 +99,32 @@ fun wheeledRuntimeStateFromTag(
     raceColorId: Int = -1,
     partStates: Map<String, VehiclePartState>
 ): WheeledVehicleRuntimeState {
+    val physics = (definition.behavior as WheeledVehicleBehaviorDefinition).physics
     val state = WheeledVehicleRuntimeState(
         engineOn = engineOn,
         fuelAmount = VehicleFuel.initialAmount(definition, fuelAmount),
         raceParticipant = raceParticipant,
         raceColorId = raceColorId,
         parkingBrakeEngaged = tag.getBoolean("parking_brake_engaged"),
-        transmissionGear = tag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
-        engineRpm = tag.getDouble("engine_rpm").takeIf { it > 0.0 } ?: 850.0,
+        transmissionGear = tag.transmissionGear(physics.transmission),
+        engineRpm = if (tag.contains("engine_rpm")) tag.finiteDouble("engine_rpm", physics.engine.idleRpm)
+            .coerceIn(0.0, physics.engine.revLimiterRpm) else physics.engine.idleRpm,
         engineStalled = tag.getBoolean("engine_stalled"),
-        frontWheelSpin = tag.getDouble("front_wheel_spin"),
-        rearWheelSpin = tag.getDouble("rear_wheel_spin"),
-        frontWheelAngularVelocity = tag.getDouble("front_wheel_angular_velocity"),
-        rearWheelAngularVelocity = tag.getDouble("rear_wheel_angular_velocity")
+        frontWheelSpin = tag.finiteDouble("front_wheel_spin"),
+        rearWheelSpin = tag.finiteDouble("rear_wheel_spin"),
+        frontWheelAngularVelocity = tag.finiteDouble("front_wheel_angular_velocity"),
+        rearWheelAngularVelocity = tag.finiteDouble("rear_wheel_angular_velocity")
     )
     state.partStates.putAll(definition.initialPartStates(partStates))
     val wheelSpin = tag.getCompound("wheel_spin_by_id")
-    wheelSpin.allKeys.forEach { key -> state.wheelSpinById[key] = wheelSpin.getDouble(key) }
+    wheelSpin.allKeys.forEach { key -> state.wheelSpinById[key] = wheelSpin.finiteDouble(key) }
     val wheelAngularVelocity = tag.getCompound("wheel_angular_velocity_by_id")
-    wheelAngularVelocity.allKeys.forEach { key -> state.wheelAngularVelocityById[key] = wheelAngularVelocity.getDouble(key) }
+    wheelAngularVelocity.allKeys.forEach { key -> state.wheelAngularVelocityById[key] = wheelAngularVelocity.finiteDouble(key) }
     val visualWheelAngularVelocity = tag.getCompound("visual_wheel_angular_velocity_by_id")
     if (visualWheelAngularVelocity.isEmpty) {
-        wheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = wheelAngularVelocity.getDouble(key) }
+        wheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = wheelAngularVelocity.finiteDouble(key) }
     } else {
-        visualWheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = visualWheelAngularVelocity.getDouble(key) }
+        visualWheelAngularVelocity.allKeys.forEach { key -> state.visualWheelAngularVelocityById[key] = visualWheelAngularVelocity.finiteDouble(key) }
     }
     return state
 }

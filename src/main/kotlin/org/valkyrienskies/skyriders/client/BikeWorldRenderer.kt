@@ -5,6 +5,7 @@ import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.culling.Frustum
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.client.resources.model.BakedModel
@@ -36,6 +37,7 @@ import org.valkyrienskies.skyriders.content.VehicleWheelSteerSource
 import org.valkyrienskies.skyriders.content.item.RaceFlagItem
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
+import org.valkyrienskies.skyriders.util.VehicleCollisionSweep
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -48,6 +50,11 @@ object BikeWorldRenderer {
     )
     private val visualStatesByBodyId = HashMap<Long, RenderVisualState>()
     private val flagStacksByColorRgb = HashMap<Int, ItemStack>()
+
+    fun clear() {
+        visualStatesByBodyId.clear()
+        flagStacksByColorRgb.clear()
+    }
     private val flagAttachments = mapOf(
         "skyriders:dirt_bike" to FlagAttachment(
             localPos = Vector3d(0.18, 0.72, -0.62),
@@ -73,8 +80,8 @@ object BikeWorldRenderer {
         val minecraft = Minecraft.getInstance()
         val level = minecraft.level ?: return
         val vehicles = VehicleManager.getVehicles(level)
-        if (vehicles.isEmpty()) return
         visualStatesByBodyId.keys.retainAll(vehicles.mapTo(HashSet()) { it.bodyId })
+        if (vehicles.isEmpty()) return
 
         val bufferSource = minecraft.renderBuffers().bufferSource()
         val cameraPosition = event.camera.position
@@ -85,7 +92,8 @@ object BikeWorldRenderer {
                 bufferSource = bufferSource,
                 cameraX = cameraPosition.x,
                 cameraY = cameraPosition.y,
-                cameraZ = cameraPosition.z
+                cameraZ = cameraPosition.z,
+                frustum = event.frustum
             )
         }
         bufferSource.endBatch(VehicleOpenModelRenderer.BLOCK_ATLAS_NO_CULL_RENDER_TYPE)
@@ -101,7 +109,8 @@ object BikeWorldRenderer {
         bufferSource: MultiBufferSource,
         cameraX: Double,
         cameraY: Double,
-        cameraZ: Double
+        cameraZ: Double,
+        frustum: Frustum
     ) {
         val minecraft = Minecraft.getInstance()
         val transform = try {
@@ -115,6 +124,12 @@ object BikeWorldRenderer {
         val bodyPosition = carriedPlayer?.let(BikeClientHoistState::carriedPosition)
             ?: transform.toWorld.transformPosition(Vector3d())
         if (!bodyPosition.isFinite()) return
+
+        if (carriedPlayer == null) {
+            val bounds = VehicleCollisionSweep.bounds(vehicle.vehicleDefinition.body.resolvedCollisionBoxes(), transform.toWorld).inflate(2.0)
+            val range = minecraft.options.effectiveRenderDistance * 16.0 + bounds.size
+            if (bodyPosition.distanceSquared(cameraX, cameraY, cameraZ) > range * range || !frustum.isVisible(bounds)) return
+        }
 
         val render = vehicle.vehicleDefinition.render
         val missingModel = minecraft.modelManager.missingModel

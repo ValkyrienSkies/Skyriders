@@ -8,6 +8,8 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import org.valkyrienskies.skyriders.content.VehicleProjectileHits
+import org.valkyrienskies.mod.common.world.clipIncludeShips
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
@@ -101,32 +103,17 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
             return
         }
         val next = start.add(velocity)
-        val blockHit = serverLevel.clip(
-            ClipContext(
-                start,
-                next,
-                ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE,
-                this
-            )
-        )
-        if (blockHit.type != HitResult.Type.MISS) {
-            breakApart(serverLevel)
+        val hit = VehicleProjectileHits.firstHit(serverLevel, this, start, next, DIRECT_HIT_RADIUS, ownerBodyId)
+        if (hit != null) {
+            setPosition(hit.position)
+            distanceTravelled += velocity.length() * hit.fraction
+            if (hit.vehicle != null && lineConnected) attachToVehicle(serverLevel, hit.vehicle.bodyId)
+            else breakApart(serverLevel)
             return
         }
-
         setPosition(next)
         distanceTravelled += velocity.length()
-        val hitVehicle = findHitVehicle(serverLevel, next)
-        if (hitVehicle != null) {
-            if (lineConnected) {
-                attachToVehicle(serverLevel, hitVehicle.bodyId)
-            } else {
-                breakApart(serverLevel)
-            }
-        }
     }
-
     fun launch(origin: Vec3, direction: Vec3, inheritedVelocity: Vec3, ownerBodyId: BodyId) {
         val safeDirection = direction.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: Vec3(0.0, 0.0, 1.0)
         this.ownerBodyId = ownerBodyId
@@ -193,7 +180,7 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
             snapLine(level)
         }
 
-        val blockHit = level.clip(
+        val blockHit = level.clipIncludeShips(
             ClipContext(
                 start,
                 next,
@@ -255,17 +242,6 @@ class HoneyHeisterEntity(type: EntityType<HoneyHeisterEntity>, level: Level) : E
             bestTarget = target
         }
         return bestTarget
-    }
-
-    private fun findHitVehicle(level: ServerLevel, position: Vec3): IVehicle? {
-        val shipWorld = level.shipWorld ?: return null
-        val heisterPos = Vector3d(position.x, position.y, position.z)
-        return VehicleManager.getVehicles(level).firstOrNull { vehicle ->
-            if (vehicle.bodyId == ownerBodyId) return@firstOrNull false
-            val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@firstOrNull false
-            val hitRadius = DIRECT_HIT_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
-            body.kinematics.position.distanceSquared(heisterPos) <= hitRadius * hitRadius
-        }
     }
 
     private fun attachToVehicle(level: ServerLevel, targetBodyId: BodyId) {

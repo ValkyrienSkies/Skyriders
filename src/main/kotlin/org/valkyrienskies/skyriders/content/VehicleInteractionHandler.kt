@@ -4,10 +4,23 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
 import net.minecraftforge.event.TickEvent
+import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.skyriders.network.SkyridersNetwork
 
 object VehicleInteractionHandler {
+    @SubscribeEvent
+    fun onPlayerLoggedOut(event: PlayerEvent.PlayerLoggedOutEvent) {
+        BikeInteractionHandler.releaseOnExit(event.entity.uuid)
+    }
+
+    @SubscribeEvent
+    fun onPlayerChangedDimension(event: PlayerEvent.PlayerChangedDimensionEvent) {
+        BikeInteractionHandler.releaseOnExit(event.entity.uuid)
+        (event.entity as? ServerPlayer)?.let { SkyridersNetwork.sendBikeHoistState(it, false) }
+    }
+
     @SubscribeEvent
     fun onPlayerTick(event: TickEvent.PlayerTickEvent) {
         BikeInteractionHandler.onPlayerTick(event)

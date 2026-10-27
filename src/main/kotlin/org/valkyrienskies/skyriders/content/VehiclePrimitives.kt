@@ -386,14 +386,16 @@ data class VehicleInput(
     val riderPresent: Boolean = false
 ) {
     fun clamped(): VehicleInput = copy(
-        steer = steer.coerceIn(-1.0, 1.0),
-        throttle = throttle.coerceIn(-1.0, 1.0),
-        brake = brake.coerceIn(0.0, 1.0),
-        jump = jump.coerceIn(0.0, 1.0),
-        pitch = pitch.coerceIn(-1.0, 1.0),
-        handbrake = handbrake.coerceIn(0.0, 1.0),
-        clutch = clutch.coerceIn(0.0, 1.0)
+        steer = finiteControlValue(steer, -1.0, 1.0),
+        throttle = finiteControlValue(throttle, -1.0, 1.0),
+        brake = finiteControlValue(brake, 0.0, 1.0),
+        jump = finiteControlValue(jump, 0.0, 1.0),
+        pitch = finiteControlValue(pitch, -1.0, 1.0),
+        handbrake = finiteControlValue(handbrake, 0.0, 1.0),
+        clutch = finiteControlValue(clutch, 0.0, 1.0)
     )
+
+    fun withEngineState(engineOn: Boolean): VehicleInput = if (engineOn) this else copy(throttle = 0.0)
 
     fun toBikeInput(): BikeInput = BikeInput(
         steer = steer,
@@ -408,6 +410,9 @@ data class VehicleInput(
         val EMPTY = VehicleInput()
     }
 }
+
+internal fun finiteControlValue(value: Double, minimum: Double, maximum: Double): Double =
+    if (value.isFinite()) value.coerceIn(minimum, maximum) else 0.0
 
 data class VehicleRuntimeState(
     var engineOn: Boolean = false,
@@ -457,7 +462,7 @@ data class VehicleSaveRecord(
             bodyId = tag.getLong(BODY_ID_KEY),
             vehicleType = tag.getString(VEHICLE_TYPE_KEY).ifBlank { tag.getString(LEGACY_BIKE_TYPE_KEY) },
             engineOn = tag.getBoolean(ENGINE_ON_KEY),
-            fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.getDouble(FUEL_AMOUNT_KEY) else Double.NaN,
+            fuelAmount = if (tag.contains(FUEL_AMOUNT_KEY)) tag.finiteDouble(FUEL_AMOUNT_KEY) else Double.NaN,
             raceParticipant = tag.getBoolean(RACE_PARTICIPANT_KEY),
             raceColorId = if (tag.contains(RACE_COLOR_ID_KEY)) {
                 RaceFlagItem.normalizeSavedRaceColor(tag.getInt(RACE_COLOR_ID_KEY))
@@ -547,11 +552,11 @@ fun VehicleSaveRecord.toBikeSaveRecord(): BikeSaveRecord = BikeSaveRecord(
     fuelAmount = fuelAmount,
     raceParticipant = raceParticipant,
     raceColorId = raceColorId,
-    visualLeanRad = behaviorTag.getDouble("visual_lean"),
-    frontWheelSpin = behaviorTag.getDouble("front_wheel_spin"),
-    rearWheelSpin = behaviorTag.getDouble("rear_wheel_spin"),
-    frontWheelAngularVelocity = behaviorTag.getDouble("front_wheel_angular_velocity"),
-    rearWheelAngularVelocity = behaviorTag.getDouble("rear_wheel_angular_velocity"),
+    visualLeanRad = behaviorTag.finiteDouble("visual_lean"),
+    frontWheelSpin = behaviorTag.finiteDouble("front_wheel_spin"),
+    rearWheelSpin = behaviorTag.finiteDouble("rear_wheel_spin"),
+    frontWheelAngularVelocity = behaviorTag.finiteDouble("front_wheel_angular_velocity"),
+    rearWheelAngularVelocity = behaviorTag.finiteDouble("rear_wheel_angular_velocity"),
     partStates = partStates
 )
 

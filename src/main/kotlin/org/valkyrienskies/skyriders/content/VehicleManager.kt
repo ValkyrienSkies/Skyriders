@@ -47,6 +47,7 @@ object VehicleManager {
     private val clientVehiclesByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, IVehicle>>()
     private val inputsByDimension = ConcurrentHashMap<DimensionId, ConcurrentHashMap<BodyId, VehicleInput>>()
     private val lastHornTickByVehicle = ConcurrentHashMap<Pair<DimensionId, BodyId>, Long>()
+    private val pendingTeleports = ConcurrentHashMap<Pair<DimensionId, BodyId>, Vector3d>()
 
     val registeredVehicleIds: Set<ResourceLocation>
         get() = VehicleDefinitions.ids
@@ -54,6 +55,10 @@ object VehicleManager {
     fun getDefinition(vehicleId: ResourceLocation): VehicleDefinition? {
         return VehicleDefinitions.get(vehicleId)
     }
+
+    fun isKnownType(type: String): Boolean =
+        BikeDefinitions.resolveSavedId(type)?.let(BikeDefinitions::get) != null ||
+            VehicleDefinitions.resolveSavedId(type)?.let(VehicleDefinitions::get) != null
 
     fun createVehicle(vehicleId: ResourceLocation, level: ServerLevel, position: Vector3dc): IVehicle {
         if (BikeDefinitions.get(vehicleId) != null) {
@@ -75,6 +80,8 @@ object VehicleManager {
     fun clearVehicles(dimensionId: DimensionId) {
         serverVehiclesByDimension.remove(dimensionId)
         inputsByDimension.remove(dimensionId)
+        lastHornTickByVehicle.keys.removeIf { it.first == dimensionId }
+        pendingTeleports.keys.removeIf { it.first == dimensionId }
     }
 
     fun clearVehicles(level: Level) {
@@ -97,13 +104,16 @@ object VehicleManager {
 
     fun restoreVehicle(level: Level, record: VehicleSaveRecord): IVehicle? {
         if (BikeDefinitions.resolveSavedId(record.vehicleType)?.let(BikeDefinitions::get) != null) {
-            return BikeManager.restoreBike(level, record.toBikeSaveRecord())
+            return BikeManager.restoreBike(level, record.toBikeSaveRecord())?.also {
+                BikeInteractionHandler.restoreCarryState(level, record)
+            }
         }
         val vehicleId = VehicleDefinitions.resolveSavedId(record.vehicleType) ?: return null
         val definition = getDefinition(vehicleId) ?: return null
         val body = level.shipWorld?.allBodies?.getById(record.bodyId) ?: return null
         val vehicle = createVehicleFromBody(level, definition, body.id, record)
         addVehicle(level, vehicle)
+        BikeInteractionHandler.restoreCarryState(level, record)
         return vehicle
     }
 
@@ -123,6 +133,7 @@ object VehicleManager {
         }
 
         val restoredBikes = BikeManager.restoreBikes(level, bikeRecords.map(VehicleSaveRecord::toBikeSaveRecord))
+        bikeRecords.forEach { BikeInteractionHandler.restoreCarryState(level, it) }
         clearVehicles(level)
         var restoredCount = 0
         vehicleRecords.forEach { record ->
@@ -198,11 +209,11 @@ object VehicleManager {
                     fuelAmount = VehicleFuel.initialAmount(definition, record.fuelAmount),
                     raceParticipant = record.raceParticipant,
                     raceColorId = record.raceColorId,
-                    transmissionGear = record.behaviorTag.getInt("transmission_gear").takeIf { it != 0 } ?: 1,
-                    frontWheelSpin = record.behaviorTag.getDouble("front_wheel_spin"),
-                    rearWheelSpin = record.behaviorTag.getDouble("rear_wheel_spin"),
-                    frontWheelAngularVelocity = record.behaviorTag.getDouble("front_wheel_angular_velocity"),
-                    rearWheelAngularVelocity = record.behaviorTag.getDouble("rear_wheel_angular_velocity"),
+                    transmissionGear = record.behaviorTag.transmissionGear(definition.behavior.physics.transmission),
+                    frontWheelSpin = record.behaviorTag.finiteDouble("front_wheel_spin"),
+                    rearWheelSpin = record.behaviorTag.finiteDouble("rear_wheel_spin"),
+                    frontWheelAngularVelocity = record.behaviorTag.finiteDouble("front_wheel_angular_velocity"),
+                    rearWheelAngularVelocity = record.behaviorTag.finiteDouble("rear_wheel_angular_velocity"),
                     partStates = definition.initialPartStates(record.partStates)
                 )
             )
@@ -284,11 +295,8 @@ object VehicleManager {
 
     fun teleportVehicle(level: ServerLevel, bodyId: BodyId, position: Vector3dc): IVehicle? {
         val vehicle = getVehicle(level.dimensionId, bodyId) ?: return null
-        val body = level.shipWorld?.allBodies?.getById(bodyId) as? ServerBaseVsBody
-            ?: throw IllegalStateException("Vehicle $bodyId is bound to a missing VS body.")
-        body.isStatic = true
-        body.setPosition(position)
-        body.isStatic = false
+        if (!position.isFinite) return null
+        pendingTeleports[level.dimensionId to bodyId] = Vector3d(position)
         clearInput(level.dimensionId, bodyId)
         BikeLifecycle.saveLevel(level)
         BikeLifecycle.syncLevel(level)
@@ -301,100 +309,101 @@ object VehicleManager {
             return BikeManager.toggleEngine(level, bodyId)
         }
         val vehicle = serverVehiclesByDimension[level.dimensionId]?.get(bodyId) ?: return null
-        val enabled = !vehicle.vehicleState.engineOn
-        if (enabled && (!VehicleFuel.canStart(vehicle) || !VehicleDamage.canEngineStart(vehicle))) {
-            VehicleEngineSounds.playStartFail(level, vehicle)
-            return false
-        }
-        when (vehicle) {
-            is KartVehicle -> vehicle.kartState.engineOn = enabled
-            is WheeledVehicle -> {
-                vehicle.wheeledState.engineOn = enabled
-                vehicle.wheeledState.engineStalled = false
-                vehicle.wheeledState.debugEngineStalled = false
-                if (enabled) {
-                    val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition
-                    val idleRpm = behavior?.physics?.engine?.idleRpm ?: 850.0
-                    vehicle.wheeledState.engineRpm = idleRpm
-                    vehicle.wheeledState.debugEngineRpm = idleRpm
-                    vehicle.wheeledState.clutchEngagement = 0.0
-                    vehicle.wheeledState.debugClutchEngagement = 0.0
+        return withVehicleState(vehicle) {
+            val enabled = !vehicle.vehicleState.engineOn
+            if (enabled && (!VehicleFuel.canStart(vehicle) || !VehicleDamage.canEngineStart(vehicle))) {
+                VehicleEngineSounds.playStartFail(level, vehicle)
+                return false
+            }
+            when (vehicle) {
+                is KartVehicle -> vehicle.kartState.engineOn = enabled
+                is WheeledVehicle -> {
+                    vehicle.wheeledState.engineOn = enabled
+                    vehicle.wheeledState.engineStalled = false
+                    vehicle.wheeledState.debugEngineStalled = false
+                    if (enabled) {
+                        val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition
+                        val idleRpm = behavior?.physics?.engine?.idleRpm ?: 850.0
+                        vehicle.wheeledState.engineRpm = idleRpm
+                        vehicle.wheeledState.debugEngineRpm = idleRpm
+                        vehicle.wheeledState.clutchEngagement = 0.0
+                        vehicle.wheeledState.debugClutchEngagement = 0.0
+                    }
                 }
             }
+            BikeLifecycle.saveLevel(level)
+            BikeLifecycle.syncLevel(level)
+            return enabled
         }
-        if (!enabled) {
-            clearInput(level.dimensionId, bodyId)
-        }
-        BikeLifecycle.saveLevel(level)
-        BikeLifecycle.syncLevel(level)
-        return enabled
     }
 
     fun applyControlAction(level: ServerLevel, bodyId: BodyId, action: ResourceLocation): Boolean {
         val vehicle = getVehicle(level.dimensionId, bodyId) ?: return false
-        if (action == VehicleControlActions.HORN) {
-            return playHorn(level, vehicle)
-        }
-        var changed = false
-        when (vehicle) {
-            is KartVehicle -> {
-                val behavior = vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition ?: return false
-                val transmission = behavior.physics.transmission ?: return false
-                when (action) {
-                    VehicleControlActions.GEAR_UP -> {
-                        if (!transmission.automatic) {
-                            val maxGear = transmission.forwardGears.size
-                            vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear + 1).coerceAtMost(maxGear)
-                            vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
-                            changed = true
-                        }
-                    }
-                    VehicleControlActions.GEAR_DOWN -> {
-                        if (!transmission.automatic) {
-                            vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear - 1).coerceAtLeast(-1)
-                            vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
-                            changed = true
-                        }
-                    }
-                    else -> return false
-                }
+        return withVehicleState(vehicle) {
+            if (action == VehicleControlActions.HORN) {
+                return playHorn(level, vehicle)
             }
-            is WheeledVehicle -> {
-                val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition ?: return false
-                when (action) {
-                    VehicleControlActions.TOGGLE_PARKING_BRAKE -> {
-                        vehicle.wheeledState.parkingBrakeEngaged = !vehicle.wheeledState.parkingBrakeEngaged
-                        changed = true
-                    }
-                    VehicleControlActions.GEAR_UP -> {
-                        if (!behavior.physics.transmission.automatic &&
-                            canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
-                        ) {
-                            val maxGear = behavior.physics.transmission.forwardGears.size
-                            vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear + 1).coerceAtMost(maxGear)
-                            vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
-                            changed = true
+            var changed = false
+            when (vehicle) {
+                is KartVehicle -> {
+                    val behavior = vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition ?: return false
+                    val transmission = behavior.physics.transmission ?: return false
+                    when (action) {
+                        VehicleControlActions.GEAR_UP -> {
+                            if (!transmission.automatic) {
+                                val maxGear = transmission.forwardGears.size
+                                vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear + 1).coerceAtMost(maxGear)
+                                vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                                changed = true
+                            }
                         }
-                    }
-                    VehicleControlActions.GEAR_DOWN -> {
-                        if (!behavior.physics.transmission.automatic &&
-                            canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
-                        ) {
-                            vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear - 1).coerceAtLeast(-1)
-                            vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
-                            changed = true
+                        VehicleControlActions.GEAR_DOWN -> {
+                            if (!transmission.automatic) {
+                                vehicle.kartState.transmissionGear = (vehicle.kartState.transmissionGear - 1).coerceAtLeast(-1)
+                                vehicle.kartState.transmissionShiftCooldown = transmission.shiftCooldownSeconds
+                                changed = true
+                            }
                         }
+                        else -> return false
                     }
-                    else -> return false
                 }
+                is WheeledVehicle -> {
+                    val behavior = vehicle.vehicleDefinition.behavior as? WheeledVehicleBehaviorDefinition ?: return false
+                    when (action) {
+                        VehicleControlActions.TOGGLE_PARKING_BRAKE -> {
+                            vehicle.wheeledState.parkingBrakeEngaged = !vehicle.wheeledState.parkingBrakeEngaged
+                            changed = true
+                        }
+                        VehicleControlActions.GEAR_UP -> {
+                            if (!behavior.physics.transmission.automatic &&
+                                canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
+                            ) {
+                                val maxGear = behavior.physics.transmission.forwardGears.size
+                                vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear + 1).coerceAtMost(maxGear)
+                                vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
+                                changed = true
+                            }
+                        }
+                        VehicleControlActions.GEAR_DOWN -> {
+                            if (!behavior.physics.transmission.automatic &&
+                                canShiftManualTransmission(level, bodyId, behavior.physics.transmission)
+                            ) {
+                                vehicle.wheeledState.transmissionGear = (vehicle.wheeledState.transmissionGear - 1).coerceAtLeast(-1)
+                                vehicle.wheeledState.transmissionShiftCooldown = behavior.physics.transmission.shiftCooldownSeconds
+                                changed = true
+                            }
+                        }
+                        else -> return false
+                    }
+                }
+                else -> return false
             }
-            else -> return false
+            if (changed) {
+                BikeLifecycle.saveLevel(level)
+                BikeLifecycle.syncLevel(level)
+            }
+            return changed
         }
-        if (changed) {
-            BikeLifecycle.saveLevel(level)
-            BikeLifecycle.syncLevel(level)
-        }
-        return changed
     }
 
     private fun canShiftManualTransmission(
@@ -440,20 +449,23 @@ object VehicleManager {
         mutator: (CompoundTag) -> Unit
     ): Boolean {
         val vehicle = getVehicle(level.dimensionId, bodyId) ?: return false
-        val stateMap = vehicle.vehicleState.partStates
-        val current = stateMap[partId]?.data?.copy()
-            ?: vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId }?.defaultState?.copy()
-            ?: CompoundTag()
-        mutator(current)
-        stateMap[partId] = VehiclePartState(partId, current)
-        BikeLifecycle.saveLevel(level)
-        BikeLifecycle.syncLevel(level)
-        return true
+        return withVehicleState(vehicle) {
+            val stateMap = vehicle.vehicleState.partStates
+            val current = stateMap[partId]?.data?.copy()
+                ?: vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId }?.defaultState?.copy()
+                ?: CompoundTag()
+            mutator(current)
+            stateMap[partId] = VehiclePartState(partId, current)
+            BikeLifecycle.saveLevel(level)
+            BikeLifecycle.syncLevel(level)
+            return true
+        }
     }
 
     fun getSaveRecords(dimensionId: DimensionId): List<VehicleSaveRecord> {
-        return BikeManager.getBikes(dimensionId).map(IBike::toVehicleSaveRecord) +
-            (serverVehiclesByDimension[dimensionId]?.values?.map(IVehicle::toVehicleSaveRecord) ?: emptyList())
+        return getVehicles(dimensionId).map {
+            BikeInteractionHandler.saveCarryState(dimensionId, it.toVehicleSaveRecord())
+        }
     }
 
     fun save(dimensionId: DimensionId): CompoundTag = CompoundTag().apply {
@@ -476,17 +488,25 @@ object VehicleManager {
     }
 
     fun physTick(physLevel: PhysLevel, dt: Double) {
+        pendingTeleports.forEach { (key, position) ->
+            if (key.first == physLevel.dimension) {
+                val body = physLevel.getBodyById(key.second) ?: return@forEach
+                if (pendingTeleports.remove(key, position)) body.setPosition(position)
+            }
+        }
         BikeManager.physTick(physLevel, dt)
         serverVehiclesByDimension[physLevel.dimension]?.values?.forEach { vehicle ->
-            val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
-            VehicleDamage.physTick(vehicle, dt)
-            val input = VehicleDamage.modifyInput(
-                vehicle,
-                VehicleStatusEffects.modifyInput(vehicle, getInput(physLevel.dimension, vehicle.bodyId))
-            )
-            VehicleFuel.consume(vehicle, body, input, dt)
-            vehicle.physTick(physLevel, body, input, dt)
-            VehicleStatusEffects.physTick(vehicle, body, dt)
+            withVehicleState(vehicle) {
+                val body = physLevel.getBodyById(vehicle.bodyId) ?: return@forEach
+                VehicleDamage.physTick(vehicle, dt)
+                val input = VehicleDamage.modifyInput(
+                    vehicle,
+                    VehicleStatusEffects.modifyInput(vehicle, getInput(physLevel.dimension, vehicle.bodyId))
+                )
+                VehicleFuel.consume(vehicle, input, dt)
+                vehicle.physTick(physLevel, body, input, dt)
+                VehicleStatusEffects.physTick(vehicle, body, dt)
+            }
         }
         BoostPadHandler.physTick(physLevel, getVehicles(physLevel.dimension), dt)
     }
@@ -495,6 +515,7 @@ object VehicleManager {
         val bike = BikeManager.removeBike(level, bodyId, deleteBody = false)
         val vehicle = bike ?: serverVehiclesByDimension[level.dimensionId]?.remove(bodyId)
         inputsByDimension[level.dimensionId]?.remove(bodyId)
+        pendingTeleports.remove(level.dimensionId to bodyId)
         if (vehicle != null && deleteBody) {
             val shipWorld = requireNotNull(vsApi.getServerShipWorld(level.server)) {
                 "Cannot delete vehicle body before VS server ship world is available"
@@ -508,6 +529,9 @@ object VehicleManager {
             }
         }
         if (vehicle != null) {
+            BikeInteractionHandler.forgetVehicle(level.dimensionId, bodyId)
+            org.valkyrienskies.skyriders.content.racing.RaceManager.onVehicleRemoved(level, bodyId)
+            VehicleImpairmentEffects.clear(level, bodyId)
             BikeLifecycle.saveLevel(level)
             BikeLifecycle.syncLevel(level)
         }

@@ -1,0 +1,116 @@
+diff --git a/api/src/main/kotlin/org/valkyrienskies/core/api/physics/ShapeCastResult.kt b/api/src/main/kotlin/org/valkyrienskies/core/api/physics/ShapeCastResult.kt
+new file mode 100644
+index 00000000..83f52c02
+--- /dev/null
++++ b/api/src/main/kotlin/org/valkyrienskies/core/api/physics/ShapeCastResult.kt
+@@ -0,0 +1,24 @@
++package org.valkyrienskies.core.api.physics
++
++import org.joml.Vector3dc
++import org.valkyrienskies.core.api.bodies.PhysVsBody
++import org.valkyrienskies.core.api.util.PhysTickOnly
++
++/** Fixed-orientation sweep result. Distance measures center travel, including zero for initial overlap.
++ * Unsupported geometry conservatively blocks the query; its point and normal are not a surface contact.
++ */
++@PhysTickOnly
++data class ShapeCastResult(
++    val hitBody: PhysVsBody,
++    val segmentId: Long,
++    val distance: Double,
++    val point: Vector3dc,
++    val normal: Vector3dc,
++    val velocity: Vector3dc,
++    val angularVelocity: Vector3dc,
++    val staticFriction: Double,
++    val dynamicFriction: Double,
++    val restitution: Double,
++    val initialOverlap: Boolean,
++    val geometrySupported: Boolean,
++)
+diff --git a/api/src/main/kotlin/org/valkyrienskies/core/api/world/PhysLevel.kt b/api/src/main/kotlin/org/valkyrienskies/core/api/world/PhysLevel.kt
+index a0183a7e..eaf1a527 100644
+--- a/api/src/main/kotlin/org/valkyrienskies/core/api/world/PhysLevel.kt
++++ b/api/src/main/kotlin/org/valkyrienskies/core/api/world/PhysLevel.kt
+@@ -1,6 +1,8 @@
+ package org.valkyrienskies.core.api.world
+ 
+ import org.joml.Vector3dc
++import org.joml.Quaterniondc
++import org.valkyrienskies.core.api.physics.ShapeCastResult
+ import org.valkyrienskies.core.api.VsBeta
+ import org.valkyrienskies.core.api.bodies.PhysVsBody
+ import org.valkyrienskies.core.api.bodies.properties.BodyId
+@@ -71,6 +73,17 @@ interface PhysLevel {
+         vararg ignoredShips: ShipId,
+     ): RayCastResult?
+ 
++    /** Direction and rotation must be normalized. Length zero tests initial overlap. */
++    fun castBox(start: Vector3dc, rotation: Quaterniondc, halfExtents: Vector3dc,
++                direction: Vector3dc, length: Double, vararg ignoredBodies: BodyId): ShapeCastResult? {
++        throw UnsupportedOperationException("Box sweeps are unavailable")
++    }
++
++    fun castSphere(start: Vector3dc, radius: Double, direction: Vector3dc, length: Double,
++                   vararg ignoredBodies: BodyId): ShapeCastResult? {
++        throw UnsupportedOperationException("Sphere sweeps are unavailable")
++    }
++
+     /**
+      * Enables collision between the two bodies correlating to the given Ids.
+      *
+diff --git a/buildSrc/src/main/kotlin/vs-core.convention.gradle.kts b/buildSrc/src/main/kotlin/vs-core.convention.gradle.kts
+index 5bee235b..65083082 100644
+--- a/buildSrc/src/main/kotlin/vs-core.convention.gradle.kts
++++ b/buildSrc/src/main/kotlin/vs-core.convention.gradle.kts
+@@ -11,7 +11,8 @@ plugins {
+ group = "org.valkyrienskies.core"
+ // Determine the version
+ val gitRevision = execute("git", "rev-parse", "HEAD")
+-version = "1.1.0+" + gitRevision.substring(0, 10.coerceAtMost(gitRevision.length))
++version = providers.gradleProperty("CustomReleaseVersion").orNull
++    ?: ("1.1.0+" + gitRevision.substring(0, 10.coerceAtMost(gitRevision.length)))
+ 
+ repositories {
+     mavenLocal()
+diff --git a/impl/src/main/kotlin/org/valkyrienskies/core/impl/pipelines/physics/PhysLevelImpl.kt b/impl/src/main/kotlin/org/valkyrienskies/core/impl/pipelines/physics/PhysLevelImpl.kt
+index b491c05a..2b1ae36b 100644
+--- a/impl/src/main/kotlin/org/valkyrienskies/core/impl/pipelines/physics/PhysLevelImpl.kt
++++ b/impl/src/main/kotlin/org/valkyrienskies/core/impl/pipelines/physics/PhysLevelImpl.kt
+@@ -2,6 +2,8 @@ package org.valkyrienskies.core.impl.pipelines.physics
+ 
+ import org.joml.Vector3d
+ import org.joml.Vector3dc
++import org.joml.Quaterniondc
++import org.valkyrienskies.core.api.physics.ShapeCastResult
+ import org.valkyrienskies.core.api.bodies.properties.BodyId
+ import org.valkyrienskies.core.api.physics.RayCastResult
+ import org.valkyrienskies.core.api.ships.PhysShip
+@@ -130,6 +132,27 @@ class PhysLevelImpl(
+         )
+     }
+ 
++    override fun castBox(start: Vector3dc, rotation: Quaterniondc, halfExtents: Vector3dc,
++                         direction: Vector3dc, length: Double, vararg ignoredBodies: BodyId): ShapeCastResult? {
++        val ignored = ignoredBodies.toList().mapNotNull { getBodyById(it)?.rigidBodyReference?.physicsBodyId }.toIntArray()
++        return wrapper.sweepBox(start, rotation, halfExtents, direction, length, *ignored)?.toCoreResult()
++    }
++
++    override fun castSphere(start: Vector3dc, radius: Double, direction: Vector3dc, length: Double,
++                            vararg ignoredBodies: BodyId): ShapeCastResult? {
++        val ignored = ignoredBodies.toList().mapNotNull { getBodyById(it)?.rigidBodyReference?.physicsBodyId }.toIntArray()
++        return wrapper.sweepSphere(start, radius, direction, length, *ignored)?.toCoreResult()
++    }
++
++    private fun org.valkyrienskies.physics_api.ShapeCastResult.toCoreResult(): ShapeCastResult {
++        val body = physBodyLookup(hitBodyId) ?: if (hitBodyId == groundShipReferenceId) {
++            physicsStage.groundShips[dimension]?.let(::getBodyById)
++        } else null
++        checkNotNull(body) { "Shape cast hit an unknown physics body: $hitBodyId" }
++        return ShapeCastResult(body, segmentId, distance, point, normal, velocity, angularVelocity,
++            staticFriction, dynamicFriction, restitution, initialOverlap, geometrySupported)
++    }
++
+     override fun enableCollisionBetween(
+         shipId0: ShipId,
+         shipId1: ShipId

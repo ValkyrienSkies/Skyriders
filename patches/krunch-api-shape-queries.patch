@@ -1,0 +1,196 @@
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 19007f1..1ab243f 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -49,9 +49,11 @@ repositories {
+ }
+ 
+ val krunchXUrl = "${project.properties["krunchx_base_url"]}/${project.properties["krunchx_commit_hash"]}"
++val localKrunchNativeDirectory = providers.gradleProperty("LocalKrunchNativeDirectory")
+ 
+ // Download Krunch binaries to build resources folder
+ val downloadResources = tasks.register<Download>("downloadResources") {
++    onlyIf { !localKrunchNativeDirectory.isPresent }
+     group = "Build"
+     description = "Downloads resources from URLs"
+ 
+@@ -68,7 +70,18 @@ val downloadResources = tasks.register<Download>("downloadResources") {
+     onlyIfModified(true)
+ }
+ 
+-tasks.processResources { dependsOn(downloadResources) }
++tasks.processResources {
++    dependsOn(downloadResources)
++    if (localKrunchNativeDirectory.isPresent) {
++        val nativeDirectory = file(localKrunchNativeDirectory.get())
++        require(nativeDirectory.isDirectory) { "LocalKrunchNativeDirectory must exist: $nativeDirectory" }
++        require(nativeDirectory.listFiles()?.any { it.name.contains("KrunchJni") } == true) { "No Krunch native binaries in $nativeDirectory" }
++        from(nativeDirectory) { include("*KrunchJni*.dll", "*KrunchJni*.so", "*KrunchJni*.dylib") }
++        doFirst {
++            fileTree(destinationDir) { include("*KrunchJni*.dll", "*KrunchJni*.so", "*KrunchJni*.dylib") }.files.forEach { it.delete() }
++        }
++    }
++}
+ 
+ val localKrunchJniDll = providers.gradleProperty("LocalKrunchJniDll")
+ val copyLocalKrunchNative = tasks.register<Copy>("copyLocalKrunchNative") {
+diff --git a/src/main/java/org/valkyrienskies/physics_api_krunch/KrunchNativePhysicsWorldReference.java b/src/main/java/org/valkyrienskies/physics_api_krunch/KrunchNativePhysicsWorldReference.java
+index e725251..8f6e71e 100644
+--- a/src/main/java/org/valkyrienskies/physics_api_krunch/KrunchNativePhysicsWorldReference.java
++++ b/src/main/java/org/valkyrienskies/physics_api_krunch/KrunchNativePhysicsWorldReference.java
+@@ -6,6 +6,9 @@ import kotlin.Pair;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+ import org.joml.Vector3dc;
++import org.joml.Quaterniondc;
++import org.valkyrienskies.physics_api.ShapeCastResult;
++import org.valkyrienskies.physics_api_krunch.raycast.ShapeCastResultDecoder;
+ import org.valkyrienskies.physics_api.CollisionShapeReference;
+ import org.valkyrienskies.physics_api.PhysicsBodyReference;
+ import org.valkyrienskies.physics_api.PhysicsWorldReference;
+@@ -587,6 +590,32 @@ class KrunchNativePhysicsWorldReference implements PhysicsWorldReference, org.va
+         return RayCastResultEncoder.INSTANCE.decodeRayCastResultWithVelocityImpl(rayTraceResult);
+     }
+ 
++    @Nullable
++    @Override
++    public ShapeCastResult sweepBox(@NotNull Vector3dc start, @NotNull Quaterniondc rotation,
++                                   @NotNull Vector3dc halfExtents, @NotNull Vector3dc direction,
++                                   double length, @NotNull int... ignoredBodies) {
++        ensureResourcesNotDeleted();
++        byte[] bytes = shapeCastNative(physicsWorldPointer, start.x(), start.y(), start.z(),
++            rotation.x(), rotation.y(), rotation.z(), rotation.w(), halfExtents.x(), halfExtents.y(), halfExtents.z(),
++            false, direction.x(), direction.y(), direction.z(), length, ignoredBodies);
++        return bytes == null ? null : ShapeCastResultDecoder.decode(bytes);
++    }
++
++    @Nullable
++    @Override
++    public ShapeCastResult sweepSphere(@NotNull Vector3dc start, double radius, @NotNull Vector3dc direction,
++                                      double length, @NotNull int... ignoredBodies) {
++        ensureResourcesNotDeleted();
++        byte[] bytes = shapeCastNative(physicsWorldPointer, start.x(), start.y(), start.z(),
++            0, 0, 0, 1, radius, radius, radius, true, direction.x(), direction.y(), direction.z(), length, ignoredBodies);
++        return bytes == null ? null : ShapeCastResultDecoder.decode(bytes);
++    }
++
++    private static native byte[] shapeCastNative(long world, double x, double y, double z,
++        double qx, double qy, double qz, double qw, double hx, double hy, double hz,
++        boolean sphere, double dx, double dy, double dz, double length, int[] ignored);
++
+     @Override
+     public void setGroundBodyId(@Nullable final Integer bodyId) {
+         ensureResourcesNotDeleted();
+diff --git a/src/main/kotlin/org/valkyrienskies/physics_api_krunch/raycast/ShapeCastResultDecoder.kt b/src/main/kotlin/org/valkyrienskies/physics_api_krunch/raycast/ShapeCastResultDecoder.kt
+new file mode 100644
+index 0000000..a9ec808
+--- /dev/null
++++ b/src/main/kotlin/org/valkyrienskies/physics_api_krunch/raycast/ShapeCastResultDecoder.kt
+@@ -0,0 +1,18 @@
++package org.valkyrienskies.physics_api_krunch.raycast
++
++import org.valkyrienskies.physics_api.ShapeCastResult
++import org.valkyrienskies.physics_api_krunch.ConstraintEncoder
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++
++object ShapeCastResultDecoder {
++    @JvmStatic
++    fun decode(bytes: ByteArray): ShapeCastResult {
++        require(bytes.size == 142) { "Invalid shape cast result size ${bytes.size}" }
++        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
++        return ShapeCastResult(buffer.int, buffer.long, buffer.double,
++            ConstraintEncoder.readVector3dc(buffer), ConstraintEncoder.readVector3dc(buffer),
++            ConstraintEncoder.readVector3dc(buffer), ConstraintEncoder.readVector3dc(buffer),
++            buffer.double, buffer.double, buffer.double, buffer.get().toInt() != 0, buffer.get().toInt() != 0)
++    }
++}
+diff --git a/src/test/kotlin/org/valkyrienskies/physics_api_krunch/ShapeCastTest.kt b/src/test/kotlin/org/valkyrienskies/physics_api_krunch/ShapeCastTest.kt
+new file mode 100644
+index 0000000..435e650
+--- /dev/null
++++ b/src/test/kotlin/org/valkyrienskies/physics_api_krunch/ShapeCastTest.kt
+@@ -0,0 +1,83 @@
++package org.valkyrienskies.physics_api_krunch
++
++import org.joml.Quaterniond
++import org.joml.Vector3d
++import org.joml.Vector3i
++import org.joml.primitives.AABBi
++import org.junit.jupiter.api.Assertions.*
++import org.junit.jupiter.api.Test
++import org.valkyrienskies.physics_api.PoseVel
++import org.valkyrienskies.physics_api_krunch.KrunchTestUtils.assertVecNearlyEquals
++import org.valkyrienskies.physics_api_krunch.KrunchTestUtils.createTestPhysicsWorld
++import org.valkyrienskies.physics_api_krunch.factories.VSKrunchPhysicsFactories
++
++class ShapeCastTest {
++    @Test
++    fun sphereAndBoxReportSurfaceAndInitialOverlap() {
++        KrunchBootstrap.loadNativeBinaries()
++        val world = createTestPhysicsWorld()
++        val shape = KrunchCollisionShapeFactory().makeBoxShapeReference(Vector3d(2.0))
++        try {
++            val body = world.createRigidBody(shape)
++            body.isStatic = true
++            val hit = requireNotNull(world.sweepSphere(Vector3d(0.0, 4.0, 0.0), 0.5, Vector3d(0.0, -1.0, 0.0), 10.0))
++            assertEquals(2.5, hit.distance, 1e-5)
++            assertVecNearlyEquals(Vector3d(0.0, 1.0, 0.0), hit.point, 1e-5)
++            assertVecNearlyEquals(Vector3d(0.0, 1.0, 0.0), hit.normal, 1e-5)
++            assertFalse(hit.initialOverlap)
++            assertTrue(hit.geometrySupported)
++            val box = requireNotNull(world.sweepBox(Vector3d(0.0, 4.0, 0.0), Quaterniond(), Vector3d(0.25, 0.5, 0.25),
++                Vector3d(0.0, -1.0, 0.0), 10.0))
++            assertEquals(hit.distance, box.distance, 1e-5)
++            val embedded = requireNotNull(world.sweepSphere(Vector3d(0.0, 1.1, 0.0), 0.5, Vector3d(0.0, -1.0, 0.0), 0.0))
++            assertTrue(embedded.initialOverlap)
++            assertEquals(0.0, embedded.distance)
++            assertNull(world.sweepSphere(Vector3d(0.0, 4.0, 0.0), 0.5, Vector3d(0.0, -1.0, 0.0), 10.0, body.physicsBodyId))
++            assertThrows(IllegalArgumentException::class.java) {
++                world.sweepSphere(Vector3d(), Double.NaN, Vector3d(0.0, -1.0, 0.0), 1.0)
++            }
++        } finally { world.deletePhysicsWorldResources(); shape.close() }
++    }
++
++    @Test
++    fun transformedSegmentPreservesIdentityPointVelocityAndLargeCoordinates() {
++        KrunchBootstrap.loadNativeBinaries()
++        val world = createTestPhysicsWorld()
++        val factory = KrunchCollisionShapeFactory()
++        val box = factory.makeBoxShapeReference(Vector3d(2.0))
++        val compound = factory.makeCompoundShapeReference()
++        try {
++            compound.makeNewSegment(37, box, PoseVel.createPoseVel(Vector3d(3.0, 0.0, 0.0), Quaterniond()), 2.0, Vector3d())
++            val body = world.createRigidBody(compound)
++            val origin = Vector3d(30_000_000.0, 20.0, -30_000_000.0)
++            val rotation = Quaterniond().rotateZ(Math.PI / 2)
++            body.poseVel = PoseVel.createPoseVel(origin, rotation).copy(vel = Vector3d(7.0, 0.0, 0.0), omega = Vector3d(0.0, 0.0, 2.0))
++            val center = rotation.transform(Vector3d(3.0, 0.0, 0.0)).add(origin)
++            val hit = requireNotNull(world.sweepSphere(Vector3d(center).add(0.0, 5.0, 0.0), 0.5,
++                Vector3d(0.0, -1.0, 0.0), 10.0))
++            assertEquals(37L, hit.segmentId)
++            assertEquals(2.5, hit.distance, 1e-5)
++            assertVecNearlyEquals(Vector3d(center).add(0.0, 2.0, 0.0), hit.point, 1e-5)
++            val expectedVelocity = Vector3d(0.0, 0.0, 2.0).cross(Vector3d(hit.point).sub(origin)).add(7.0, 0.0, 0.0)
++            assertVecNearlyEquals(expectedVelocity, hit.velocity, 1e-5)
++        } finally { world.deletePhysicsWorldResources(); compound.close(); box.close() }
++    }
++
++    @Test
++    fun voxelSlabUsesItsSubBoxAndEmptyHalfRemainsClear() {
++        KrunchBootstrap.loadNativeBinaries()
++        val world = createTestPhysicsWorld()
++        val registry = TestLod1Blocks.generateBasicLod1Registry()
++        val buffer = VSKrunchPhysicsFactories.vsByteBufferFactory.createVSByteBuffer(65536)
++        val shape = KrunchCollisionShapeFactory().makeVoxelShapeReference(Vector3i(0), Vector3i(15), AABBi(0, 0, 0, 15, 15, 15), registry)
++        try {
++            KrunchTestUtils.setBlock(shape, Vector3i(2, 2, 2), TestLod1Blocks.BOTTOM_SLAB_STATE, registry, buffer)
++            shape.bakeVoxelShape()
++            world.createRigidBody(shape).isStatic = true
++            val hit = requireNotNull(world.sweepSphere(Vector3d(2.0, 4.0, 2.0), 0.25, Vector3d(0.0, -1.0, 0.0), 4.0))
++            assertEquals(1.75, hit.distance, 1e-5)
++            assertEquals(2.0, hit.point.y(), 1e-5)
++            assertNull(world.sweepBox(Vector3d(0.0, 2.3, 2.0), Quaterniond(), Vector3d(0.1), Vector3d(1.0, 0.0, 0.0), 4.0))
++        } finally { world.deletePhysicsWorldResources(); shape.close(); registry.close() }
++    }
++}

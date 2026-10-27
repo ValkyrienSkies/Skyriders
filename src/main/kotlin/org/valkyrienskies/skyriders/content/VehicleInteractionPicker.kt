@@ -1,17 +1,20 @@
 package org.valkyrienskies.skyriders.content
 
 import net.minecraft.world.level.Level
+import net.minecraft.world.level.ClipContext
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.joml.Quaterniond
 import org.joml.Vector3d
+import org.valkyrienskies.mod.common.world.clipIncludeShips
 import kotlin.math.max
 
 object VehicleInteractionPicker {
     fun findVehicleOnRay(level: Level, start: Vec3, end: Vec3): VehicleRayHit? {
+        val visibleEnd = unobstructedEnd(level, start, end)
         return VehicleManager.getVehicles(level)
             .asSequence()
-            .flatMap { vehicle -> hitVehicleInteractionZones(vehicle, start, end).asSequence() }
+            .flatMap { vehicle -> hitVehicleInteractionZones(vehicle, start, visibleEnd).asSequence() }
             .groupBy { it.vehicle.bodyId }
             .values
             .asSequence()
@@ -21,6 +24,10 @@ object VehicleInteractionPicker {
                     .thenBy { it.distanceSqr }
             )
     }
+
+    fun unobstructedEnd(level: Level, start: Vec3, end: Vec3): Vec3 = level.clipIncludeShips(
+        ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null as Entity?)
+    ).location
 
     fun hitVehicleInteractionZones(vehicle: IVehicle, start: Vec3, end: Vec3): List<VehicleRayHit> {
         val transform = try {
@@ -61,7 +68,8 @@ object VehicleInteractionPicker {
             center.z + halfZ
         )
         val hitLocal = aabb.clip(startLocal, endLocal).orElse(null) ?: return null
-        val distanceSqr = hitLocal.distanceToSqr(startLocal)
+        val hitWorld = transform.toWorld.transformPosition(Vector3d(hitLocal.x, hitLocal.y, hitLocal.z))
+        val distanceSqr = start.distanceToSqr(hitWorld.x, hitWorld.y, hitWorld.z)
         return VehicleRayHit(vehicle, zone, distanceSqr, distanceSqr)
     }
 
@@ -69,12 +77,7 @@ object VehicleInteractionPicker {
         transform: org.valkyrienskies.core.api.bodies.properties.BodyTransform,
         world: Vec3
     ): Vec3 {
-        val local = Vector3d(
-            world.x - transform.position.x(),
-            world.y - transform.position.y(),
-            world.z - transform.position.z()
-        )
-        Quaterniond(transform.rotation).invert().transform(local)
+        val local = transform.toModel.transformPosition(Vector3d(world.x, world.y, world.z))
         return Vec3(local.x, local.y, local.z)
     }
 

@@ -3,6 +3,7 @@ package org.valkyrienskies.skyriders.content
 import org.joml.Vector3d
 
 data class BikeRuntimeState(
+    val stepTraversal: org.valkyrienskies.skyriders.util.VehicleStepState = org.valkyrienskies.skyriders.util.VehicleStepState(),
     var engineOn: Boolean = false,
     var fuelAmount: Double = Double.NaN,
     var raceParticipant: Boolean = false,

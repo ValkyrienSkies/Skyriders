@@ -9,13 +9,15 @@ data class BikeInput(
     val riderPresent: Boolean = false
 ) {
     fun clamped(): BikeInput = BikeInput(
-        steer = steer.coerceIn(-1.0, 1.0),
-        throttle = throttle.coerceIn(-1.0, 1.0),
-        brake = brake.coerceIn(0.0, 1.0),
-        jump = jump.coerceIn(0.0, 1.0),
-        pitch = pitch.coerceIn(-1.0, 1.0),
+        steer = finiteControlValue(steer, -1.0, 1.0),
+        throttle = finiteControlValue(throttle, -1.0, 1.0),
+        brake = finiteControlValue(brake, 0.0, 1.0),
+        jump = finiteControlValue(jump, 0.0, 1.0),
+        pitch = finiteControlValue(pitch, -1.0, 1.0),
         riderPresent = riderPresent
     )
+
+    fun withEngineState(engineOn: Boolean): BikeInput = if (engineOn) this else copy(throttle = 0.0)
 
     companion object {
         val EMPTY = BikeInput()
