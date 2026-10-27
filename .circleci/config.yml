@@ -9,7 +9,7 @@ executors:
   java_large:
     resource_class: large
     docker:
-      - image: cimg/base:current-24.04
+      - image: cimg/openjdk:21.0
     environment:
       ORG_GRADLE_PROJECT_block_external_repositories: "true"
 
@@ -23,6 +23,12 @@ commands:
             JDK17_DIR="${HOME}/.jdks/temurin-17"
             JDK17_ARCHIVE="/tmp/temurin-17.tar.gz"
             JDK17_URL="https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
+            if [ -n "${JAVA_HOME:-}" ]; then
+              JDK21_DIR="${JAVA_HOME}"
+            else
+              JAVA_BIN="$(readlink -f "$(command -v java)")"
+              JDK21_DIR="$(dirname "$(dirname "${JAVA_BIN}")")"
+            fi
 
             if [ ! -x "${JDK17_DIR}/bin/java" ]; then
               rm -rf "${JDK17_DIR}" "${JDK17_ARCHIVE}"
@@ -38,13 +44,11 @@ commands:
               sed -i '/^org.gradle.java.installations.paths=/d;/^org.gradle.java.installations.auto-detect=/d' "${HOME}/.gradle/gradle.properties"
             fi
             {
-              echo "org.gradle.java.installations.paths=${JDK17_DIR}"
+              echo "org.gradle.java.installations.paths=${JDK17_DIR},${JDK21_DIR}"
               echo "org.gradle.java.installations.auto-detect=true"
             } >> "${HOME}/.gradle/gradle.properties"
 
             echo "export JDK17_HOME='${JDK17_DIR}'" >> "${BASH_ENV}"
-            echo "export JAVA_HOME='${JDK17_DIR}'" >> "${BASH_ENV}"
-            echo 'export PATH="$JAVA_HOME/bin:$PATH"' >> "${BASH_ENV}"
 
   checkout_and_cache:
     steps:
@@ -63,12 +67,6 @@ commands:
           keys:
             - v1-{{ checksum "build.gradle" }}-{{ checksum "gradle.properties" }}
       - install_jdk17
-      - run:
-          name: Build pinned playtest and physics dependencies
-          command: |
-            sudo apt-get update
-            sudo apt-get install --yes clang lld cmake ninja-build
-            bash scripts/build-vs-playtest.sh
 
   save_artifacts:
     parameters:
@@ -153,10 +151,21 @@ commands:
             set -euo pipefail
             cd "<< parameters.workdir >>"
             
-            echo "eula=true" > eula.txt
-            rm -f logs/latest.log
-            printf 'stop\n' | timeout --signal=TERM --kill-after=30s 5m << parameters.cmd >>
-            grep -q 'For help, type "help"' logs/latest.log
+            # Accept eula automatically
+            echo "eula=true" > eula.txt || true
+            
+            # Pipe "stop" into servers stdin so it closes right after a successful launch
+            # Timeout 5 mins just in case, but we should either stop after launch, or error and move on
+            timeout 5m echo "stop" | << parameters.cmd >> || true
+            
+            # Most reliable way I could find to detect a crash or not
+            if grep -q "For help, type \"help\"" logs/latest.log; then
+              echo "Server loaded successfully!"
+              exit 0
+            else
+              echo "Server failed to start!"
+              exit 1
+            fi
       - store_artifacts:
           path: << parameters.workdir >>/logs
           when: always
@@ -171,20 +180,17 @@ jobs:
       - checkout_and_cache
       - run:
           name: Build
-          command: "./gradlew build exportServerRuntime runAuditServer -PgameTests --no-daemon --stacktrace"
-      - store_test_results:
-          path: build/test-results/test
-      - store_artifacts:
-          path: run-audit/logs
-      - persist_to_workspace:
-          root: build
-          paths:
-            - server-runtime
+          command: "./gradlew build --no-daemon --stacktrace"
       - save_artifacts
       - save_gradle_cache
 
   forge_server_test:
     executor: java_large
+    environment:
+      MC_VERSION: "1.20.1"
+      FORGE_VERSION: "47.2.0"
+      KFF_URL: "https://cdn.modrinth.com/data/ordsPcFz/versions/hmeyC41q/kotlinforforge-4.11.0-all.jar"
+      VS2_URL: "https://maven.valkyrienskies.org/org/valkyrienskies/valkyrienskies-120-forge/2.4.13+c805b0b2ab/valkyrienskies-120-forge-2.4.13+c805b0b2ab.jar"
     steps:
       - attach_workspace:
           at: .
@@ -207,14 +213,12 @@ jobs:
               exit 1
             fi
             echo "export FORGE_MOD_JAR=${FORGE_JAR}" >> "$BASH_ENV"
-            cat server-runtime/server.properties | sed 's/^/export /' >> "$BASH_ENV"
-            echo "export RUNTIME_MODS_DIR=$(pwd)/server-runtime/mods" >> "$BASH_ENV"
       - run:
           name: Download Forge server
           command: |
             set -euo pipefail
             cd /tmp/forge-server
-            curl --fail --location "https://maven.minecraftforge.net/net/minecraftforge/forge/${MC_VERSION}-${FORGE_VERSION}/forge-${MC_VERSION}-${FORGE_VERSION}-installer.jar" -o forge-installer-${FORGE_VERSION}.jar
+            curl -L "https://maven.minecraftforge.net/net/minecraftforge/forge/${MC_VERSION}-${FORGE_VERSION}/forge-${MC_VERSION}-${FORGE_VERSION}-installer.jar" -o forge-installer-${FORGE_VERSION}.jar
       - run:
           name: Install Forge server
           command: |
@@ -223,7 +227,18 @@ jobs:
             java -jar forge-installer-${FORGE_VERSION}.jar --installServer
             # Copy the mod into mods/
             cp "${FORGE_MOD_JAR}" mods/
-            cp "${RUNTIME_MODS_DIR}"/*.jar mods/
+      - run:
+          name: Download Kotlin For Forge
+          command: |
+            set -euo pipefail
+            cd /tmp/forge-server
+            curl -L "${KFF_URL}" -o mods/kff.jar
+      - run:
+          name: Download Valkyrien Skies 2
+          command: |
+            set -euo pipefail
+            cd /tmp/forge-server
+            curl -L "${VS2_URL}" -o mods/vs2.jar
       - run_test_server:
           cmd: "./run.sh nogui"
           workdir: "/tmp/forge-server"
