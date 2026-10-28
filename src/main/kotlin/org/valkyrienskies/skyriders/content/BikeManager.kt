@@ -60,12 +60,15 @@ object BikeManager {
     }
 
     fun removeBike(dimensionId: DimensionId, bodyId: BodyId): IBike? {
+        BikeInteractionHandler.forgetVehicle(dimensionId, bodyId)
         inputsByDimension[dimensionId]?.remove(bodyId)
         return serverBikesByDimension[dimensionId]?.remove(bodyId)
     }
 
     fun removeBike(level: ServerLevel, bodyId: BodyId, deleteBody: Boolean = true): IBike? {
         val bike = removeBike(level.dimensionId, bodyId) ?: return null
+        org.valkyrienskies.skyriders.content.racing.RaceManager.onVehicleRemoved(level, bodyId)
+        VehicleImpairmentEffects.clear(level, bodyId)
         if (deleteBody) {
             val shipWorld = requireNotNull(vsApi.getServerShipWorld(level.server)) {
                 "Cannot delete bike body before VS server ship world is available"
@@ -99,11 +102,14 @@ object BikeManager {
 
     fun physTick(physLevel: PhysLevel, dt: Double) {
         serverBikesByDimension[physLevel.dimension]?.values?.forEach { bike ->
+            withVehicleState(bike) {
             val body = physLevel.getBodyById(bike.bodyId) ?: return@forEach
-            val vehicleInput = VehicleStatusEffects.modifyInput(bike, getInput(physLevel.dimension, bike.bodyId).toVehicleInput())
-            VehicleFuel.consume(bike, body, vehicleInput, dt)
+            VehicleDamage.physTick(bike, dt)
+            val vehicleInput = VehicleDamage.modifyInput(bike, VehicleStatusEffects.modifyInput(bike, getInput(physLevel.dimension, bike.bodyId).toVehicleInput()))
+            VehicleFuel.consume(bike, vehicleInput, dt)
             bike.physTick(physLevel, body, vehicleInput.toBikeInput(), dt)
             VehicleStatusEffects.physTick(bike, body, dt)
+            }
         }
     }
 
@@ -122,18 +128,17 @@ object BikeManager {
 
     fun toggleEngine(level: ServerLevel, bodyId: BodyId): Boolean? {
         val bike = getBike(level.dimensionId, bodyId) ?: return null
-        val enabled = !bike.state.engineOn
-        if (enabled && !VehicleFuel.canStart(bike)) {
-            VehicleEngineSounds.playStartFail(level, bike)
-            return false
+        return withVehicleState(bike) {
+            val enabled = !bike.state.engineOn
+            if (enabled && (!VehicleFuel.canStart(bike) || !VehicleDamage.canEngineStart(bike))) {
+                VehicleEngineSounds.playStartFail(level, bike)
+                return false
+            }
+            bike.state.engineOn = enabled
+            BikeLifecycle.saveLevel(level)
+            BikeLifecycle.syncLevel(level)
+            return bike.state.engineOn
         }
-        bike.state.engineOn = enabled
-        if (!bike.state.engineOn) {
-            updateInput(level.dimensionId, bodyId) { BikeInput.EMPTY }
-        }
-        BikeLifecycle.saveLevel(level)
-        BikeLifecycle.syncLevel(level)
-        return bike.state.engineOn
     }
 
     fun save(dimensionId: DimensionId): CompoundTag = CompoundTag().apply {
@@ -211,7 +216,7 @@ object BikeManager {
         clientBikesByDimension.getOrPut(level.dimensionId) { ConcurrentHashMap() }[bike.bodyId] = bike
     }
 
-    private fun clearBikes(level: Level) {
+    fun clearBikes(level: Level) {
         if (!level.isClientSide) {
             clearBikes(level.dimensionId)
             return

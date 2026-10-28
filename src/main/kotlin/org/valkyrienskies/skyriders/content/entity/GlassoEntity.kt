@@ -7,6 +7,8 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import org.valkyrienskies.skyriders.content.VehicleProjectileHits
+import org.valkyrienskies.mod.common.world.clipIncludeShips
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
@@ -68,33 +70,15 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
         }
         val next = start.add(velocity)
 
-        findHitEntity(serverLevel, start, next)?.let { target ->
-            yankEntity(serverLevel, target)
-            shatter(serverLevel)
+        VehicleProjectileHits.firstHit(serverLevel, this, start, next, VEHICLE_HIT_RADIUS, ownerBodyId, ownerPlayerId, hitEntities = true)?.let { hit ->
+            setPos(hit.position.x, hit.position.y, hit.position.z)
+            when {
+                hit.vehicle != null -> latchVehicle(serverLevel, hit.vehicle.bodyId)
+                hit.entity != null -> { yankEntity(serverLevel, hit.entity); shatter(serverLevel) }
+                else -> { yankOwnerVehicle(serverLevel, hit.position); shatter(serverLevel) }
+            }
             return
         }
-
-        findHitVehicle(serverLevel, next)?.let { targetBodyId ->
-            latchVehicle(serverLevel, targetBodyId)
-            return
-        }
-
-        val blockHit = serverLevel.clip(
-            ClipContext(
-                start,
-                next,
-                ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE,
-                this
-            )
-        )
-        if (blockHit.type != HitResult.Type.MISS) {
-            setPos(blockHit.location.x, blockHit.location.y, blockHit.location.z)
-            yankOwnerVehicle(serverLevel, blockHit.location)
-            shatter(serverLevel)
-            return
-        }
-
         setPos(next.x, next.y, next.z)
         distanceTravelled += velocity.length()
         deltaMovement = Vec3(velocity.x * AIR_DRAG, velocity.y * AIR_DRAG - GRAVITY, velocity.z * AIR_DRAG)
@@ -138,26 +122,6 @@ class GlassoEntity(type: EntityType<GlassoEntity>, level: Level) : Entity(type, 
 
     override fun shouldRenderAtSqrDistance(distance: Double): Boolean {
         return distance < RENDER_DISTANCE * RENDER_DISTANCE
-    }
-
-    private fun findHitEntity(level: ServerLevel, start: Vec3, end: Vec3): LivingEntity? {
-        val searchBox = AABB(start, end).inflate(ENTITY_HIT_RADIUS)
-        return level.getEntitiesOfClass(LivingEntity::class.java, searchBox) { entity ->
-            entity.isAlive && entity.uuid != ownerPlayerId && entity.vehicle !is BikeSeatEntity
-        }.minByOrNull { it.distanceToSqr(start) }?.takeIf { entity ->
-            entity.boundingBox.inflate(ENTITY_HIT_RADIUS).clip(start, end).isPresent
-        }
-    }
-
-    private fun findHitVehicle(level: ServerLevel, position: Vec3): BodyId? {
-        val shipWorld = level.shipWorld ?: return null
-        val hookPos = Vector3d(position.x, position.y, position.z)
-        return VehicleManager.getVehicles(level).firstOrNull { vehicle ->
-            if (vehicle.bodyId == ownerBodyId) return@firstOrNull false
-            val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@firstOrNull false
-            val hitRadius = VEHICLE_HIT_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
-            body.kinematics.position.distanceSquared(hookPos) <= hitRadius * hitRadius
-        }?.bodyId
     }
 
     private fun yankOwnerVehicle(level: ServerLevel, hitPosition: Vec3) {

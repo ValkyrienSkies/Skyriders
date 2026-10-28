@@ -32,6 +32,8 @@ build
 eclipse
 run
 run_server
+run-audit
+run-audit-client
 logs
 
 # Files from Forge MDK

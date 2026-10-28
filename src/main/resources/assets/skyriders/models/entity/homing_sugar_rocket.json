@@ -3,7 +3,7 @@
 	"loader": "framework:open_model",
 	"texture_size": [16, 16],
 	"textures": {
-		"sugar_rocket": "skyriders:entity/homing_sugar_rocket"
+		"sugar_rocket": "skyriders:entity/sugar_rocket_homing"
 	},
 	"components": [
 		{

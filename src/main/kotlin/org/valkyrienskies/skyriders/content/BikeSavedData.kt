@@ -21,8 +21,11 @@ class BikeSavedData : SavedData() {
     }
 
     fun replaceFromManager(level: ServerLevel) {
+        val unresolved = BikeLifecycle.unresolvedRecords(level)
         records.clear()
         records.addAll(VehicleManager.loadRecords(VehicleManager.save(level.dimensionId)))
+        val restoredIds = records.mapTo(HashSet()) { it.bodyId }
+        records.addAll(unresolved.filter { it.bodyId !in restoredIds })
         setDirty()
     }
 

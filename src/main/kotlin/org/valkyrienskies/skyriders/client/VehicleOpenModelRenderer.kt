@@ -23,6 +23,10 @@ object VehicleOpenModelRenderer {
     val BLOCK_ATLAS_NO_CULL_RENDER_TYPE: RenderType = RenderType.entityCutoutNoCull(InventoryMenu.BLOCK_ATLAS)
 
     private val models = HashMap<ResourceLocation, OpenModel?>()
+
+    fun clearModels() {
+        models.clear()
+    }
     private val faceNames = listOf("north", "east", "south", "west", "up", "down")
     private val damageCrackRenderTypes = (0..9).map { stage ->
         RenderType.entityTranslucent(ResourceLocation("textures/block/destroy_stage_$stage.png"))
@@ -349,9 +353,8 @@ object VehicleOpenModelRenderer {
     }
 
     private fun getModel(modelLocation: ResourceLocation): OpenModel? {
-        return models.getOrPut(modelLocation) {
-            loadModel(modelLocation)
-        }
+        if (!models.containsKey(modelLocation)) models[modelLocation] = loadModel(modelLocation)
+        return models[modelLocation]
     }
 
     private fun loadModel(modelLocation: ResourceLocation): OpenModel? {

@@ -425,6 +425,7 @@ object SkyridersMod {
             modEventBus.addListener(SkyridersModClient::registerKeyMappings)
             modEventBus.addListener(SkyridersModClient::registerItemColors)
             modEventBus.addListener(SkyridersModClient::registerAdditionalModels)
+            modEventBus.addListener(SkyridersModClient::registerReloadListeners)
             modEventBus.addListener(SkyridersModClient::registerGuiOverlays)
         }
     }

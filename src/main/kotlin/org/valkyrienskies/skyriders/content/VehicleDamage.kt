@@ -55,6 +55,10 @@ object VehicleDamage {
 
     private val criticalFailures = HashMap<VehicleKey, CriticalFailureState>()
 
+    fun clear(level: ServerLevel) {
+        criticalFailures.keys.removeIf { it.dimensionId == level.dimensionId }
+    }
+
     fun bodyPartDefinition(bodyHealth: Double = BODY_HEALTH): VehiclePartDefinition = damageablePart(BODY_PART_ID, VehiclePartTypes.BODY, bodyHealth)
 
     fun enginePartDefinition(engineHealth: Double = ENGINE_HEALTH): VehiclePartDefinition = damageablePart(ENGINE_PART_ID, VehiclePartTypes.ENGINE, engineHealth)
@@ -109,15 +113,17 @@ object VehicleDamage {
     }
 
     fun damageCrash(level: ServerLevel, vehicle: IVehicle, severity: Double) {
-        if (VehicleStatusEffects.isMoondropActive(vehicle)) return
-        val damage = severity.takeIf { it.isFinite() && it > 0.0 } ?: return
-        damagePart(level, vehicle, BODY_PART_ID, damage * 0.68)
-        damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.32)
-//        wheelPartIds(vehicle).randomOrNull()?.let { wheelId ->
-//            damagePart(level, vehicle, wheelId, damage * 0.48)
-//        }
-        playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.72f, randomPitch(0.9f, 1.08f))
-        finishDamage(level, vehicle)
+        return withVehicleState(vehicle) {
+            if (VehicleStatusEffects.isMoondropActive(vehicle)) return
+            val damage = severity.takeIf { it.isFinite() && it > 0.0 } ?: return
+            damagePart(level, vehicle, BODY_PART_ID, damage * 0.68)
+            damagePart(level, vehicle, ENGINE_PART_ID, damage * 0.32)
+    //        wheelPartIds(vehicle).randomOrNull()?.let { wheelId ->
+    //            damagePart(level, vehicle, wheelId, damage * 0.48)
+    //        }
+            playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.72f, randomPitch(0.9f, 1.08f))
+            finishDamage(level, vehicle)
+        }
     }
 
     fun damageExplosion(
@@ -153,94 +159,104 @@ object VehicleDamage {
     }
 
     fun damageAt(level: ServerLevel, vehicle: IVehicle, worldPos: Vec3, amount: Double) {
-        if (VehicleStatusEffects.isMoondropActive(vehicle)) return
-        val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
-        val partId = targetedPart(vehicle, worldPos) ?: BODY_PART_ID
-        val scaled = when {
-            isWheelPart(vehicle, partId) -> safeAmount * 1.35
-            partId == ENGINE_PART_ID -> safeAmount * 1.15
-            else -> safeAmount
+        return withVehicleState(vehicle) {
+            if (VehicleStatusEffects.isMoondropActive(vehicle)) return
+            val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
+            val partId = targetedPart(vehicle, worldPos) ?: BODY_PART_ID
+            val scaled = when {
+                isWheelPart(vehicle, partId) -> safeAmount * 1.35
+                partId == ENGINE_PART_ID -> safeAmount * 1.15
+                else -> safeAmount
+            }
+            damagePart(level, vehicle, partId, scaled)
+            if (partId != BODY_PART_ID) {
+                damagePart(level, vehicle, BODY_PART_ID, scaled * 0.18)
+            }
+            playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.38f, randomPitch(1.04f, 1.22f))
+            finishDamage(level, vehicle)
         }
-        damagePart(level, vehicle, partId, scaled)
-        if (partId != BODY_PART_ID) {
-            damagePart(level, vehicle, BODY_PART_ID, scaled * 0.18)
-        }
-        playVehicleSound(level, vehicle, SkyridersSounds.CRASH_SOUND.get(), 0.38f, randomPitch(1.04f, 1.22f))
-        finishDamage(level, vehicle)
     }
 
     fun handleRepair(player: ServerPlayer, vehicle: IVehicle, zone: VehicleInteractionZone): Boolean {
-        val partId = zone.partId ?: return false
-        val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
-        if (part.type != VehiclePartTypes.WHEEL && part.type != VehiclePartTypes.ENGINE && part.type != VehiclePartTypes.BODY) {
-            return false
-        }
-
-        val hand = InteractionHand.entries.firstOrNull { hand ->
-            repairAmountFor(player.getItemInHand(hand).item, vehicle, part.type) > 0.0
-        } ?: return false
-        val stack = player.getItemInHand(hand)
-        val amount = repairAmountFor(stack.item, vehicle, part.type)
-        if (amount <= 0.0) return false
-
-        val level = player.level() as? ServerLevel ?: return false
-        var repaired = 0.0
-        val changed = VehicleManager.mutatePartState(level, vehicle.bodyId, partId) { state ->
-            val maxHealth = maxHealth(state, part)
-            val before = health(state, part)
-            val replace = part.type == VehiclePartTypes.WHEEL ||
-                stack.item == SkyridersMod.ENGINE.get() ||
-                stack.item == SkyridersMod.BIKE_ENGINE.get()
-            val next = if (replace) maxHealth else (before + amount).coerceAtMost(maxHealth)
-            state.putDouble(HEALTH_KEY, next)
-            state.putDouble(MAX_HEALTH_KEY, maxHealth)
-            if (part.type == VehiclePartTypes.WHEEL) {
-                state.putBoolean(POPPED_KEY, false)
+        return withVehicleState(vehicle) {
+            val partId = zone.partId ?: return false
+            val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
+            if (part.type != VehiclePartTypes.WHEEL && part.type != VehiclePartTypes.ENGINE && part.type != VehiclePartTypes.BODY) {
+                return false
             }
-            repaired = next - before
-        }
-        if (!changed || repaired <= 1.0e-4) {
-            player.displayClientMessage(Component.literal("${partDisplayName(partId)} is already repaired"), true)
+
+            val hand = InteractionHand.entries.firstOrNull { hand ->
+                repairAmountFor(player.getItemInHand(hand).item, vehicle, part.type) > 0.0
+            } ?: return false
+            val stack = player.getItemInHand(hand)
+            val amount = repairAmountFor(stack.item, vehicle, part.type)
+            if (amount <= 0.0) return false
+
+            val level = player.level() as? ServerLevel ?: return false
+            var repaired = 0.0
+            val changed = VehicleManager.mutatePartState(level, vehicle.bodyId, partId) { state ->
+                val maxHealth = maxHealth(state, part)
+                val before = health(state, part)
+                val replace = part.type == VehiclePartTypes.WHEEL ||
+                    stack.item == SkyridersMod.ENGINE.get() ||
+                    stack.item == SkyridersMod.BIKE_ENGINE.get()
+                val next = if (replace) maxHealth else (before + amount).coerceAtMost(maxHealth)
+                state.putDouble(HEALTH_KEY, next)
+                state.putDouble(MAX_HEALTH_KEY, maxHealth)
+                if (part.type == VehiclePartTypes.WHEEL) {
+                    state.putBoolean(POPPED_KEY, false)
+                }
+                repaired = next - before
+            }
+            if (!changed || repaired <= 1.0e-4) {
+                player.displayClientMessage(Component.literal("${partDisplayName(partId)} is already repaired"), true)
+                return true
+            }
+
+            if (!player.abilities.instabuild) {
+                stack.shrink(1)
+            }
+            clearEngineDestroyedState(vehicle)
+            criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
+            player.displayClientMessage(Component.literal("Repaired ${partDisplayName(partId)}"), true)
+            level.playSound(null, player.blockPosition(), SoundEvents.ANVIL_USE, SoundSource.PLAYERS, 0.45f, 1.35f)
             return true
         }
-
-        if (!player.abilities.instabuild) {
-            stack.shrink(1)
-        }
-        clearEngineDestroyedState(vehicle)
-        criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
-        player.displayClientMessage(Component.literal("Repaired ${partDisplayName(partId)}"), true)
-        level.playSound(null, player.blockPosition(), SoundEvents.ANVIL_USE, SoundSource.PLAYERS, 0.45f, 1.35f)
-        return true
     }
 
     fun canEngineStart(vehicle: IVehicle): Boolean {
-        return healthFraction(vehicle, ENGINE_PART_ID) > 0.02
+        return withVehicleState(vehicle) {
+            return healthFraction(vehicle, ENGINE_PART_ID) > 0.02
+        }
     }
 
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
-        val engineHealth = healthFraction(vehicle, ENGINE_PART_ID)
-        if (engineHealth >= ENGINE_MALFUNCTION_START) return input
+        return withVehicleState(vehicle) {
+            val engineHealth = healthFraction(vehicle, ENGINE_PART_ID)
+            if (engineHealth >= ENGINE_MALFUNCTION_START) return input
 
-        val powerScale = enginePowerScale(vehicle)
-        val throttle = input.throttle * powerScale
-        val brake = if (engineHealth <= 0.0) input.brake.coerceAtLeast(1.0) else input.brake
-        return input.copy(throttle = throttle, brake = brake).clamped()
+            val powerScale = enginePowerScale(vehicle)
+            val throttle = input.throttle * powerScale
+            val brake = if (engineHealth <= 0.0) input.brake.coerceAtLeast(1.0) else input.brake
+            return input.copy(throttle = throttle, brake = brake).clamped()
+        }
     }
 
     fun physTick(vehicle: IVehicle, dt: Double) {
-        val engineHealth = healthFraction(vehicle, ENGINE_PART_ID)
-        if (engineHealth <= 0.0) {
-            stopEngine(vehicle, stalled = true)
-            return
-        }
-        if (!isEngineOn(vehicle) || engineHealth >= ENGINE_STALL_START) return
+        return withVehicleState(vehicle) {
+            val engineHealth = healthFraction(vehicle, ENGINE_PART_ID)
+            if (engineHealth <= 0.0) {
+                stopEngine(vehicle, stalled = true)
+                return
+            }
+            if (!isEngineOn(vehicle) || engineHealth >= ENGINE_STALL_START) return
 
-        val safeDt = dt.coerceIn(0.0, 0.25)
-        val chance = (ENGINE_STALL_START - engineHealth) / ENGINE_STALL_START *
-            ENGINE_STALL_CHANCE_PER_SECOND * safeDt
-        if (ThreadLocalRandom.current().nextDouble() < chance) {
-            stopEngine(vehicle, stalled = true)
+            val safeDt = dt.coerceIn(0.0, 0.25)
+            val chance = (ENGINE_STALL_START - engineHealth) / ENGINE_STALL_START *
+                ENGINE_STALL_CHANCE_PER_SECOND * safeDt
+            if (ThreadLocalRandom.current().nextDouble() < chance) {
+                stopEngine(vehicle, stalled = true)
+            }
         }
     }
 
@@ -293,100 +309,118 @@ object VehicleDamage {
     }
 
     fun healthFraction(vehicle: IVehicle, partId: String): Double {
-        val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return 1.0
-        val state = vehicle.vehicleState.partStates[partId]?.data ?: part.defaultState
-        val maxHealth = maxHealth(state, part)
-        if (maxHealth <= 0.0) return 1.0
-        return (health(state, part) / maxHealth).coerceIn(0.0, 1.0)
+        return withVehicleState(vehicle) {
+            val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return 1.0
+            val state = vehicle.vehicleState.partStates[partId]?.data ?: part.defaultState
+            val maxHealth = maxHealth(state, part)
+            if (maxHealth <= 0.0) return 1.0
+            return (health(state, part) / maxHealth).coerceIn(0.0, 1.0)
+        }
     }
 
     fun damageFraction(vehicle: IVehicle, partId: String): Double {
-        return 1.0 - healthFraction(vehicle, partId)
+        return withVehicleState(vehicle) {
+            return 1.0 - healthFraction(vehicle, partId)
+        }
     }
 
     fun repairAllParts(level: ServerLevel, vehicle: IVehicle, fraction: Double): Double {
-        val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
-        var totalRepaired = 0.0
-        vehicle.vehicleDefinition.parts
-            .filter(::isDamageablePart)
-            .forEach { part ->
-                val state = vehicle.vehicleState.partStates[part.id]?.data?.copy() ?: part.defaultState.copy()
-                val maxHealth = maxHealth(state, part)
-                val before = health(state, part)
-                val next = (before + maxHealth * safeFraction).coerceAtMost(maxHealth)
-                if (next <= before + 1.0e-4) return@forEach
-                state.putDouble(HEALTH_KEY, next)
-                state.putDouble(MAX_HEALTH_KEY, maxHealth)
-                if (part.type == VehiclePartTypes.WHEEL && next / maxHealth > WHEEL_POP_FRACTION) {
-                    state.putBoolean(POPPED_KEY, false)
+        return withVehicleState(vehicle) {
+            val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+            var totalRepaired = 0.0
+            vehicle.vehicleDefinition.parts
+                .filter(::isDamageablePart)
+                .forEach { part ->
+                    val state = vehicle.vehicleState.partStates[part.id]?.data?.copy() ?: part.defaultState.copy()
+                    val maxHealth = maxHealth(state, part)
+                    val before = health(state, part)
+                    val next = (before + maxHealth * safeFraction).coerceAtMost(maxHealth)
+                    if (next <= before + 1.0e-4) return@forEach
+                    state.putDouble(HEALTH_KEY, next)
+                    state.putDouble(MAX_HEALTH_KEY, maxHealth)
+                    if (part.type == VehiclePartTypes.WHEEL && next / maxHealth > WHEEL_POP_FRACTION) {
+                        state.putBoolean(POPPED_KEY, false)
+                    }
+                    vehicle.vehicleState.partStates[part.id] = VehiclePartState(part.id, state)
+                    totalRepaired += next - before
                 }
-                vehicle.vehicleState.partStates[part.id] = VehiclePartState(part.id, state)
-                totalRepaired += next - before
-            }
 
-        if (totalRepaired > 1.0e-4) {
-            clearEngineDestroyedState(vehicle)
-            criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
-            BikeLifecycle.saveLevel(level)
-            BikeLifecycle.syncLevel(level)
+            if (totalRepaired > 1.0e-4) {
+                clearEngineDestroyedState(vehicle)
+                criticalFailures.remove(VehicleKey(level.dimensionId, vehicle.bodyId))
+                BikeLifecycle.saveLevel(level)
+                BikeLifecycle.syncLevel(level)
+            }
+            return totalRepaired
         }
-        return totalRepaired
     }
 
     fun repairAllPartsFully(level: ServerLevel, vehicle: IVehicle): Double {
-        return repairAllParts(level, vehicle, 1.0)
+        return withVehicleState(vehicle) {
+            return repairAllParts(level, vehicle, 1.0)
+        }
     }
 
     fun wheelPartIds(vehicle: IVehicle): List<String> {
-        return vehicle.vehicleDefinition.parts
-            .filter { it.type == VehiclePartTypes.WHEEL }
-            .map { it.id }
+        return withVehicleState(vehicle) {
+            return vehicle.vehicleDefinition.parts
+                .filter { it.type == VehiclePartTypes.WHEEL }
+                .map { it.id }
+        }
     }
 
     fun isWheelPopped(vehicle: IVehicle, partId: String): Boolean {
-        val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
-        if (part.type != VehiclePartTypes.WHEEL) return false
-        val state = vehicle.vehicleState.partStates[partId]?.data ?: part.defaultState
-        return state.getBoolean(POPPED_KEY) || healthFraction(vehicle, partId) <= WHEEL_POP_FRACTION
+        return withVehicleState(vehicle) {
+            val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return false
+            if (part.type != VehiclePartTypes.WHEEL) return false
+            val state = vehicle.vehicleState.partStates[partId]?.data ?: part.defaultState
+            return state.getBoolean(POPPED_KEY) || healthFraction(vehicle, partId) <= WHEEL_POP_FRACTION
+        }
     }
 
     fun isPartDestroyed(vehicle: IVehicle, partId: String): Boolean {
-        return healthFraction(vehicle, partId) <= 0.0
+        return withVehicleState(vehicle) {
+            return healthFraction(vehicle, partId) <= 0.0
+        }
     }
 
     fun partWorldPosition(vehicle: IVehicle, partId: String): Vector3d? {
-        val zone = vehicle.vehicleDefinition.interactions.zones.firstOrNull { it.partId == partId }
-            ?: return null
-        val transform = try {
-            vehicle.getRenderTransform()
-        } catch (_: IllegalStateException) {
-            null
-        } ?: return null
-        return transform.toWorld.transformPosition(Vector3d(zone.center)).takeIf { it.isFinite() }
+        return withVehicleState(vehicle) {
+            val zone = vehicle.vehicleDefinition.interactions.zones.firstOrNull { it.partId == partId }
+                ?: return null
+            val transform = try {
+                vehicle.getRenderTransform()
+            } catch (_: IllegalStateException) {
+                null
+            } ?: return null
+            return transform.toWorld.transformPosition(Vector3d(zone.center)).takeIf { it.isFinite() }
+        }
     }
 
     private fun damagePart(level: ServerLevel, vehicle: IVehicle, partId: String, amount: Double) {
-        val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return
-        val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
-        val effectiveAmount = safeAmount * damageScale(level, vehicle)
-        val stateMap = vehicle.vehicleState.partStates
-        val state = stateMap[partId]?.data?.copy() ?: part.defaultState.copy()
-        val maxHealth = maxHealth(state, part)
-        val before = health(state, part)
-        val wasPopped = part.type == VehiclePartTypes.WHEEL && before / maxHealth <= WHEEL_POP_FRACTION
-        val wasEngineBroken = part.id == ENGINE_PART_ID && before <= 0.0
-        val next = (before - effectiveAmount).coerceIn(0.0, maxHealth)
-        state.putDouble(HEALTH_KEY, next)
-        state.putDouble(MAX_HEALTH_KEY, maxHealth)
-        if (part.type == VehiclePartTypes.WHEEL && next / maxHealth <= WHEEL_POP_FRACTION) {
-            state.putBoolean(POPPED_KEY, true)
-        }
-        stateMap[partId] = VehiclePartState(partId, state)
-        if (part.type == VehiclePartTypes.WHEEL && !wasPopped && next / maxHealth <= WHEEL_POP_FRACTION) {
-            playVehicleSound(level, vehicle, SkyridersSounds.TIRE_POP_SOUND.get(), 0.9f, randomPitch(0.92f, 1.08f), partId)
-        }
-        if (part.id == ENGINE_PART_ID && !wasEngineBroken && next <= 0.0) {
-            playVehicleSound(level, vehicle, SkyridersSounds.ENGINE_BREAK_SOUND.get(), 0.95f, randomPitch(0.94f, 1.06f), partId)
+        return withVehicleState(vehicle) {
+            val part = vehicle.vehicleDefinition.parts.firstOrNull { it.id == partId } ?: return
+            val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return
+            val effectiveAmount = safeAmount * damageScale(level, vehicle)
+            val stateMap = vehicle.vehicleState.partStates
+            val state = stateMap[partId]?.data?.copy() ?: part.defaultState.copy()
+            val maxHealth = maxHealth(state, part)
+            val before = health(state, part)
+            val wasPopped = part.type == VehiclePartTypes.WHEEL && before / maxHealth <= WHEEL_POP_FRACTION
+            val wasEngineBroken = part.id == ENGINE_PART_ID && before <= 0.0
+            val next = (before - effectiveAmount).coerceIn(0.0, maxHealth)
+            state.putDouble(HEALTH_KEY, next)
+            state.putDouble(MAX_HEALTH_KEY, maxHealth)
+            if (part.type == VehiclePartTypes.WHEEL && next / maxHealth <= WHEEL_POP_FRACTION) {
+                state.putBoolean(POPPED_KEY, true)
+            }
+            stateMap[partId] = VehiclePartState(partId, state)
+            if (part.type == VehiclePartTypes.WHEEL && !wasPopped && next / maxHealth <= WHEEL_POP_FRACTION) {
+                playVehicleSound(level, vehicle, SkyridersSounds.TIRE_POP_SOUND.get(), 0.9f, randomPitch(0.92f, 1.08f), partId)
+            }
+            if (part.id == ENGINE_PART_ID && !wasEngineBroken && next <= 0.0) {
+                playVehicleSound(level, vehicle, SkyridersSounds.ENGINE_BREAK_SOUND.get(), 0.95f, randomPitch(0.94f, 1.06f), partId)
+            }
         }
     }
 
@@ -399,7 +433,9 @@ object VehicleDamage {
     }
 
     fun isCriticalFailure(vehicle: IVehicle): Boolean {
-        return healthFraction(vehicle, BODY_PART_ID) <= 0.0 && healthFraction(vehicle, ENGINE_PART_ID) <= 0.0
+        return withVehicleState(vehicle) {
+            return healthFraction(vehicle, BODY_PART_ID) <= 0.0 && healthFraction(vehicle, ENGINE_PART_ID) <= 0.0
+        }
     }
 
     private fun playCriticalFailureEffects(
@@ -661,16 +697,18 @@ object VehicleDamage {
     }
 
     private fun stopEngine(vehicle: IVehicle, stalled: Boolean) {
-        when (vehicle) {
-            is IBike -> vehicle.state.engineOn = false
-            is KartVehicle -> vehicle.kartState.engineOn = false
-            is WheeledVehicle -> {
-                vehicle.wheeledState.engineOn = false
-                vehicle.wheeledState.engineStalled = stalled
-                vehicle.wheeledState.debugEngineStalled = stalled
-                if (stalled) {
-                    vehicle.wheeledState.engineRpm = 0.0
-                    vehicle.wheeledState.debugEngineRpm = 0.0
+        return withVehicleState(vehicle) {
+            when (vehicle) {
+                is IBike -> vehicle.state.engineOn = false
+                is KartVehicle -> vehicle.kartState.engineOn = false
+                is WheeledVehicle -> {
+                    vehicle.wheeledState.engineOn = false
+                    vehicle.wheeledState.engineStalled = stalled
+                    vehicle.wheeledState.debugEngineStalled = stalled
+                    if (stalled) {
+                        vehicle.wheeledState.engineRpm = 0.0
+                        vehicle.wheeledState.debugEngineRpm = 0.0
+                    }
                 }
             }
         }

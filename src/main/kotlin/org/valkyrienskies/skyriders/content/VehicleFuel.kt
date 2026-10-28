@@ -1,6 +1,5 @@
 package org.valkyrienskies.skyriders.content
 
-import org.valkyrienskies.core.api.bodies.PhysVsBody
 import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 import kotlin.math.abs
@@ -18,60 +17,79 @@ object VehicleFuel {
     }
 
     fun amount(vehicle: IVehicle): Double {
-        return when (vehicle) {
-            is IBike -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.state.fuelAmount)
-            is KartVehicle -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.kartState.fuelAmount)
-            is WheeledVehicle -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.wheeledState.fuelAmount)
-            else -> capacity(vehicle.vehicleDefinition)
+        return withVehicleState(vehicle) {
+            return when (vehicle) {
+                is IBike -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.state.fuelAmount)
+                is KartVehicle -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.kartState.fuelAmount)
+                is WheeledVehicle -> resolveRuntimeAmount(vehicle.vehicleDefinition, vehicle.wheeledState.fuelAmount)
+                else -> capacity(vehicle.vehicleDefinition)
+            }
         }
     }
 
     fun fraction(vehicle: IVehicle): Double {
-        val capacity = capacity(vehicle.vehicleDefinition)
-        if (capacity <= 0.0) return 1.0
-        return (amount(vehicle) / capacity).coerceIn(0.0, 1.0)
+        return withVehicleState(vehicle) {
+            val capacity = capacity(vehicle.vehicleDefinition)
+            if (capacity <= 0.0) return 1.0
+            return (amount(vehicle) / capacity).coerceIn(0.0, 1.0)
+        }
     }
 
     fun canStart(vehicle: IVehicle): Boolean {
-        return capacity(vehicle.vehicleDefinition) <= 0.0 || amount(vehicle) > EPSILON
+        return withVehicleState(vehicle) {
+            return capacity(vehicle.vehicleDefinition) <= 0.0 || amount(vehicle) > EPSILON
+        }
     }
 
     fun refill(vehicle: IVehicle): Double {
-        val capacity = capacity(vehicle.vehicleDefinition)
-        val before = amount(vehicle)
-        setAmount(vehicle, capacity)
-        clearFuelStall(vehicle)
-        return (capacity - before).coerceAtLeast(0.0)
+        return withVehicleState(vehicle) {
+            val capacity = capacity(vehicle.vehicleDefinition)
+            val before = amount(vehicle)
+            setAmount(vehicle, capacity)
+            clearFuelStall(vehicle)
+            return (capacity - before).coerceAtLeast(0.0)
+        }
     }
 
     fun refillAmount(vehicle: IVehicle, amount: Double): Double {
-        val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
-        val capacity = capacity(vehicle.vehicleDefinition)
-        if (capacity <= 0.0) return 0.0
-        val before = amount(vehicle)
-        setAmount(vehicle, before + safeAmount)
-        val added = (amount(vehicle) - before).coerceAtLeast(0.0)
-        if (added > EPSILON) {
-            clearFuelStall(vehicle)
+        return withVehicleState(vehicle) {
+            val safeAmount = amount.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+            val capacity = capacity(vehicle.vehicleDefinition)
+            if (capacity <= 0.0) return 0.0
+            val before = amount(vehicle)
+            setAmount(vehicle, before + safeAmount)
+            val added = (amount(vehicle) - before).coerceAtLeast(0.0)
+            if (added > EPSILON) {
+                clearFuelStall(vehicle)
+            }
+            return added
         }
-        return added
     }
 
     fun refillFraction(vehicle: IVehicle, fraction: Double): Double {
-        val capacity = capacity(vehicle.vehicleDefinition)
-        val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
-        if (capacity <= 0.0) return 0.0
-        val before = amount(vehicle)
-        val addedTarget = capacity * safeFraction
-        setAmount(vehicle, before + addedTarget)
-        val added = (amount(vehicle) - before).coerceAtLeast(0.0)
-        if (added > EPSILON) {
-            clearFuelStall(vehicle)
+        return withVehicleState(vehicle) {
+            val capacity = capacity(vehicle.vehicleDefinition)
+            val safeFraction = fraction.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
+            if (capacity <= 0.0) return 0.0
+            val before = amount(vehicle)
+            val addedTarget = capacity * safeFraction
+            setAmount(vehicle, before + addedTarget)
+            val added = (amount(vehicle) - before).coerceAtLeast(0.0)
+            if (added > EPSILON) {
+                clearFuelStall(vehicle)
+            }
+            return added
         }
-        return added
     }
 
     fun transfer(from: IVehicle, to: IVehicle, maxAmount: Double): Double {
+        if (from.bodyId == to.bodyId) return 0.0
+        val first = if (from.bodyId < to.bodyId) from else to
+        val second = if (first === from) to else from
+        return withVehicleState(first) { withVehicleState(second) { transferLocked(from, to, maxAmount) } }
+    }
+
+    private fun transferLocked(from: IVehicle, to: IVehicle, maxAmount: Double): Double {
         val amount = maxAmount.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
         val toCapacity = capacity(to.vehicleDefinition)
         if (toCapacity <= 0.0) return 0.0
@@ -91,40 +109,42 @@ object VehicleFuel {
         return transferred
     }
 
-    fun consume(vehicle: IVehicle, body: PhysVsBody, input: VehicleInput, dt: Double) {
-        if (!isEngineOn(vehicle)) return
-        val definition = vehicle.vehicleDefinition
-        val capacity = capacity(definition)
-        if (capacity <= 0.0) return
+    fun consume(vehicle: IVehicle, input: VehicleInput, dt: Double) {
+        return withVehicleState(vehicle) {
+            if (!isEngineOn(vehicle)) return
+            val definition = vehicle.vehicleDefinition
+            val capacity = capacity(definition)
+            if (capacity <= 0.0) return
 
-        val current = amount(vehicle)
-        if (current <= EPSILON) {
-            stallOutOfFuel(vehicle)
-            return
-        }
+            val current = amount(vehicle)
+            if (current <= EPSILON) {
+                stallOutOfFuel(vehicle)
+                return
+            }
 
-        val safeDt = dt.coerceIn(0.0, 0.25)
-        val throttle = abs(input.throttle.coerceIn(-1.0, 1.0))
-        val driveWork = driveWork(vehicle)
-        val stepAssistWork = stepAssistWork(vehicle)
-        val driftBoostWork = driftBoostWork(vehicle)
-        val fuel = definition.fuel
-        val rate =
-            fuel.idleUsePerSecond.coerceAtLeast(0.0) +
-                throttle * fuel.throttleUsePerSecond.coerceAtLeast(0.0) +
-                driveWork * fuel.driveWorkUsePerWorkSecond.coerceAtLeast(0.0) +
-                stepAssistWork * fuel.stepAssistUsePerWorkSecond.coerceAtLeast(0.0) +
-                driftBoostWork * fuel.driftBoostUsePerForceSecond.coerceAtLeast(0.0)
-        val next = (current - rate * safeDt).coerceAtLeast(0.0)
-        setAmount(vehicle, next)
-        if (next <= EPSILON) {
-            stallOutOfFuel(vehicle)
+            val safeDt = finiteControlValue(dt, 0.0, 0.25)
+            val throttle = abs(finiteControlValue(input.throttle, -1.0, 1.0))
+            val driveWork = driveWork(vehicle)
+            val stepAssistWork = stepAssistWork(vehicle)
+            val driftBoostWork = driftBoostWork(vehicle)
+            val fuel = definition.fuel
+            val rate =
+                fuel.idleUsePerSecond.coerceAtLeast(0.0) +
+                    throttle * fuel.throttleUsePerSecond.coerceAtLeast(0.0) +
+                    driveWork * fuel.driveWorkUsePerWorkSecond.coerceAtLeast(0.0) +
+                    stepAssistWork * fuel.stepAssistUsePerWorkSecond.coerceAtLeast(0.0) +
+                    driftBoostWork * fuel.driftBoostUsePerForceSecond.coerceAtLeast(0.0)
+            val next = (current - rate * safeDt).coerceAtLeast(0.0)
+            setAmount(vehicle, next)
+            if (next <= EPSILON) {
+                stallOutOfFuel(vehicle)
+            }
         }
     }
 
     private fun resolveRuntimeAmount(definition: VehicleDefinition, runtimeAmount: Double): Double {
         val capacity = capacity(definition)
-        return if (runtimeAmount.isFinite()) runtimeAmount.coerceIn(0.0, capacity) else capacity
+        return if (runtimeAmount.isFinite()) runtimeAmount.coerceIn(0.0, capacity) else 0.0
     }
 
     private fun setAmount(vehicle: IVehicle, amount: Double) {

@@ -53,6 +53,7 @@ object VehicleStatusEffects {
     private val LOCAL_UP = Vector3d(0.0, 1.0, 0.0)
 
     private val states = ConcurrentHashMap<VehicleKey, RuntimeState>()
+    private val clientVisualStates = ConcurrentHashMap<VehicleKey, RuntimeState>()
 
     fun applySpinOut(
         vehicle: IVehicle,
@@ -60,17 +61,19 @@ object VehicleStatusEffects {
         yawSpeed: Double = DEFAULT_SPIN_OUT_YAW_SPEED,
         preserveMomentum: Boolean = false
     ) {
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        if (state.spinOutImmunityRemaining > 0.0 && state.spinOutTimeRemaining <= 0.0) return
+        return withVehicleState(vehicle) {
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            if (state.spinOutImmunityRemaining > 0.0 && state.spinOutTimeRemaining <= 0.0) return
 
-        state.spinOutDuration = duration.coerceAtLeast(0.05)
-        state.spinOutTimeRemaining = state.spinOutDuration
-        state.spinOutYawSpeed = yawSpeed.coerceAtLeast(0.0)
-        state.spinOutDirection = if (ThreadLocalRandom.current().nextBoolean()) 1.0 else -1.0
-        state.spinOutPreserveMomentum = preserveMomentum
-        state.spinOutEngineWasOn = state.spinOutEngineWasOn || isEngineOn(vehicle)
-        setEngineOn(vehicle, false)
-        playOneShot(vehicle, SkyridersSounds.SPINOUT_SOUND.get(), 0.85f, randomPitch(0.92f, 1.08f))
+            state.spinOutDuration = duration.coerceAtLeast(0.05)
+            state.spinOutTimeRemaining = state.spinOutDuration
+            state.spinOutYawSpeed = yawSpeed.coerceAtLeast(0.0)
+            state.spinOutDirection = if (ThreadLocalRandom.current().nextBoolean()) 1.0 else -1.0
+            state.spinOutPreserveMomentum = preserveMomentum
+            state.spinOutEngineWasOn = state.spinOutEngineWasOn || isEngineOn(vehicle)
+            setEngineOn(vehicle, false)
+            playOneShot(vehicle, SkyridersSounds.SPINOUT_SOUND.get(), 0.85f, randomPitch(0.92f, 1.08f))
+        }
     }
 
     fun applyBoost(
@@ -80,13 +83,15 @@ object VehicleStatusEffects {
         targetSpeed: Double = DEFAULT_BOOST_TARGET_SPEED,
         fadeRange: Double = DEFAULT_BOOST_FADE_RANGE
     ) {
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        state.boostDuration = duration.coerceAtLeast(0.05)
-        state.boostTimeRemaining = max(state.boostTimeRemaining, state.boostDuration)
-        state.boostAcceleration = acceleration.coerceAtLeast(0.0)
-        state.boostTargetSpeed = targetSpeed.coerceAtLeast(0.0)
-        state.boostFadeRange = fadeRange.coerceAtLeast(0.001)
-        playOneShot(vehicle, SkyridersSounds.BOOST_SOUND.get(), 0.75f, randomPitch(0.94f, 1.04f))
+        return withVehicleState(vehicle) {
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            state.boostDuration = duration.coerceAtLeast(0.05)
+            state.boostTimeRemaining = max(state.boostTimeRemaining, state.boostDuration)
+            state.boostAcceleration = acceleration.coerceAtLeast(0.0)
+            state.boostTargetSpeed = targetSpeed.coerceAtLeast(0.0)
+            state.boostFadeRange = fadeRange.coerceAtLeast(0.001)
+            playOneShot(vehicle, SkyridersSounds.BOOST_SOUND.get(), 0.75f, randomPitch(0.94f, 1.04f))
+        }
     }
 
     fun applyPullToPoint(
@@ -96,13 +101,15 @@ object VehicleStatusEffects {
         acceleration: Double = DEFAULT_PULL_ACCELERATION,
         maxSpeed: Double = DEFAULT_PULL_MAX_SPEED
     ) {
-        if (!VehiclePhysicsMath.isFinite(target)) return
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        state.pullTarget = Vector3d(target)
-        state.pullDuration = duration.coerceAtLeast(0.05)
-        state.pullTimeRemaining = max(state.pullTimeRemaining, state.pullDuration)
-        state.pullAcceleration = acceleration.coerceAtLeast(0.0)
-        state.pullMaxSpeed = maxSpeed.coerceAtLeast(0.0)
+        return withVehicleState(vehicle) {
+            if (!VehiclePhysicsMath.isFinite(target)) return
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            state.pullTarget = Vector3d(target)
+            state.pullDuration = duration.coerceAtLeast(0.05)
+            state.pullTimeRemaining = max(state.pullTimeRemaining, state.pullDuration)
+            state.pullAcceleration = acceleration.coerceAtLeast(0.0)
+            state.pullMaxSpeed = maxSpeed.coerceAtLeast(0.0)
+        }
     }
 
     fun applyCarryToPoint(
@@ -113,13 +120,15 @@ object VehicleStatusEffects {
         damping: Double = DEFAULT_CARRY_DAMPING,
         maxAcceleration: Double = DEFAULT_CARRY_MAX_ACCELERATION
     ) {
-        if (!VehiclePhysicsMath.isFinite(target)) return
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        state.carryTarget = Vector3d(target)
-        state.carryTimeRemaining = max(state.carryTimeRemaining, duration.coerceAtLeast(0.05))
-        state.carryStiffness = stiffness.coerceAtLeast(0.0)
-        state.carryDamping = damping.coerceAtLeast(0.0)
-        state.carryMaxAcceleration = maxAcceleration.coerceAtLeast(0.0)
+        return withVehicleState(vehicle) {
+            if (!VehiclePhysicsMath.isFinite(target)) return
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            state.carryTarget = Vector3d(target)
+            state.carryTimeRemaining = max(state.carryTimeRemaining, duration.coerceAtLeast(0.05))
+            state.carryStiffness = stiffness.coerceAtLeast(0.0)
+            state.carryDamping = damping.coerceAtLeast(0.0)
+            state.carryMaxAcceleration = maxAcceleration.coerceAtLeast(0.0)
+        }
     }
 
     fun applySlippery(
@@ -127,51 +136,63 @@ object VehicleStatusEffects {
         duration: Double = DEFAULT_SLIPPERY_DURATION,
         tractionScale: Double = DEFAULT_SLIPPERY_TRACTION_SCALE
     ) {
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        state.slipperyTimeRemaining = max(state.slipperyTimeRemaining, duration.coerceAtLeast(0.05))
-        state.slipperyTractionScale = tractionScale.coerceIn(0.02, 1.0)
+        return withVehicleState(vehicle) {
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            state.slipperyTimeRemaining = max(state.slipperyTimeRemaining, duration.coerceAtLeast(0.05))
+            state.slipperyTractionScale = tractionScale.coerceIn(0.02, 1.0)
+        }
     }
 
     fun applyMoondrop(vehicle: IVehicle, duration: Double = MOONDROP_DURATION) {
-        val state = states.getOrPut(key(vehicle)) { RuntimeState() }
-        state.moondropDuration = duration.coerceAtLeast(0.05)
-        state.moondropTimeRemaining = max(state.moondropTimeRemaining, state.moondropDuration)
-        val level = vehicle.level as? ServerLevel
-        if (level != null) {
-            val endTick = level.gameTime + (state.moondropDuration * 20.0).toLong().coerceAtLeast(1L)
-            state.moondropEndGameTick = max(state.moondropEndGameTick, endTick)
+        return withVehicleState(vehicle) {
+            val state = states.getOrPut(key(vehicle)) { RuntimeState() }
+            state.moondropDuration = duration.coerceAtLeast(0.05)
+            state.moondropTimeRemaining = max(state.moondropTimeRemaining, state.moondropDuration)
+            val level = vehicle.level as? ServerLevel
+            if (level != null) {
+                val endTick = level.gameTime + (state.moondropDuration * 20.0).toLong().coerceAtLeast(1L)
+                state.moondropEndGameTick = max(state.moondropEndGameTick, endTick)
+            }
         }
     }
 
     fun modifyInput(vehicle: IVehicle, input: VehicleInput): VehicleInput {
-        val state = states[key(vehicle)]
-        return if ((state?.spinOutTimeRemaining ?: 0.0) > 0.0 && state?.spinOutPreserveMomentum != true) {
-            VehicleInput.EMPTY.copy(
-                brake = 1.0,
-                handbrake = 1.0,
-                riderPresent = input.riderPresent
-            )
-        } else {
-            input
+        return withVehicleState(vehicle) {
+            val state = states[key(vehicle)]
+            return if ((state?.spinOutTimeRemaining ?: 0.0) > 0.0 && state?.spinOutPreserveMomentum != true) {
+                VehicleInput.EMPTY.copy(
+                    brake = 1.0,
+                    handbrake = 1.0,
+                    riderPresent = input.riderPresent
+                )
+            } else {
+                input
+            }
         }
     }
 
     fun isSpinningOut(vehicle: IVehicle): Boolean {
-        return (states[key(vehicle)]?.spinOutTimeRemaining ?: 0.0) > 0.0
+        return withVehicleState(vehicle) {
+            return (states[key(vehicle)]?.spinOutTimeRemaining ?: 0.0) > 0.0
+        }
     }
 
     fun isBoosting(vehicle: IVehicle): Boolean {
-        return (states[key(vehicle)]?.boostTimeRemaining ?: 0.0) > 0.0
+        return withVehicleState(vehicle) {
+            return (states[key(vehicle)]?.boostTimeRemaining ?: 0.0) > 0.0
+        }
     }
 
     fun isMoondropActive(vehicle: IVehicle): Boolean {
-        val state = states[key(vehicle)] ?: return false
-        return state.moondropTimeRemaining > 0.0 || (vehicle.level.isClientSide && state.moondropVisualIntensity() > 0.0)
+        return withVehicleState(vehicle) {
+            if (vehicle.level.isClientSide) return (clientVisualStates[key(vehicle)]?.moondropVisualIntensity() ?: 0.0) > 0.0
+            return (states[key(vehicle)]?.moondropTimeRemaining ?: 0.0) > 0.0
+        }
     }
 
     fun isMoondropActive(dimensionId: DimensionId, bodyId: BodyId): Boolean {
-        val state = states[VehicleKey(dimensionId, bodyId)] ?: return false
-        return state.moondropTimeRemaining > 0.0
+        val vehicle = VehicleManager.getVehicle(dimensionId, bodyId) ?: return false
+        return isMoondropActive(vehicle)
     }
 
     fun topSpeedMultiplier(dimensionId: DimensionId, bodyId: BodyId): Double {
@@ -180,7 +201,7 @@ object VehicleStatusEffects {
 
     fun setClientMoondropVisual(dimensionId: DimensionId, bodyId: BodyId, active: Boolean) {
         val key = VehicleKey(dimensionId, bodyId)
-        val state = states.getOrPut(key) { RuntimeState() }
+        val state = clientVisualStates.getOrPut(key) { RuntimeState() }
         val now = System.currentTimeMillis()
         if (active) {
             state.moondropVisualActive = true
@@ -198,86 +219,103 @@ object VehicleStatusEffects {
             }
         }
         if (!active && state.isIdle()) {
-            states.remove(key, state)
+            clientVisualStates.remove(key, state)
         }
     }
 
     fun moondropVisualIntensity(vehicle: IVehicle): Double {
-        val state = states[key(vehicle)] ?: return 0.0
-        if (!vehicle.level.isClientSide) return if (state.moondropTimeRemaining > 0.0) 1.0 else 0.0
-        return state.moondropVisualIntensity()
+        return withVehicleState(vehicle) {
+            if (vehicle.level.isClientSide) return clientVisualStates[key(vehicle)]?.moondropVisualIntensity() ?: 0.0
+            return if ((states[key(vehicle)]?.moondropTimeRemaining ?: 0.0) > 0.0) 1.0 else 0.0
+        }
     }
 
     fun tractionScale(dimensionId: DimensionId, bodyId: BodyId): Double {
-        val state = states[VehicleKey(dimensionId, bodyId)] ?: return 1.0
-        return if (state.slipperyTimeRemaining > 0.0) state.slipperyTractionScale else 1.0
+        val vehicle = VehicleManager.getVehicle(dimensionId, bodyId) ?: return 1.0
+        return withVehicleState(vehicle) {
+            val state = states[VehicleKey(dimensionId, bodyId)] ?: return 1.0
+            if (state.slipperyTimeRemaining > 0.0) state.slipperyTractionScale else 1.0
+        }
+    }
+
+    fun clear(dimensionId: DimensionId, client: Boolean = false) {
+        val target = if (client) clientVisualStates else states
+        target.keys.removeIf { it.dimension == dimensionId }
+    }
+
+    fun clearClient() {
+        clientVisualStates.clear()
     }
 
     fun gameTick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
         val now = level.gameTime
         val shipWorld = level.shipWorld
         vehicles.forEach { vehicle ->
-            val state = states[key(vehicle)] ?: return@forEach
-            if (state.moondropEndGameTick != Long.MIN_VALUE) {
-                state.moondropTimeRemaining = ((state.moondropEndGameTick - now).coerceAtLeast(0L) / 20.0)
-            } else if (state.moondropTimeRemaining > 0.0) {
-                state.moondropTimeRemaining = (state.moondropTimeRemaining - 0.05).coerceAtLeast(0.0)
-            }
-
-            if (state.moondropTimeRemaining > 0.0) {
-                if (now - state.moondropLastRepairTick >= MOONDROP_REPAIR_INTERVAL_TICKS) {
-                    VehicleDamage.repairAllParts(level, vehicle, MOONDROP_REPAIR_FRACTION)
-                    state.moondropLastRepairTick = now
+            withVehicleState(vehicle) {
+                val state = states[key(vehicle)] ?: return@forEach
+                if (state.moondropEndGameTick != Long.MIN_VALUE) {
+                    state.moondropTimeRemaining = ((state.moondropEndGameTick - now).coerceAtLeast(0L) / 20.0)
+                } else if (state.moondropTimeRemaining > 0.0) {
+                    state.moondropTimeRemaining = (state.moondropTimeRemaining - 0.05).coerceAtLeast(0.0)
                 }
 
-                if (now - state.moondropLastTrailTick >= MOONDROP_TRAIL_INTERVAL_TICKS) {
-                    val body = shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
-                    spawnMoondropTrail(level, body, now)
-                    state.moondropLastTrailTick = now
+                if (state.moondropTimeRemaining > 0.0) {
+                    if (now - state.moondropLastRepairTick >= MOONDROP_REPAIR_INTERVAL_TICKS) {
+                        VehicleDamage.repairAllParts(level, vehicle, MOONDROP_REPAIR_FRACTION)
+                        state.moondropLastRepairTick = now
+                    }
+
+                    if (now - state.moondropLastTrailTick >= MOONDROP_TRAIL_INTERVAL_TICKS) {
+                        val body = shipWorld?.allBodies?.getById(vehicle.bodyId) ?: return@forEach
+                        spawnMoondropTrail(level, body, now)
+                        state.moondropLastTrailTick = now
+                    }
+                } else if (state.isIdle()) {
+                    states.remove(key(vehicle), state)
                 }
-            } else if (state.isIdle()) {
-                states.remove(key(vehicle), state)
             }
         }
     }
 
     fun physTick(vehicle: IVehicle, body: PhysVsBody, dt: Double) {
-        val state = states[key(vehicle)] ?: return
-        val safeDt = dt.coerceIn(0.0, 0.25)
+        return withVehicleState(vehicle) {
+            val state = states[key(vehicle)] ?: return
+            val safeDt = dt.coerceIn(0.0, 0.25)
 
-        if (state.spinOutImmunityRemaining > 0.0) {
-            state.spinOutImmunityRemaining = (state.spinOutImmunityRemaining - safeDt).coerceAtLeast(0.0)
-        }
-        if (state.spinOutTimeRemaining > 0.0) {
-            applySpinOutForces(vehicle, body, state)
-            state.spinOutTimeRemaining = (state.spinOutTimeRemaining - safeDt).coerceAtLeast(0.0)
-            if (state.spinOutTimeRemaining <= 0.0) {
-                finishSpinOut(vehicle, state)
+            if (state.spinOutImmunityRemaining > 0.0) {
+                state.spinOutImmunityRemaining = (state.spinOutImmunityRemaining - safeDt).coerceAtLeast(0.0)
             }
-        }
-        if (state.boostTimeRemaining > 0.0) {
-            applyBoostForce(vehicle, body, state)
-            state.boostTimeRemaining = (state.boostTimeRemaining - safeDt).coerceAtLeast(0.0)
-        }
-        if (state.pullTimeRemaining > 0.0) {
-            applyPullForce(vehicle, body, state)
-            state.pullTimeRemaining = (state.pullTimeRemaining - safeDt).coerceAtLeast(0.0)
-            if (state.pullTimeRemaining <= 0.0) {
-                state.pullTarget = null
+            if (state.spinOutTimeRemaining > 0.0) {
+                applySpinOutForces(vehicle, body, state)
+                state.spinOutTimeRemaining = (state.spinOutTimeRemaining - safeDt).coerceAtLeast(0.0)
+                if (state.spinOutTimeRemaining <= 0.0) {
+                    finishSpinOut(vehicle, state)
+                }
             }
-        }
-        if (state.carryTimeRemaining > 0.0) {
-            applyCarryForce(vehicle, body, state)
-            state.carryTimeRemaining = (state.carryTimeRemaining - safeDt).coerceAtLeast(0.0)
-            if (state.carryTimeRemaining <= 0.0) {
-                state.carryTarget = null
+            if (state.boostTimeRemaining > 0.0) {
+                applyBoostForce(vehicle, body, state)
+                state.boostTimeRemaining = (state.boostTimeRemaining - safeDt).coerceAtLeast(0.0)
             }
-        }
-        if (state.slipperyTimeRemaining > 0.0) {
-            state.slipperyTimeRemaining = (state.slipperyTimeRemaining - safeDt).coerceAtLeast(0.0)
-        }
-        if (state.isIdle()) {
-            states.remove(key(vehicle), state)
+            if (state.pullTimeRemaining > 0.0) {
+                applyPullForce(vehicle, body, state)
+                state.pullTimeRemaining = (state.pullTimeRemaining - safeDt).coerceAtLeast(0.0)
+                if (state.pullTimeRemaining <= 0.0) {
+                    state.pullTarget = null
+                }
+            }
+            if (state.carryTimeRemaining > 0.0) {
+                applyCarryForce(vehicle, body, state)
+                state.carryTimeRemaining = (state.carryTimeRemaining - safeDt).coerceAtLeast(0.0)
+                if (state.carryTimeRemaining <= 0.0) {
+                    state.carryTarget = null
+                }
+            }
+            if (state.slipperyTimeRemaining > 0.0) {
+                state.slipperyTimeRemaining = (state.slipperyTimeRemaining - safeDt).coerceAtLeast(0.0)
+            }
+            if (state.isIdle()) {
+                states.remove(key(vehicle), state)
+            }
         }
     }
 

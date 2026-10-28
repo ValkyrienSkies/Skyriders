@@ -58,7 +58,7 @@ open class DefaultBike(override val bodyId: BodyId,
     }
 
     protected fun engineInput(input: BikeInput): BikeInput {
-        return if (state.engineOn) input else BikeInput.EMPTY.copy(riderPresent = input.riderPresent)
+        return input.withEngineState(state.engineOn)
     }
 
     private fun requireBody() =

@@ -10,6 +10,8 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
 import net.minecraft.resources.ResourceLocation
 import net.minecraftforge.client.event.InputEvent
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent
+import net.minecraftforge.client.event.RegisterClientReloadListenersEvent
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import net.minecraftforge.client.event.ModelEvent
 import net.minecraftforge.client.event.RegisterColorHandlersEvent
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent
@@ -37,7 +39,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 object SkyridersModClient {
-    private var lastSentInput = VehicleInput.EMPTY
+    private val inputTracker = VehicleInputTracker()
     val bikeDismountKey = KeyMapping(
         "key.skyriders.bike_dismount",
         InputConstants.Type.KEYSYM,
@@ -116,6 +118,11 @@ object SkyridersModClient {
     }
 
     @JvmStatic
+    fun registerReloadListeners(event: RegisterClientReloadListenersEvent) {
+        event.registerReloadListener(ResourceManagerReloadListener { VehicleOpenModelRenderer.clearModels() })
+    }
+
+    @JvmStatic
     fun registerKeyMappings(event: RegisterKeyMappingsEvent) {
         event.register(bikeDismountKey)
         event.register(bikeBrakeKey)
@@ -179,7 +186,11 @@ object SkyridersModClient {
             RaceResultsClientState.tick()
             val player = minecraft.player ?: return
             tickRaceDangerRadiusPreview(minecraft)
-            if (player.vehicle !is BikeSeatEntity) return
+            val seat = player.vehicle as? BikeSeatEntity
+            if (seat == null) {
+                inputTracker.reset()
+                return
+            }
 
             val options = minecraft.options
             val forward = options.keyUp.isDown
@@ -198,9 +209,8 @@ object SkyridersModClient {
             )
             player.isShiftKeyDown = false
 
-            if (input != lastSentInput) {
+            if (inputTracker.shouldSend(seat.uuid.takeIf { seat.isDriverSeat() }, input)) {
                 SkyridersNetwork.sendVehicleInput(input)
-                lastSentInput = input
             }
 
             while (bikeDismountKey.consumeClick()) {
@@ -263,7 +273,9 @@ object SkyridersModClient {
 
         @SubscribeEvent
         fun onLoggedOut(event: ClientPlayerNetworkEvent.LoggingOut) {
-            lastSentInput = VehicleInput.EMPTY
+            inputTracker.reset()
+            ClientBikeSyncHandler.clear()
+            BikeWorldRenderer.clear()
             BikeClientHoistState.hoisting = false
             RaceHudClientState.clear()
             RaceResultsClientState.clear()

@@ -8,6 +8,7 @@ import net.minecraft.world.phys.Vec3
 import net.minecraftforge.api.distmarker.Dist
 import net.minecraftforge.fml.DistExecutor
 import net.minecraftforge.network.NetworkEvent
+import net.minecraftforge.network.NetworkDirection
 import net.minecraftforge.network.NetworkRegistry
 import net.minecraftforge.network.PacketDistributor
 import net.minecraftforge.network.simple.SimpleChannel
@@ -32,6 +33,7 @@ import org.valkyrienskies.skyriders.content.BikeVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.IBike
 import org.valkyrienskies.skyriders.content.KartVehicleBehaviorDefinition
 import org.valkyrienskies.skyriders.content.VehicleInput
+import org.valkyrienskies.skyriders.content.withVehicleState
 import org.valkyrienskies.skyriders.content.VehicleFuel
 import org.valkyrienskies.skyriders.content.VehicleDamageEvents
 import org.valkyrienskies.skyriders.content.VehicleStatusEffects
@@ -43,11 +45,12 @@ import org.valkyrienskies.skyriders.content.vehicles.KartVehicle
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.content.toVehicleInput
 import java.util.UUID
+import java.util.Optional
 import java.util.function.Supplier
 import org.valkyrienskies.skyriders.content.vehicles.WheeledVehicle
 
 object SkyridersNetwork {
-    private const val PROTOCOL_VERSION = "3"
+    private const val PROTOCOL_VERSION = "4"
     private const val VEHICLE_DEBUG_SYNC_ENABLED = false
     private const val VEHICLE_VISUAL_ENGINE_ON_FLAG = 1
     private const val VEHICLE_VISUAL_LEAN_FLAG = 1 shl 1
@@ -69,140 +72,160 @@ object SkyridersNetwork {
             VehicleInputPacket::class.java,
             VehicleInputPacket::encode,
             VehicleInputPacket::decode,
-            VehicleInputPacket::handle
+            VehicleInputPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeDismountPacket::class.java,
             BikeDismountPacket::encode,
             BikeDismountPacket::decode,
-            BikeDismountPacket::handle
+            BikeDismountPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeEngineTogglePacket::class.java,
             BikeEngineTogglePacket::encode,
             BikeEngineTogglePacket::decode,
-            BikeEngineTogglePacket::handle
+            BikeEngineTogglePacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleControlActionPacket::class.java,
             VehicleControlActionPacket::encode,
             VehicleControlActionPacket::decode,
-            VehicleControlActionPacket::handle
+            VehicleControlActionPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeSyncPacket::class.java,
             BikeSyncPacket::encode,
             BikeSyncPacket::decode,
-            BikeSyncPacket::handle
+            BikeSyncPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleSyncPacket::class.java,
             VehicleSyncPacket::encode,
             VehicleSyncPacket::decode,
-            VehicleSyncPacket::handle
+            VehicleSyncPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeDebugPacket::class.java,
             BikeDebugPacket::encode,
             BikeDebugPacket::decode,
-            BikeDebugPacket::handle
+            BikeDebugPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleTelemetryPacket::class.java,
             VehicleTelemetryPacket::encode,
             VehicleTelemetryPacket::decode,
-            VehicleTelemetryPacket::handle
+            VehicleTelemetryPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleDebugPacket::class.java,
             VehicleDebugPacket::encode,
             VehicleDebugPacket::decode,
-            VehicleDebugPacket::handle
+            VehicleDebugPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeVisualStatePacket::class.java,
             BikeVisualStatePacket::encode,
             BikeVisualStatePacket::decode,
-            BikeVisualStatePacket::handle
+            BikeVisualStatePacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleVisualStatePacket::class.java,
             VehicleVisualStatePacket::encode,
             VehicleVisualStatePacket::decode,
-            VehicleVisualStatePacket::handle
+            VehicleVisualStatePacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeUsePacket::class.java,
             BikeUsePacket::encode,
             BikeUsePacket::decode,
-            BikeUsePacket::handle
+            BikeUsePacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             VehicleMeleeAttackPacket::class.java,
             VehicleMeleeAttackPacket::encode,
             VehicleMeleeAttackPacket::decode,
-            VehicleMeleeAttackPacket::handle
+            VehicleMeleeAttackPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_SERVER)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             BikeHoistStatePacket::class.java,
             BikeHoistStatePacket::encode,
             BikeHoistStatePacket::decode,
-            BikeHoistStatePacket::handle
+            BikeHoistStatePacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             RaceCompassTargetPacket::class.java,
             RaceCompassTargetPacket::encode,
             RaceCompassTargetPacket::decode,
-            RaceCompassTargetPacket::handle
+            RaceCompassTargetPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             MoondropMusicPacket::class.java,
             MoondropMusicPacket::encode,
             MoondropMusicPacket::decode,
-            MoondropMusicPacket::handle
+            MoondropMusicPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             RaceMusicPacket::class.java,
             RaceMusicPacket::encode,
             RaceMusicPacket::decode,
-            RaceMusicPacket::handle
+            RaceMusicPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             RaceHudPacket::class.java,
             RaceHudPacket::encode,
             RaceHudPacket::decode,
-            RaceHudPacket::handle
+            RaceHudPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             RaceResultsPacket::class.java,
             RaceResultsPacket::encode,
             RaceResultsPacket::decode,
-            RaceResultsPacket::handle
+            RaceResultsPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
         CHANNEL.registerMessage(
             nextPacketId++,
             RocketExplosionSoundPacket::class.java,
             RocketExplosionSoundPacket::encode,
             RocketExplosionSoundPacket::decode,
-            RocketExplosionSoundPacket::handle
+            RocketExplosionSoundPacket::handle,
+            Optional.of(NetworkDirection.PLAY_TO_CLIENT)
         )
     }
 
@@ -236,255 +259,267 @@ object SkyridersNetwork {
 
     fun sendBikeSync(player: ServerPlayer, records: List<BikeSaveRecord>) {
         SkyridersNetworkStats.record("S2C.BikeSync", estimateBikeSyncBytes(records), records.size)
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(records))
+        val batches = records.chunked(128).ifEmpty { listOf(emptyList()) }
+        batches.forEachIndexed { index, batch ->
+            CHANNEL.send(PacketDistributor.PLAYER.with { player }, BikeSyncPacket(batch, index == 0, index == batches.lastIndex))
+        }
     }
 
     fun sendVehicleSync(player: ServerPlayer, records: List<VehicleSaveRecord>) {
         SkyridersNetworkStats.record("S2C.VehicleSync", estimateVehicleSyncBytes(records), records.size)
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, VehicleSyncPacket(records))
+        val batches = records.chunked(128).ifEmpty { listOf(emptyList()) }
+        batches.forEachIndexed { index, batch ->
+            CHANNEL.send(PacketDistributor.PLAYER.with { player }, VehicleSyncPacket(batch, index == 0, index == batches.lastIndex))
+        }
     }
 
     fun sendBikeDebug(player: ServerPlayer, bike: IBike) {
-        val state = bike.state
-        val bikeId = bike.id
-        val bikeName = bike.definition.displayName
-        SkyridersNetworkStats.record("S2C.BikeDebug", estimateBikeDebugBytes(bikeId, bikeName))
-        CHANNEL.send(
-            PacketDistributor.PLAYER.with { player },
-            BikeDebugPacket(
-                bodyId = bike.bodyId,
-                bikeId = bikeId,
-                bikeName = bikeName,
-                speed = state.debugSpeed,
-                frontGrounded = state.debugFrontWheelGrounded,
-                rearGrounded = state.debugRearWheelGrounded,
-                throttle = state.debugThrottle,
-                steeringAngleRad = state.debugSteeringAngleRad,
-                drifting = state.debugDrifting,
-                engineOn = state.engineOn,
-                driftBoostCharge = state.driftBoostCharge,
-                driftBoostLevel = state.driftBoostLevel,
-                jumpCharge = state.jumpCharge
+        return withVehicleState(bike) {
+            val state = bike.state
+            val bikeId = bike.id
+            val bikeName = bike.definition.displayName
+            SkyridersNetworkStats.record("S2C.BikeDebug", estimateBikeDebugBytes(bikeId, bikeName))
+            CHANNEL.send(
+                PacketDistributor.PLAYER.with { player },
+                BikeDebugPacket(
+                    bodyId = bike.bodyId,
+                    bikeId = bikeId,
+                    bikeName = bikeName,
+                    speed = state.debugSpeed,
+                    frontGrounded = state.debugFrontWheelGrounded,
+                    rearGrounded = state.debugRearWheelGrounded,
+                    throttle = state.debugThrottle,
+                    steeringAngleRad = state.debugSteeringAngleRad,
+                    drifting = state.debugDrifting,
+                    engineOn = state.engineOn,
+                    driftBoostCharge = state.driftBoostCharge,
+                    driftBoostLevel = state.driftBoostLevel,
+                    jumpCharge = state.jumpCharge
+                )
             )
-        )
+        }
     }
 
     fun sendVehicleTelemetry(player: ServerPlayer, vehicle: org.valkyrienskies.skyriders.content.IVehicle) {
-        val input = VehicleManager.getInput(player.level().dimensionId, vehicle.bodyId)
-        val speed = try {
-            player.level().shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
-        } catch (_: IllegalStateException) {
-            0.0
-        }
-        val maxSpeed = when (vehicle) {
-            is KartVehicle -> (vehicle.vehicleDefinition.behavior as KartVehicleBehaviorDefinition).physics.wheelTopSpeed
-            is WheeledVehicle -> (vehicle.vehicleDefinition.behavior as WheeledVehicleBehaviorDefinition).physics.wheelTopSpeed
-            is IBike -> (vehicle.vehicleDefinition.behavior as BikeVehicleBehaviorDefinition).physics.wheelTopSpeed
-            else -> 0.0
-        }
-        val groundedCount = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugGroundedWheels
-            is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
-            is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
-            else -> -1
-        }
-        val drifting = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.drifting
-            is WheeledVehicle -> vehicle.wheeledState.drifting
-            is IBike -> vehicle.state.debugDrifting
-            else -> false
-        }
-        val driftBoostCharge = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostCharge
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostCharge
-            is IBike -> vehicle.state.driftBoostCharge
-            else -> 0.0
-        }
-        val driftBoostLevel = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostLevel
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostLevel
-            is IBike -> vehicle.state.driftBoostLevel
-            else -> 0
-        }
-        val forwardSpeed = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugForwardSpeed
-            is WheeledVehicle -> vehicle.wheeledState.debugForwardSpeed
-            is IBike -> vehicle.state.debugSpeed
-            else -> speed
-        }
-        val driftBoostTimeRemaining = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostTimeRemaining
-            is IBike -> vehicle.state.driftBoostTimeRemaining
-            else -> 0.0
-        }
-        val transmissionGear = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugTransmissionGear
-            is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
-            else -> 0
-        }
-        val parkingBrakeEngaged = when (vehicle) {
-            is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
-            else -> false
-        }
-        val engineRpm = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugEngineRpm
-            is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
-            else -> 0.0
-        }
-        val engineStalled = when (vehicle) {
-            is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
-            else -> false
-        }
-        val jumpCharge = when (vehicle) {
-            is IBike -> vehicle.state.jumpCharge
-            else -> 0.0
-        }
-        val hasTransmission = when (vehicle) {
-            is KartVehicle -> (vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition)?.physics?.transmission != null
-            is WheeledVehicle -> true
-            else -> false
-        }
-        val hasJump = vehicle.vehicleDefinition.behavior is BikeVehicleBehaviorDefinition
+        return withVehicleState(vehicle) {
+            val input = VehicleManager.getInput(player.level().dimensionId, vehicle.bodyId)
+            val speed = try {
+                player.level().shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
+            } catch (_: IllegalStateException) {
+                0.0
+            }
+            val maxSpeed = when (vehicle) {
+                is KartVehicle -> (vehicle.vehicleDefinition.behavior as KartVehicleBehaviorDefinition).physics.wheelTopSpeed
+                is WheeledVehicle -> (vehicle.vehicleDefinition.behavior as WheeledVehicleBehaviorDefinition).physics.wheelTopSpeed
+                is IBike -> (vehicle.vehicleDefinition.behavior as BikeVehicleBehaviorDefinition).physics.wheelTopSpeed
+                else -> 0.0
+            }
+            val groundedCount = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugGroundedWheels
+                is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
+                is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
+                else -> -1
+            }
+            val drifting = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.drifting
+                is WheeledVehicle -> vehicle.wheeledState.drifting
+                is IBike -> vehicle.state.debugDrifting
+                else -> false
+            }
+            val driftBoostCharge = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostCharge
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostCharge
+                is IBike -> vehicle.state.driftBoostCharge
+                else -> 0.0
+            }
+            val driftBoostLevel = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostLevel
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostLevel
+                is IBike -> vehicle.state.driftBoostLevel
+                else -> 0
+            }
+            val forwardSpeed = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugForwardSpeed
+                is WheeledVehicle -> vehicle.wheeledState.debugForwardSpeed
+                is IBike -> vehicle.state.debugSpeed
+                else -> speed
+            }
+            val driftBoostTimeRemaining = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostTimeRemaining
+                is IBike -> vehicle.state.driftBoostTimeRemaining
+                else -> 0.0
+            }
+            val transmissionGear = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugTransmissionGear
+                is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
+                else -> 0
+            }
+            val parkingBrakeEngaged = when (vehicle) {
+                is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
+                else -> false
+            }
+            val engineRpm = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugEngineRpm
+                is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
+                else -> 0.0
+            }
+            val engineStalled = when (vehicle) {
+                is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
+                else -> false
+            }
+            val jumpCharge = when (vehicle) {
+                is IBike -> vehicle.state.jumpCharge
+                else -> 0.0
+            }
+            val hasTransmission = when (vehicle) {
+                is KartVehicle -> (vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition)?.physics?.transmission != null
+                is WheeledVehicle -> true
+                else -> false
+            }
+            val hasJump = vehicle.vehicleDefinition.behavior is BikeVehicleBehaviorDefinition
 
-        val packet = VehicleTelemetryPacket(
-            bodyId = vehicle.bodyId,
-            maxSpeed = maxSpeed,
-            speed = speed,
-            engineOn = vehicle.vehicleState.engineOn,
-            fuel = VehicleFuel.fraction(vehicle),
-            throttle = input.throttle,
-            steer = input.steer,
-            groundedCount = groundedCount,
-            hasJump = hasJump,
-            jumpCharge = jumpCharge,
-            drifting = drifting,
-            driftBoostCharge = driftBoostCharge,
-            driftBoostLevel = driftBoostLevel,
-            forwardSpeed = forwardSpeed,
-            driftBoostTimeRemaining = driftBoostTimeRemaining,
-            hasTransmission = hasTransmission,
-            transmissionGear = transmissionGear,
-            parkingBrakeEngaged = parkingBrakeEngaged,
-            engineRpm = engineRpm,
-            engineStalled = engineStalled
-        )
-        SkyridersNetworkStats.record("S2C.VehicleTelemetry", estimateVehicleTelemetryBytes(packet))
-        CHANNEL.send(
-            PacketDistributor.PLAYER.with { player },
-            packet
-        )
+            val packet = VehicleTelemetryPacket(
+                bodyId = vehicle.bodyId,
+                maxSpeed = maxSpeed,
+                speed = speed,
+                engineOn = vehicle.vehicleState.engineOn,
+                fuel = VehicleFuel.fraction(vehicle),
+                throttle = input.throttle,
+                steer = input.steer,
+                groundedCount = groundedCount,
+                hasJump = hasJump,
+                jumpCharge = jumpCharge,
+                drifting = drifting,
+                driftBoostCharge = driftBoostCharge,
+                driftBoostLevel = driftBoostLevel,
+                forwardSpeed = forwardSpeed,
+                driftBoostTimeRemaining = driftBoostTimeRemaining,
+                hasTransmission = hasTransmission,
+                transmissionGear = transmissionGear,
+                parkingBrakeEngaged = parkingBrakeEngaged,
+                engineRpm = engineRpm,
+                engineStalled = engineStalled
+            )
+            SkyridersNetworkStats.record("S2C.VehicleTelemetry", estimateVehicleTelemetryBytes(packet))
+            CHANNEL.send(
+                PacketDistributor.PLAYER.with { player },
+                packet
+            )
+        }
     }
 
     fun sendVehicleDebug(player: ServerPlayer, vehicle: org.valkyrienskies.skyriders.content.IVehicle) {
-        if (!VEHICLE_DEBUG_SYNC_ENABLED) return
+        return withVehicleState(vehicle) {
+            if (!VEHICLE_DEBUG_SYNC_ENABLED) return
 
-        val input = VehicleManager.getInput(player.level().dimensionId, vehicle.bodyId)
-        val speed = try {
-            player.level().shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
-        } catch (_: IllegalStateException) {
-            0.0
-        }
-        val groundedCount = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugGroundedWheels
-            is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
-            is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
-            else -> -1
-        }
-        val drifting = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.drifting
-            is WheeledVehicle -> vehicle.wheeledState.drifting
-            is IBike -> vehicle.state.debugDrifting
-            else -> false
-        }
-        val driftBoostCharge = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostCharge
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostCharge
-            is IBike -> vehicle.state.driftBoostCharge
-            else -> 0.0
-        }
-        val driftBoostLevel = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostLevel
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostLevel
-            is IBike -> vehicle.state.driftBoostLevel
-            else -> 0
-        }
-        val lateralSlip = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugLateralSlip
-            is WheeledVehicle -> vehicle.wheeledState.debugLateralSlip
-            else -> 0.0
-        }
-        val forwardSpeed = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugForwardSpeed
-            is WheeledVehicle -> vehicle.wheeledState.debugForwardSpeed
-            is IBike -> vehicle.state.debugSpeed
-            else -> speed
-        }
-        val steerAngleRad = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugSteerRad
-            is WheeledVehicle -> vehicle.wheeledState.debugSteerRad
-            is IBike -> vehicle.state.debugSteeringAngleRad
-            else -> 0.0
-        }
-        val driftBoostTimeRemaining = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
-            is WheeledVehicle -> vehicle.wheeledState.driftBoostTimeRemaining
-            is IBike -> vehicle.state.driftBoostTimeRemaining
-            else -> 0.0
-        }
-        val transmissionGear = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugTransmissionGear
-            is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
-            else -> 0
-        }
-        val parkingBrakeEngaged = when (vehicle) {
-            is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
-            else -> false
-        }
-        val engineRpm = when (vehicle) {
-            is KartVehicle -> vehicle.kartState.debugEngineRpm
-            is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
-            else -> 0.0
-        }
-        val clutchEngagement = when (vehicle) {
-            is WheeledVehicle -> vehicle.wheeledState.debugClutchEngagement
-            else -> 0.0
-        }
-        val engineStalled = when (vehicle) {
-            is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
-            else -> false
-        }
-        val hasTransmission = when (vehicle) {
-            is KartVehicle -> (vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition)?.physics?.transmission != null
-            is WheeledVehicle -> true
-            else -> false
-        }
+            val input = VehicleManager.getInput(player.level().dimensionId, vehicle.bodyId)
+            val speed = try {
+                player.level().shipWorld?.allBodies?.getById(vehicle.bodyId)?.kinematics?.velocity?.length() ?: 0.0
+            } catch (_: IllegalStateException) {
+                0.0
+            }
+            val groundedCount = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugGroundedWheels
+                is WheeledVehicle -> vehicle.wheeledState.debugGroundedWheels
+                is IBike -> listOf(vehicle.state.debugFrontWheelGrounded, vehicle.state.debugRearWheelGrounded).count { it }
+                else -> -1
+            }
+            val drifting = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.drifting
+                is WheeledVehicle -> vehicle.wheeledState.drifting
+                is IBike -> vehicle.state.debugDrifting
+                else -> false
+            }
+            val driftBoostCharge = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostCharge
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostCharge
+                is IBike -> vehicle.state.driftBoostCharge
+                else -> 0.0
+            }
+            val driftBoostLevel = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostLevel
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostLevel
+                is IBike -> vehicle.state.driftBoostLevel
+                else -> 0
+            }
+            val lateralSlip = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugLateralSlip
+                is WheeledVehicle -> vehicle.wheeledState.debugLateralSlip
+                else -> 0.0
+            }
+            val forwardSpeed = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugForwardSpeed
+                is WheeledVehicle -> vehicle.wheeledState.debugForwardSpeed
+                is IBike -> vehicle.state.debugSpeed
+                else -> speed
+            }
+            val steerAngleRad = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugSteerRad
+                is WheeledVehicle -> vehicle.wheeledState.debugSteerRad
+                is IBike -> vehicle.state.debugSteeringAngleRad
+                else -> 0.0
+            }
+            val driftBoostTimeRemaining = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.driftBoostTimeRemaining
+                is WheeledVehicle -> vehicle.wheeledState.driftBoostTimeRemaining
+                is IBike -> vehicle.state.driftBoostTimeRemaining
+                else -> 0.0
+            }
+            val transmissionGear = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugTransmissionGear
+                is WheeledVehicle -> vehicle.wheeledState.debugTransmissionGear
+                else -> 0
+            }
+            val parkingBrakeEngaged = when (vehicle) {
+                is WheeledVehicle -> vehicle.wheeledState.debugParkingBrake
+                else -> false
+            }
+            val engineRpm = when (vehicle) {
+                is KartVehicle -> vehicle.kartState.debugEngineRpm
+                is WheeledVehicle -> vehicle.wheeledState.debugEngineRpm
+                else -> 0.0
+            }
+            val clutchEngagement = when (vehicle) {
+                is WheeledVehicle -> vehicle.wheeledState.debugClutchEngagement
+                else -> 0.0
+            }
+            val engineStalled = when (vehicle) {
+                is WheeledVehicle -> vehicle.wheeledState.debugEngineStalled
+                else -> false
+            }
+            val hasTransmission = when (vehicle) {
+                is KartVehicle -> (vehicle.vehicleDefinition.behavior as? KartVehicleBehaviorDefinition)?.physics?.transmission != null
+                is WheeledVehicle -> true
+                else -> false
+            }
 
-        val packet = VehicleDebugPacket(
-            bodyId = vehicle.bodyId,
-            vehicleId = vehicle.id,
-            vehicleName = vehicle.vehicleDefinition.displayName,
-            speed = speed,
-            engineOn = vehicle.vehicleState.engineOn,
-            throttle = input.throttle,
-            steer = input.steer,
-            groundedCount = groundedCount,
-            drifting = drifting,
-            driftBoostCharge = driftBoostCharge,
-            driftBoostLevel = driftBoostLevel,
-            lateralSlip = lateralSlip,
-            forwardSpeed = forwardSpeed,
-            steerAngleRad = steerAngleRad,
-            driftBoostTimeRemaining = driftBoostTimeRemaining,
-            hasTransmission = hasTransmission,
-            transmissionGear = transmissionGear,
-            parkingBrakeEngaged = parkingBrakeEngaged,
-            engineRpm = engineRpm,
-            clutchEngagement = clutchEngagement,
-            engineStalled = engineStalled
-        )
-        SkyridersNetworkStats.record("S2C.VehicleDebug", estimateVehicleDebugBytes(packet))
-        CHANNEL.send(PacketDistributor.PLAYER.with { player }, packet)
+            val packet = VehicleDebugPacket(
+                bodyId = vehicle.bodyId,
+                vehicleId = vehicle.id,
+                vehicleName = vehicle.vehicleDefinition.displayName,
+                speed = speed,
+                engineOn = vehicle.vehicleState.engineOn,
+                throttle = input.throttle,
+                steer = input.steer,
+                groundedCount = groundedCount,
+                drifting = drifting,
+                driftBoostCharge = driftBoostCharge,
+                driftBoostLevel = driftBoostLevel,
+                lateralSlip = lateralSlip,
+                forwardSpeed = forwardSpeed,
+                steerAngleRad = steerAngleRad,
+                driftBoostTimeRemaining = driftBoostTimeRemaining,
+                hasTransmission = hasTransmission,
+                transmissionGear = transmissionGear,
+                parkingBrakeEngaged = parkingBrakeEngaged,
+                engineRpm = engineRpm,
+                clutchEngagement = clutchEngagement,
+                engineStalled = engineStalled
+            )
+            SkyridersNetworkStats.record("S2C.VehicleDebug", estimateVehicleDebugBytes(packet))
+            CHANNEL.send(PacketDistributor.PLAYER.with { player }, packet)
+        }
     }
 
     fun sendBikeVisualState(player: ServerPlayer, bikes: List<IBike>) {
@@ -493,19 +528,21 @@ object SkyridersNetwork {
             PacketDistributor.PLAYER.with { player },
             BikeVisualStatePacket(
                 bikes.map { bike ->
-                    val state = bike.state
-                    BikeVisualState(
-                        bodyId = bike.bodyId,
-                        engineOn = state.engineOn,
-                        visualLeanRad = state.visualLeanRad,
-                        visualSteerRad = state.visualSteerRad,
-                        frontWheelSpin = state.frontWheelSpin,
-                        rearWheelSpin = state.rearWheelSpin,
-                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
-                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
-                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
-                    )
+                    withVehicleState(bike) {
+                        val state = bike.state
+                        BikeVisualState(
+                            bodyId = bike.bodyId,
+                            engineOn = state.engineOn,
+                            visualLeanRad = state.visualLeanRad,
+                            visualSteerRad = state.visualSteerRad,
+                            frontWheelSpin = state.frontWheelSpin,
+                            rearWheelSpin = state.rearWheelSpin,
+                            frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                            rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                            frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                            rearWheelSuspensionOffset = state.rearWheelSuspensionOffset
+                        )
+                    }
                 }
             )
         )
@@ -513,54 +550,56 @@ object SkyridersNetwork {
 
     fun sendVehicleVisualState(player: ServerPlayer, vehicles: List<org.valkyrienskies.skyriders.content.IVehicle>) {
         val states = vehicles.mapNotNull { vehicle ->
-            when (vehicle) {
-                is IBike -> {
-                    val state = vehicle.state
-                    VehicleVisualState(
-                        bodyId = vehicle.bodyId,
-                        engineOn = state.engineOn,
-                        visualLeanRad = state.visualLeanRad,
-                        frontSteerRad = state.visualSteerRad,
-                        frontWheelSpin = state.frontWheelSpin,
-                        rearWheelSpin = state.rearWheelSpin,
-                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
-                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
-                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
-                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
-                    )
+            withVehicleState(vehicle) {
+                when (vehicle) {
+                    is IBike -> {
+                        val state = vehicle.state
+                        VehicleVisualState(
+                            bodyId = vehicle.bodyId,
+                            engineOn = state.engineOn,
+                            visualLeanRad = state.visualLeanRad,
+                            frontSteerRad = state.visualSteerRad,
+                            frontWheelSpin = state.frontWheelSpin,
+                            rearWheelSpin = state.rearWheelSpin,
+                            frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                            rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                            frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                            rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                            moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
+                        )
+                    }
+                    is KartVehicle -> {
+                        val state = vehicle.kartState
+                        VehicleVisualState(
+                            bodyId = vehicle.bodyId,
+                            engineOn = state.engineOn,
+                            frontSteerRad = state.debugSteerRad,
+                            frontWheelSpin = state.frontWheelSpin,
+                            rearWheelSpin = state.rearWheelSpin,
+                            frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                            rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                            frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                            rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                            moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
+                        )
+                    }
+                    is WheeledVehicle -> {
+                        val state = vehicle.wheeledState
+                        VehicleVisualState(
+                            bodyId = vehicle.bodyId,
+                            engineOn = state.engineOn,
+                            frontSteerRad = state.debugSteerRad,
+                            frontWheelSpin = state.frontWheelSpin,
+                            rearWheelSpin = state.rearWheelSpin,
+                            frontWheelAngularVelocity = state.frontWheelAngularVelocity,
+                            rearWheelAngularVelocity = state.rearWheelAngularVelocity,
+                            frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
+                            rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
+                            moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
+                        )
+                    }
+                    else -> null
                 }
-                is KartVehicle -> {
-                    val state = vehicle.kartState
-                    VehicleVisualState(
-                        bodyId = vehicle.bodyId,
-                        engineOn = state.engineOn,
-                        frontSteerRad = state.debugSteerRad,
-                        frontWheelSpin = state.frontWheelSpin,
-                        rearWheelSpin = state.rearWheelSpin,
-                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
-                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
-                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
-                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
-                    )
-                }
-                is WheeledVehicle -> {
-                    val state = vehicle.wheeledState
-                    VehicleVisualState(
-                        bodyId = vehicle.bodyId,
-                        engineOn = state.engineOn,
-                        frontSteerRad = state.debugSteerRad,
-                        frontWheelSpin = state.frontWheelSpin,
-                        rearWheelSpin = state.rearWheelSpin,
-                        frontWheelAngularVelocity = state.frontWheelAngularVelocity,
-                        rearWheelAngularVelocity = state.rearWheelAngularVelocity,
-                        frontWheelSuspensionOffset = state.frontWheelSuspensionOffset,
-                        rearWheelSuspensionOffset = state.rearWheelSuspensionOffset,
-                        moondropActive = VehicleStatusEffects.isMoondropActive(vehicle)
-                    )
-                }
-                else -> null
             }
         }
         if (states.isEmpty()) return
@@ -844,8 +883,10 @@ object SkyridersNetwork {
         }
     }
 
-    data class BikeSyncPacket(val records: List<BikeSaveRecord>) {
+    data class BikeSyncPacket(val records: List<BikeSaveRecord>, val first: Boolean = true, val last: Boolean = true) {
         fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(first)
+            buf.writeBoolean(last)
             buf.writeVarInt(records.size)
             records.forEach { record ->
                 buf.writeLong(record.bodyId)
@@ -863,7 +904,7 @@ object SkyridersNetwork {
             val context = contextSupplier.get()
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
-                    Runnable { ClientBikeSyncHandler.handleBikeSync(records) }
+                    Runnable { ClientBikeSyncHandler.handleBikeSync(records, first, last) }
                 }
             }
             context.packetHandled = true
@@ -875,7 +916,9 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): BikeSyncPacket {
-                val count = buf.readVarInt()
+                val first = buf.readBoolean()
+                val last = buf.readBoolean()
+                val count = readCollectionSize(buf, 4096)
                 val records = (0 until count).map {
                     BikeSaveRecord(
                         bodyId = buf.readLong(),
@@ -888,7 +931,7 @@ object SkyridersNetwork {
                         rearWheelAngularVelocity = buf.readDouble()
                     )
                 }
-                return BikeSyncPacket(records)
+                return BikeSyncPacket(records, first, last)
             }
 
             fun handle(packet: BikeSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -897,8 +940,10 @@ object SkyridersNetwork {
         }
     }
 
-    data class VehicleSyncPacket(val records: List<VehicleSaveRecord>) {
+    data class VehicleSyncPacket(val records: List<VehicleSaveRecord>, val first: Boolean = true, val last: Boolean = true) {
         fun encode(buf: FriendlyByteBuf) {
+            buf.writeBoolean(first)
+            buf.writeBoolean(last)
             buf.writeVarInt(records.size)
             records.forEach { record ->
                 buf.writeNbt(record.save())
@@ -909,7 +954,7 @@ object SkyridersNetwork {
             val context = contextSupplier.get()
             context.enqueueWork {
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT) {
-                    Runnable { ClientBikeSyncHandler.handleVehicleSync(records) }
+                    Runnable { ClientBikeSyncHandler.handleVehicleSync(records, first, last) }
                 }
             }
             context.packetHandled = true
@@ -921,11 +966,13 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): VehicleSyncPacket {
-                val count = buf.readVarInt()
+                val first = buf.readBoolean()
+                val last = buf.readBoolean()
+                val count = readCollectionSize(buf, 4096)
                 val records = (0 until count).map {
                     VehicleSaveRecord.load(buf.readNbt() ?: CompoundTag())
                 }
-                return VehicleSyncPacket(records)
+                return VehicleSyncPacket(records, first, last)
             }
 
             fun handle(packet: VehicleSyncPacket, contextSupplier: Supplier<NetworkEvent.Context>) {
@@ -1245,7 +1292,7 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): BikeVisualStatePacket {
-                val count = buf.readVarInt()
+                val count = readCollectionSize(buf, 4096)
                 val states = (0 until count).map {
                     BikeVisualState(
                         bodyId = buf.readLong(),
@@ -1339,7 +1386,7 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): VehicleVisualStatePacket {
-                val count = buf.readVarInt()
+                val count = readCollectionSize(buf, 4096)
                 val states = (0 until count).map {
                     val bodyId = buf.readLong()
                     val flags = buf.readByte().toInt() and 0xFF
@@ -1583,7 +1630,7 @@ object SkyridersNetwork {
             }
 
             fun decode(buf: FriendlyByteBuf): RaceResultsPacket {
-                val count = buf.readVarInt().coerceIn(0, MAX_RACE_RESULT_ENTRIES)
+                val count = readCollectionSize(buf, MAX_RACE_RESULT_ENTRIES)
                 val results = ArrayList<RaceResultEntry>(count)
                 repeat(count) {
                     results += RaceResultEntry(

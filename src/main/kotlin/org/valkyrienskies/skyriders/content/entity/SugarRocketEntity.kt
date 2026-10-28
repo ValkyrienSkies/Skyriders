@@ -8,6 +8,8 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
+import org.valkyrienskies.skyriders.content.VehicleProjectileHits
+import org.valkyrienskies.mod.common.world.clipIncludeShips
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
@@ -95,26 +97,13 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
             return
         }
         val next = start.add(velocity)
-        val blockHit = serverLevel.clip(
-            ClipContext(
-                start,
-                next,
-                ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE,
-                this
-            )
-        )
-        if (blockHit.type != HitResult.Type.MISS) {
-            explode(serverLevel, blockHit.location)
+        val hit = VehicleProjectileHits.firstHit(serverLevel, this, start, next, DIRECT_HIT_RADIUS, ownerBodyId)
+        if (hit != null) {
+            explode(serverLevel, hit.position, hit.vehicle)
             return
         }
-
         setPosition(next)
-        findHitVehicle(serverLevel, next)?.let { target ->
-            explode(serverLevel, next, target)
-        }
     }
-
     fun launch(origin: Vec3, direction: Vec3, inheritedVelocity: Vec3 = Vec3.ZERO) {
         val safeDirection = direction.normalize().takeIf { it.lengthSqr() > 1.0e-8 } ?: Vec3(0.0, 0.0, 1.0)
         motorDirection = safeDirection
@@ -175,7 +164,7 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         val start = position()
         val nextVelocity = updateUnlitVelocity(deltaMovement)
         val next = start.add(nextVelocity)
-        val blockHit = level.clip(
+        val blockHit = level.clipIncludeShips(
             ClipContext(
                 start,
                 next,
@@ -291,17 +280,6 @@ class SugarRocketEntity(type: EntityType<SugarRocketEntity>, level: Level) : Ent
         }
 
         return bestTarget
-    }
-
-    private fun findHitVehicle(level: ServerLevel, position: Vec3): IVehicle? {
-        val shipWorld = level.shipWorld ?: return null
-        val rocketPos = Vector3d(position.x, position.y, position.z)
-        return VehicleManager.getVehicles(level).firstOrNull { vehicle ->
-            if (vehicle.bodyId == ownerBodyId) return@firstOrNull false
-            val body = shipWorld.allBodies.getById(vehicle.bodyId) ?: return@firstOrNull false
-            val hitRadius = DIRECT_HIT_RADIUS + vehicleApproxRadius(vehicle.vehicleDefinition.body.collisionBoxSize)
-            body.kinematics.position.distanceSquared(rocketPos) <= hitRadius * hitRadius
-        }
     }
 
     private fun explode(level: ServerLevel, position: Vec3, directTarget: IVehicle? = null) {

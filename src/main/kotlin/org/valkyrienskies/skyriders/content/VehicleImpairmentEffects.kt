@@ -48,6 +48,11 @@ object VehicleImpairmentEffects {
         veerStates.remove(key)
     }
 
+    fun clear(level: ServerLevel) {
+        intendedInputs.keys.removeIf { it.dimensionId == level.dimensionId }
+        veerStates.keys.removeIf { it.dimensionId == level.dimensionId }
+    }
+
     private fun applyInput(level: ServerLevel, key: VehicleKey, driver: LivingEntity) {
         val intended = intendedInputs[key] ?: VehicleInput.EMPTY.copy(riderPresent = true)
         val modified = if (hasTipsy(driver)) applyTipsySteer(level, key, intended) else {
