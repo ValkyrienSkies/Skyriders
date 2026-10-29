@@ -16,6 +16,38 @@ import kotlin.math.abs
 
 class BikeTraversalRegressionTest {
     @ParameterizedTest
+    @CsvSource("false", "true")
+    fun reboundDampingDoesNotCancelRiderJump(ceiling: Boolean) {
+        NativeVehicleWorld().use { world ->
+            val config = BikePhysicsConfig.DIRT_BIKE
+            world.box(Vector3d(40.0, 1.0, 80.0), Vector3d(0.0, -0.5, 20.0))
+            if (ceiling) world.box(Vector3d(40.0, 1.0, 80.0), Vector3d(0.0, 2.0, 20.0))
+            val bike = world.compound(listOf(CompoundBodyShapeData.Child(BoxBodyShapeData(config.collisionBoxSize),
+                config.collisionBoxOffset, segmentId = 0)), Vector3d(0.0, 1.5, 0.0), config.mass, false,
+                pivot = Vector3d(0.0, -0.2, 0.0))
+            val state = BikeRuntimeState(engineOn = true)
+            fun tick(jump: Double) {
+                BikePhysicsSolver.updateBikePhysics(bike.api, world.level,
+                    BikeInput(jump = jump, riderPresent = true), config, state, 1.0 / 60.0)
+                world.step(1.0 / 60.0)
+                assertTrue(state.debugStepAssistWork == 0.0)
+                if (System.getenv("SKYRIDERS_NATIVE_TRACE") == "1") {
+                    println("JUMP input=$jump pos=${bike.current.position} vel=${bike.current.velocity} charge=${state.jumpCharge} release=${state.jumpReleaseTimeRemaining} grounded=${state.debugFrontWheelGrounded}/${state.debugRearWheelGrounded}")
+                }
+            }
+            repeat(180) { tick(0.0) }
+            repeat(60) { tick(1.0) }
+            var peak = bike.current.position.y()
+            repeat(120) { tick(0.0); peak = maxOf(peak, bike.current.position.y()) }
+            assertTrue(peak > if (ceiling) 0.6 else 1.5, "Suspension cancelled the charged jump: peak=$peak ceiling=$ceiling")
+            repeat(180) { tick(0.0) }
+            assertTrue(!state.jumpTakingOff, "Jump left rebound damping disabled")
+            assertTrue(state.debugFrontWheelGrounded && state.debugRearWheelGrounded,
+                "Bike did not recover wheel support after jump: ${bike.current.position}")
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("-1", "1")
     fun riderPitchControlTurnsInRequestedDirection(pitch: Double) {
         NativeVehicleWorld().use { world ->

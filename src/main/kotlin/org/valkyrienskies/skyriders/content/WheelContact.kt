@@ -17,5 +17,9 @@ data class WheelContact(
     val wheelRightWorld: Vector3d,
     val wheelVelocityWorld: Vector3d,
     val surfaceVelocityWorld: Vector3d,
-    val relativeWheelVelocityWorld: Vector3d
+    val relativeWheelVelocityWorld: Vector3d,
+    val suspensionPointWorld: Vector3d = contactPointWorld,
+    val suspensionRelativeVelocityWorld: Vector3d = relativeWheelVelocityWorld,
+    val stepRise: Double = 0.0,
+    val supportNormalWorld: Vector3d = contactNormalWorld
 )
