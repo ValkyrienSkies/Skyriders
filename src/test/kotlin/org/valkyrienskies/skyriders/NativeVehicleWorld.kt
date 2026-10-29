@@ -140,7 +140,7 @@ internal class NativeVehicleWorld(
                 "getId" -> native.physicsBodyId.toLong()
                 "getKinematics" -> current
                 "getPrevTickKinematics" -> previous
-                "getCollisionShape" -> shape
+                "getCollisionShape" -> null
                 "isStatic", "getIsStatic" -> native.isStatic
                 "applyWorldForce" -> {
                     val force = args[0] as Vector3dc

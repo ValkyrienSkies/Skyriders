@@ -55,7 +55,7 @@ data class KartPhysicsConfig(
     val driftBoostDurations: List<Double> = listOf(0.35, 0.55, 0.8),
     val transmission: VehicleTransmissionConfig? = null,
     val maxStepHeight: Double = 1.0,
-    val stepAssistStrength: Double = mass * 45.0,
+    val stepAssistStrength: Double = 7200.0,
     val groundNormalSmoothingTime: Double = 0.12,
     val suspensionDroopGroundedFraction: Double = 0.45,
     val suspensionDroopPreloadFraction: Double = 0.16
@@ -118,13 +118,13 @@ data class KartPhysicsConfig(
             driftBoostForces = listOf(4600.0, 6800.0, 9200.0),
             driftBoostDurations = listOf(0.32, 0.5, 0.72),
             maxStepHeight = 1.0,
+            stepAssistStrength = 7200.0,
             groundNormalSmoothingTime = 0.12
         )
     }
 }
 
 data class KartRuntimeState(
-    val stepTraversal: org.valkyrienskies.skyriders.util.VehicleStepState = org.valkyrienskies.skyriders.util.VehicleStepState(),
     var engineOn: Boolean = false,
     var fuelAmount: Double = Double.NaN,
     var raceParticipant: Boolean = false,
