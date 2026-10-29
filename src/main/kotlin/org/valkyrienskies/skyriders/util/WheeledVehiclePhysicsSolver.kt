@@ -62,9 +62,16 @@ object WheeledVehiclePhysicsSolver {
         val wheels = expandWheels(config).filterNot { wheel ->
             VehicleDamage.isWheelDestroyed(physLevel.dimension, body.id, wheel.damagePartId())
         }
+        val stepSettings = if (activeInput.riderPresent && state.engineOn && activeInput.brake <= 0.0 &&
+            activeInput.handbrake <= 0.0 && !state.parkingBrakeEngaged && config.stepAssistStrength > 0.0 && config.maxStepHeight > 0.0 &&
+            (abs(driveCommand.throttle) > 0.05 || abs(forwardSpeed) > 0.35)) {
+            VehicleWheelPhysics.StepSettings(config.maxStepHeight, driveCommand.throttle) { rise ->
+                VehicleStepClearance.canRise(body, physLevel, rise, config.collisionBoxSize, config.collisionBoxOffset, collisionBoxes)
+            }
+        } else null
         val contacts = wheels.map { wheel ->
             val axleSteer = if (wheel.axle.steerable) steerRad * wheel.axle.steerScale else 0.0
-            WheelContactState(wheel, sampleWheel(body, physLevel, wheel, contactUp, axleSteer, config, dt))
+            WheelContactState(wheel, sampleWheel(body, physLevel, wheel, contactUp, axleSteer, config, if (wheel.axle.stepAssist) stepSettings else null))
         }
         val grounded = contacts.filter { it.contact.grounded }
         if (grounded.isNotEmpty()) {
@@ -74,11 +81,14 @@ object WheeledVehiclePhysicsSolver {
         }
         val stabilizedGrounded = grounded.isNotEmpty() || state.groundedGraceTimeRemaining > 0.0
 
-        val loaded = contacts.map { contactState ->
+        val suspensionForces = VehicleSuspension.apply(body, contacts.map { contact ->
+            suspensionSpring(contact, config)?.copy(allowRebound = true)
+        }, dt)
+        val loaded = contacts.mapIndexed { index, contactState ->
             LoadedWheelContact(
                 wheel = contactState.wheel,
                 contact = contactState.contact,
-                normalForce = applySuspension(body, contactState, config)
+                normalForce = suspensionForces[index]
             )
         }
         if (grounded.isNotEmpty()) {
@@ -109,12 +119,12 @@ object WheeledVehiclePhysicsSolver {
             updateWheelLongitudinalPhysics(body, loaded, driveCommand, driveLimitSpeed, driftGripActive, config, state, dt, tractionScale)
         }
 
-        if (activeInput.riderPresent && state.engineOn && !parkingBrakeActive && activeInput.brake <= 0.0) {
-            val activeStepWheels = loaded.count { it.contact.grounded && it.wheel.axle.stepAssist }.coerceAtLeast(1)
-            state.debugStepAssistWork = loaded.sumOf {
-                applyStepAssist(body, physLevel, it, forward, terrainUp, driveCommand, config, activeStepWheels, collisionBoxes)
-            }
-        }
+        state.debugStepAssistWork = contacts.sumOf { contactState ->
+            val contact = contactState.contact
+            if (contact.grounded && contact.stepRise > 0.0)
+                VehicleSuspension.assistGrade(body, contact.hitBody, contact.suspensionPointWorld, contact.contactNormalWorld,
+                    config.mass / contacts.size, config.stepAssistStrength / contacts.size) else 0.0
+        } / config.mass
         if (stabilizedGrounded) {
             applyUpright(body, up, terrainUp, driftGripActive, config)
         }
@@ -468,11 +478,10 @@ object WheeledVehiclePhysicsSolver {
         contactUp: Vector3d,
         steerRad: Double,
         config: WheeledVehiclePhysicsConfig,
-        dt: Double
+        stepSettings: VehicleWheelPhysics.StepSettings?
     ): VehicleWheelContact {
         val mountWorld = body.kinematics.transform.toWorld.transformPosition(Vector3d(wheel.localPos))
         val suspensionUp = VehiclePhysicsMath.safeNormalize(contactUp, WORLD_UP)
-        val castDir = Vector3d(suspensionUp).negate()
         val axle = wheel.axle
         val maxLength = axle.suspensionRestLength + axle.suspensionTravel + axle.wheelRadius
         val droopGroundedRange = axle.suspensionTravel * config.suspensionDroopGroundedFraction.coerceIn(0.0, 1.0)
@@ -487,21 +496,17 @@ object WheeledVehiclePhysicsSolver {
         } else {
             baseForward
         }
-        val wheelRight = VehiclePhysicsMath.safeNormalize(
-            Vector3d(suspensionUp).cross(wheelForward),
-            VehiclePhysicsMath.transformDirection(body, LOCAL_RIGHT, LOCAL_RIGHT)
-        )
-        return VehicleWheelPhysics.sampleSphereWheel(body, physLevel, mountWorld, castDir, maxLength,
-            axle.wheelRadius, wheelForward, wheelRight, groundedMaxDistance)
+        return VehicleWheelPhysics.sampleSphereWheel(body, physLevel, mountWorld, maxLength,
+            axle.wheelRadius, wheelForward, groundedMaxDistance, stepSettings)
     }
-    private fun applySuspension(
-        body: PhysVsBody,
+
+    private fun suspensionSpring(
         contactState: WheelContactState,
         config: WheeledVehiclePhysicsConfig
-    ): Double {
+    ): VehicleSuspension.Spring? {
         val contact = contactState.contact
         val axle = contactState.wheel.axle
-        if (!contact.grounded) return 0.0
+        if (contact.hitBody == null) return null
         val springLength = contact.hitDistance - axle.wheelRadius
         val compression = axle.suspensionRestLength - springLength
         val compressed = compression.coerceIn(0.0, axle.suspensionTravel)
@@ -514,14 +519,9 @@ object WheeledVehiclePhysicsSolver {
         } else {
             0.0
         }
-        if (compressed <= 0.0 && droopLoad <= 0.0) return 0.0
-        val suspensionUp = VehiclePhysicsMath.safeNormalize(Vector3d(contact.suspensionDirWorld).negate(), WORLD_UP)
-        val springVelocity = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, contact.suspensionDirWorld)
-        val dampingScale = if (compressed > 0.0) 1.0 else 0.35
-        val forceMag = (compressed * axle.suspensionStrength + droopLoad + springVelocity * axle.suspensionDamping * dampingScale).coerceAtLeast(0.0)
-        val normalForce = forceMag.coerceIn(0.0, MAX_FORCE)
-        VehicleWheelPhysics.applyContactForce(body, contact, Vector3d(suspensionUp).mul(normalForce))
-        return normalForce
+        return VehicleSuspension.Spring(contact.hitBody, contact.suspensionPointWorld, contact.contactNormalWorld,
+            contact.suspensionDirWorld, contact.suspensionRelativeVelocityWorld, compressed,
+            axle.suspensionStrength, axle.suspensionDamping, droopLoad, supported = contact.grounded)
     }
 
     private fun applyLateralGrip(
@@ -1111,217 +1111,4 @@ object WheeledVehiclePhysicsSolver {
         val engineBrakeScale: Double
     )
 
-    private const val MIN_STEP_ASSIST_RISE = 0.12
-
-    private const val STEP_SIDE_PROBE_BIAS = 0.025
-
-    private fun applyStepAssist(
-        body: PhysVsBody,
-        physLevel: PhysLevel,
-        loaded: LoadedWheelContact,
-        forward: Vector3d,
-        terrainUp: Vector3d,
-        driveCommand: DriveCommand,
-        config: WheeledVehiclePhysicsConfig,
-        activeStepWheels: Int,
-        collisionBoxes: List<VehicleCollisionBoxDefinition>?
-    ): Double {
-        val contact = loaded.contact
-        val axle = loaded.wheel.axle
-        if (!axle.stepAssist || !contact.grounded || config.maxStepHeight <= 0.0 || config.stepAssistStrength <= 0.0) return 0.0
-        val driveDirection = driveCommand.throttle.coerceIn(-1.0, 1.0)
-        val terrainForward = computeStepApproachDirection(body, forward, terrainUp, driveDirection)
-        if (terrainForward.lengthSquared() < 1.0e-6) return 0.0
-        val speedIntoStep = max(0.0, VehiclePhysicsMath.safeDot(body.kinematics.velocity, terrainForward))
-        val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
-        val throttleIntoStep = max(0.0, driveDirection * VehiclePhysicsMath.safeDot(projectedForward, terrainForward))
-        val crawlAmount = throttleIntoStep * (1.0 - smoothstep(0.8, 3.5, speedIntoStep))
-        val effectiveSpeed = max(speedIntoStep, crawlAmount * 1.8)
-        if (effectiveSpeed < 0.35) return 0.0
-
-        val speedLookahead = smoothstep(3.0, config.wheelTopSpeed * 0.85, effectiveSpeed)
-        val probeLength = (axle.wheelRadius + 0.55 + effectiveSpeed * 0.11)
-            .coerceIn(axle.wheelRadius + 0.45, axle.wheelRadius + 2.15)
-        val lowProbeStart = Vector3d(contact.contactPointWorld)
-            .fma(axle.wheelRadius * 0.45, terrainUp)
-            .fma(0.16 + speedLookahead * 0.36, terrainForward)
-        val sideProbeDistance = axle.wheelWidth * 0.7 + 0.08
-        val obstacle = findStepObstacle(
-            physLevel = physLevel,
-            body = body,
-            lowProbeStart = lowProbeStart,
-            terrainForward = terrainForward,
-            terrainUp = terrainUp,
-            wheelRight = contact.wheelRightWorld,
-            sideProbeDistance = sideProbeDistance,
-            verticalProbeDistance = min(config.maxStepHeight * 0.45, axle.wheelRadius * 1.15),
-            probeLength = probeLength
-        ) ?: return 0.0
-        val step = findStepLandingSurface(
-            physLevel = physLevel,
-            body = body,
-            contact = contact,
-            lowProbeStart = obstacle.probeStart,
-            obstacleDistance = obstacle.distance,
-            terrainForward = terrainForward,
-            terrainUp = terrainUp,
-            wheelRight = contact.wheelRightWorld,
-            sideProbeDistance = sideProbeDistance,
-            axle = axle,
-            config = config,
-            speedLookahead = speedLookahead
-        ) ?: return 0.0
-
-        if (!VehicleStepClearance.canRise(body, physLevel, step.rise, config.collisionBoxSize, config.collisionBoxOffset, collisionBoxes)) return 0.0
-
-        val heightAmount = smoothstep(0.12, config.maxStepHeight, step.rise)
-        val approachDistance = max(0.25, step.approachDistance)
-        val targetUpSpeed = (effectiveSpeed * step.rise / approachDistance * (0.55 + speedLookahead * 0.25))
-            .coerceIn(0.0, 2.4 + speedLookahead * 2.8)
-        val currentUpSpeed = VehiclePhysicsMath.safeDot(contact.relativeWheelVelocityWorld, terrainUp)
-        val missingUpSpeed = max(0.0, targetUpSpeed - currentUpSpeed)
-        val liftDemand = if (targetUpSpeed > 1.0e-4) {
-            (missingUpSpeed / targetUpSpeed).coerceIn(0.0, 1.0)
-        } else {
-            0.0
-        }
-        val wheelShare = (2.0 / activeStepWheels.toDouble()).coerceIn(0.35, 1.0)
-        val velocityLiftForce = config.mass * missingUpSpeed * (12.0 + speedLookahead * 12.0)
-        val crawlLiftForce = config.stepAssistStrength * crawlAmount * (0.22 + heightAmount * 0.16)
-        val baseLiftForce = config.stepAssistStrength * (0.22 + heightAmount * 0.2) * liftDemand
-        val maxLiftForce = min(
-            config.mass * (28.0 + speedLookahead * 40.0),
-            config.stepAssistStrength * (0.85 + heightAmount * 0.55 + speedLookahead * 1.65)
-        )
-        val lift = Vector3d(terrainUp)
-            .mul((baseLiftForce + velocityLiftForce + crawlLiftForce).coerceIn(0.0, maxLiftForce) * wheelShare)
-
-        val speedLimitScale = 1.0 - smoothstep(config.wheelTopSpeed, config.wheelTopSpeed * 1.18, speedIntoStep)
-        val obstacleProximityScale = 1.0 - smoothstep(probeLength * 0.45, probeLength, obstacle.distance)
-        val crawlCarryForce = config.stepAssistStrength * crawlAmount * (0.18 + heightAmount * 0.08)
-        val rawCarryForce = config.stepAssistStrength *
-            (0.025 + speedLookahead * 0.18 + heightAmount * 0.05) *
-            speedLimitScale.coerceIn(0.0, 1.0) * obstacleProximityScale.coerceIn(0.0, 1.0) + crawlCarryForce
-        val maxCarryForce = config.mass * (1.8 + speedLookahead * 3.8 + heightAmount * 1.2)
-        val carry = Vector3d(terrainForward).mul(rawCarryForce.coerceIn(0.0, maxCarryForce) * wheelShare)
-
-        val assistForce = lift.add(carry)
-        VehicleWheelPhysics.applyContactForce(body, contact, assistForce)
-        return assistForce.length() / max(config.mass, 1.0)
-    }
-
-    private fun findStepObstacle(
-        physLevel: PhysLevel,
-        body: PhysVsBody,
-        lowProbeStart: Vector3d,
-        terrainForward: Vector3d,
-        terrainUp: Vector3d,
-        wheelRight: Vector3d,
-        sideProbeDistance: Double,
-        verticalProbeDistance: Double,
-        probeLength: Double
-    ): StepObstacle? {
-        return lateralStepOffsets(sideProbeDistance).asSequence()
-            .flatMap { sideOffset ->
-                verticalStepOffsets(verticalProbeDistance).asSequence().map { verticalOffset -> sideOffset to verticalOffset }
-            }
-            .mapNotNull { (sideOffset, verticalOffset) ->
-                val probeStart = Vector3d(lowProbeStart)
-                    .fma(sideOffset, wheelRight)
-                    .fma(verticalOffset, terrainUp)
-                val hit = physLevel.rayCast(probeStart, terrainForward, probeLength, body.id) ?: return@mapNotNull null
-                if (hit.hitBody.id == body.id || !hit.distance.isFinite() || hit.distance <= 0.0 ||
-                    !hit.hitNormal.isFinite || hit.hitNormal.y() > 0.25 || hit.hitNormal.dot(terrainForward) > -0.25) return@mapNotNull null
-                StepObstacle(probeStart, hit.distance, abs(sideOffset))
-            }
-            .minByOrNull { it.distance + it.sideOffset * STEP_SIDE_PROBE_BIAS }
-    }
-
-    private fun findStepLandingSurface(
-        physLevel: PhysLevel,
-        body: PhysVsBody,
-        contact: VehicleWheelContact,
-        lowProbeStart: Vector3d,
-        obstacleDistance: Double,
-        terrainForward: Vector3d,
-        terrainUp: Vector3d,
-        wheelRight: Vector3d,
-        sideProbeDistance: Double,
-        axle: WheelAxleConfig,
-        config: WheeledVehiclePhysicsConfig,
-        speedLookahead: Double
-    ): StepOpportunity? {
-        if (!obstacleDistance.isFinite()) return null
-        val down = Vector3d(terrainUp).negate()
-        val stepProbeHeight = config.maxStepHeight + axle.wheelRadius * 1.2
-        val downProbeLength = stepProbeHeight + axle.wheelRadius * 1.35
-        val forwardDistances = listOf(
-            obstacleDistance + axle.wheelRadius * 0.45,
-            obstacleDistance + 0.35 + speedLookahead * 0.15,
-            obstacleDistance + 0.65 + speedLookahead * 0.65
-        )
-        return forwardDistances.asSequence()
-            .filter { it.isFinite() && it > 0.0 }
-            .flatMap { distance ->
-                lateralStepOffsets(sideProbeDistance).asSequence().map { sideOffset -> distance to sideOffset }
-            }
-            .mapNotNull { (distance, sideOffset) ->
-                val topProbeStart = Vector3d(lowProbeStart)
-                    .fma(distance, terrainForward)
-                    .fma(sideOffset, wheelRight)
-                    .fma(stepProbeHeight, terrainUp)
-                val topHit = physLevel.rayCast(topProbeStart, down, downProbeLength, body.id) ?: return@mapNotNull null
-                if (topHit.hitBody.id == body.id || !topHit.distance.isFinite()) return@mapNotNull null
-                val topPoint = Vector3d(topProbeStart).fma(topHit.distance, down)
-                val rise = VehiclePhysicsMath.safeDot(Vector3d(topPoint).sub(contact.contactPointWorld), terrainUp)
-                if (rise < MIN_STEP_ASSIST_RISE || rise > config.maxStepHeight + axle.wheelRadius * 0.25) return@mapNotNull null
-                if (VehiclePhysicsMath.safeDot(topHit.hitNormal, terrainUp) < 0.48) return@mapNotNull null
-                StepOpportunity(rise, distance, abs(sideOffset))
-            }
-            .minByOrNull { it.rise + it.sideOffset * STEP_SIDE_PROBE_BIAS }
-    }
-
-    private fun lateralStepOffsets(sideProbeDistance: Double): List<Double> {
-        val side = sideProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
-        return listOf(0.0, -side, side)
-    }
-
-    private fun verticalStepOffsets(verticalProbeDistance: Double): List<Double> {
-        val vertical = verticalProbeDistance.takeIf { it.isFinite() && it > 1.0e-4 } ?: return listOf(0.0)
-        return listOf(0.0, vertical, vertical * 0.5)
-    }
-
-    private fun computeStepApproachDirection(body: PhysVsBody, forward: Vector3d, terrainUp: Vector3d, throttle: Double): Vector3d {
-        val projectedForward = VehiclePhysicsMath.projectOntoPlane(forward, terrainUp, forward)
-        val velocity = body.kinematics.velocity
-        if (!VehiclePhysicsMath.isFinite(velocity)) return throttleStepDirection(projectedForward, throttle)
-        val planarVelocity = Vector3d(velocity).fma(-VehiclePhysicsMath.safeDot(velocity, terrainUp), terrainUp)
-        if (planarVelocity.lengthSquared() < 0.35 * 0.35) return throttleStepDirection(projectedForward, throttle)
-        val velocityDirection = VehiclePhysicsMath.safeNormalize(planarVelocity, projectedForward)
-        val alignment = VehiclePhysicsMath.safeDot(velocityDirection, projectedForward)
-        if (abs(alignment) < 0.25) return Vector3d()
-        val axisDirection = Vector3d(projectedForward).mul(if (alignment < 0.0) -1.0 else 1.0)
-        val velocityWeight = smoothstep(2.0, 12.0, planarVelocity.length()) * 0.65
-        return VehiclePhysicsMath.safeNormalize(Vector3d(axisDirection).mul(1.0 - velocityWeight).fma(velocityWeight, velocityDirection), axisDirection)
-    }
-
-    private fun throttleStepDirection(projectedForward: Vector3d, throttle: Double): Vector3d {
-        return when {
-            throttle > 0.05 -> Vector3d(projectedForward)
-            throttle < -0.05 -> Vector3d(projectedForward).negate()
-            else -> Vector3d()
-        }
-    }
-
-    private data class StepOpportunity(
-        val rise: Double,
-        val approachDistance: Double,
-        val sideOffset: Double
-    )
-
-    private data class StepObstacle(
-        val probeStart: Vector3d,
-        val distance: Double,
-        val sideOffset: Double
-    )
 }

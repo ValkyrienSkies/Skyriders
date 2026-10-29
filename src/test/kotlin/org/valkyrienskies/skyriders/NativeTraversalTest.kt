@@ -35,13 +35,14 @@ class NativeTraversalTest {
     }
 
     @ParameterizedTest
-    @CsvSource("bike,stairs", "bike,rampLip", "kart,stairs", "kart,rampLip", "atv,stairs", "atv,rampLip", "truck,stairs", "truck,rampLip")
+    @CsvSource("bike,stairs", "bike,rampLip", "dirt,stairs", "dirt,rampLip", "speedster,stairs", "speedster,rampLip",
+        "kart,stairs", "kart,rampLip", "atv,stairs", "atv,rampLip", "truck,stairs", "truck,rampLip")
     fun otherVehiclesTraverseRepeatedStepsAndCrests(vehicle: String, course: String) {
         val result = driveCar(5.5, 24.0, course, vehicle)
         assertTrue(result.position.z > 20.0, "$vehicle failed to finish $course: $result")
         assertTrue(result.penetration <= 0.1, "$vehicle penetrated $course: $result")
         assertTrue(result.velocity.z > 8.0, "$vehicle lost traversal speed on $course: $result")
-        assertTrue(result.peakHeight < 15.0, "$vehicle launched excessively on $course: $result")
+        assertTrue(result.peakHeight < 5.5 + if (vehicle == "truck") 3.0 else 2.5, "$vehicle launched excessively on $course: $result")
     }
 
     @ParameterizedTest
@@ -105,7 +106,7 @@ class NativeTraversalTest {
 
     @ParameterizedTest
     @CsvSource("0", "2")
-    fun configuredStepForceIsBounded(maxAcceleration: Double) {
+    fun configuredGradeAssistIsBounded(maxAcceleration: Double) {
         val result = driveCar(1.0, 4.0, forceBudget = WheeledVehiclePhysicsConfig.CAR.mass * maxAcceleration)
         assertTrue(result.maxAssist <= maxAcceleration + 1.0e-6, "Step force exceeded configured budget: $result")
     }
@@ -159,6 +160,8 @@ class NativeTraversalTest {
                 "car" -> WheeledVehicleDefinitions.CAR.body.centerOfMassOffset
                 "atv" -> WheeledVehicleDefinitions.ATV.body.centerOfMassOffset
                 "bike", "dirt" -> Vector3d(0.0, -0.2, 0.0)
+                "kart" -> KartDefinitions.DEBUG_KART.body.centerOfMassOffset
+                "speedster" -> KartDefinitions.SPEEDSTER.body.centerOfMassOffset
                 else -> Vector3d()
             })
             val state = WheeledVehicleRuntimeState(engineOn = course != "engineOff")
@@ -208,9 +211,19 @@ class NativeTraversalTest {
             var slopeAlignment = 0.0
             var slopeSamples = 0
             repeat((((if (course == "step") 24.0 else 45.0) / (speed * travel.z) + 1.0 + extraSeconds) / dt).toInt()) {
+                car.appliedForces.clear()
+                car.appliedTorques.clear()
                 update(true)
                 maxAssist = maxOf(maxAssist, state.debugStepAssistWork, bikeState.debugStepAssistWork, kartState.debugStepAssistWork)
                 world.step(dt)
+                if (System.getenv("SKYRIDERS_FORCE_TRACE") == "1" && car.current.position.z() - origin.z in -5.0..13.0) {
+                    val force = car.appliedForces.fold(Vector3d()) { sum, sample -> sum.add(sample.force) }
+                    val velocityChange = Vector3d(car.current.velocity).sub(car.previous.velocity)
+                    val collisionChange = Vector3d(velocityChange).fma(-dt / mass, force).add(0.0, 9.81 * dt, 0.0)
+                    if (velocityChange.y > 0.3 || collisionChange.length() > 0.3) {
+                        println("FORCES $vehicle $course $speed tick=$it pos=${car.current.position} vel=${car.current.velocity} delta=$velocityChange collision=$collisionChange forces=${car.appliedForces.groupBy { it.source }.mapValues { (_, values) -> values.fold(Vector3d()) { sum, sample -> sum.add(sample.force) } }}")
+                    }
+                }
                 assertTrue(car.current.position.isFinite, "Native simulation became non-finite at tick $it")
                 if (System.getenv("SKYRIDERS_NATIVE_TRACE") == "1" && it % 6 == 0) {
                     println("trace vehicle=$vehicle course=$course height=$height speed=$speed tick=$it pos=${car.current.position} vel=${car.current.velocity} rot=${car.current.rotation} grounded=${state.debugGroundedWheels} step=${state.debugStepAssistWork} rpm=${state.engineRpm} gear=${state.transmissionGear}")

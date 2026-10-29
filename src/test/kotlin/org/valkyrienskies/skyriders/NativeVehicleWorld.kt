@@ -14,6 +14,7 @@ import org.valkyrienskies.core.api.physics.ShapeCastResult
 import org.valkyrienskies.core.api.world.PhysLevel
 import org.valkyrienskies.core.impl.bodies.properties.BodyKinematicsImpl
 import org.valkyrienskies.core.impl.bodies.properties.BodyTransformImpl
+import org.valkyrienskies.core.impl.game.bodies.BodyInertiaDataImpl
 import org.valkyrienskies.physics_api.CollisionShapeReference
 import org.valkyrienskies.physics_api.PhysicsBodyInertiaData
 import org.valkyrienskies.physics_api.PhysicsBodyReference
@@ -34,6 +35,7 @@ internal class NativeVehicleWorld(
         PhysicsBackendType.KRUNCH_VOX3D -> 4
     }
 ) : AutoCloseable {
+    data class AppliedForce(val force: Vector3d, val position: Vector3d, val source: String)
     init { KrunchBootstrap.loadNativeBinaries() }
     private val pool = KrunchBootstrap.createKrunchPhysicsThreadPool(1)
     private val world = KrunchBootstrap.createKrunchPhysicsWorld(pool)
@@ -116,6 +118,8 @@ internal class NativeVehicleWorld(
     }
 
     inner class Body(val native: PhysicsBodyReference<*>, private val shape: BodyShapeData, private val pivot: Vector3d) {
+        val appliedForces = mutableListOf<AppliedForce>()
+        val appliedTorques = mutableListOf<Vector3d>()
         var current = snapshot()
             private set
         var previous = current
@@ -141,15 +145,25 @@ internal class NativeVehicleWorld(
                 "getKinematics" -> current
                 "getPrevTickKinematics" -> previous
                 "getCollisionShape" -> null
+                "getInertiaData" -> BodyInertiaDataImpl(pivot, 1.0 / native.inertiaData.invMass,
+                    Matrix3d(native.inertiaData.invMOI).invert())
                 "isStatic", "getIsStatic" -> native.isStatic
                 "applyWorldForce" -> {
                     val force = args[0] as Vector3dc
                     check(force.isFinite) { "Non-finite force: $force" }
+                    if (System.getenv("SKYRIDERS_FORCE_TRACE") == "1") {
+                        val source = Throwable().stackTrace.firstOrNull {
+                            it.className.startsWith("org.valkyrienskies.skyriders.util.") &&
+                                !it.methodName.startsWith("safeApplyWorldForce") && !it.methodName.startsWith("applyContactForce")
+                        }?.methodName ?: "unknown"
+                        appliedForces.add(AppliedForce(Vector3d(force), Vector3d(args[1] as Vector3dc), source))
+                    }
                     val local = current.toModel.transformPosition(args[1] as Vector3dc, Vector3d()).sub(current.positionInModel)
                     native.addInvariantForceAtPosToNextPhysTick(local, force)
                     null
                 }
                 "applyWorldTorque" -> {
+                    if (System.getenv("SKYRIDERS_FORCE_TRACE") == "1") appliedTorques.add(Vector3d(args[0] as Vector3dc))
                     native.addInvariantTorqueToNextPhysTick(args[0] as Vector3dc)
                     null
                 }
