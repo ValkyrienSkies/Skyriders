@@ -96,6 +96,10 @@ object BikeManager {
         return bikeMap(level)[level.dimensionId]?.values?.sortedBy(IBike::bodyId) ?: emptyList()
     }
 
+    fun hasBikes(level: Level): Boolean = bikeMap(level)[level.dimensionId]?.isNotEmpty() == true
+
+    fun hasServerBikes(): Boolean = serverBikesByDimension.values.any { it.isNotEmpty() }
+
     fun tick(dimensionId: DimensionId) {
         serverBikesByDimension[dimensionId]?.values?.forEach(IBike::tick)
     }

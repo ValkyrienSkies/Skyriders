@@ -14,6 +14,7 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent
 import net.minecraftforge.event.level.ExplosionEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import org.valkyrienskies.mod.api.dimensionId
+import org.valkyrienskies.mod.common.toWorldCoordinates
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import java.util.UUID
 
@@ -112,12 +113,15 @@ object VehicleDamageEvents {
         if (event.action != PlayerInteractEvent.LeftClickBlock.Action.START) return
         val player = event.entity as? ServerPlayer ?: return
         val level = player.level() as? ServerLevel ?: return
-        val start = player.eyePosition
-        val end = event.pos.center
+        val start = level.toWorldCoordinates(player.eyePosition)
+        val end = level.toWorldCoordinates(event.pos.center)
+        val distanceSqr = start.distanceToSqr(end)
+        val reach = player.blockReach + 1.0
+        if (!distanceSqr.isFinite() || distanceSqr > reach * reach) return
         val target = VehicleInteractionHandler.findVehicleOnRay(level, start, end) ?: return
-        if (target.distanceSqr > start.distanceToSqr(end)) return
+        if (target.distanceSqr > distanceSqr) return
 
-        damageMelee(player, target.vehicle, start.add(player.lookAngle.scale(sqrtDistance(target.distanceSqr))))
+        damageMelee(player, target.vehicle, hitPoint(start, end, target.distanceSqr))
         event.isCanceled = true
     }
 
@@ -143,11 +147,9 @@ object VehicleDamageEvents {
         end: Vec3,
         ignoredBodyId: Long? = null
     ): DamageRayTarget? {
-        val visibleEnd = VehicleInteractionPicker.unobstructedEnd(level, start, end)
-        return VehicleManager.getVehicles(level)
+        val vehicles = VehicleManager.getVehicles(level).filter { ignoredBodyId == null || it.bodyId != ignoredBodyId }
+        return VehicleInteractionPicker.visibleVehicleHits(level, start, end, vehicles)
             .asSequence()
-            .filter { vehicle -> ignoredBodyId == null || vehicle.bodyId != ignoredBodyId }
-            .flatMap { vehicle -> VehicleInteractionPicker.hitVehicleInteractionZones(vehicle, start, visibleEnd).asSequence() }
             .filter { hit -> isDamageablePart(hit.vehicle, hit.zone.partId) }
             .groupBy { it.vehicle.bodyId }
             .values

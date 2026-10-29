@@ -34,6 +34,7 @@ object BikeLifecycle {
 
     @SubscribeEvent
     fun onServerStopped(event: ServerStoppedEvent) {
+        VehicleImpactDamageHandler.stopCollisionListener()
         BikeInteractionHandler.clear()
         VehicleDamageEvents.clear()
         pendingRestoreLevels.clear()
@@ -89,6 +90,7 @@ object BikeLifecycle {
             }
         }
 
+        VehicleImpactDamageHandler.updateCollisionListener()
         event.server.allLevels.forEach { level ->
             pendingRecords[level]?.let { records ->
                 var restored = false
