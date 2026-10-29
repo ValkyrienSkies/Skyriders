@@ -436,7 +436,6 @@ object SkyridersMod {
         event.enqueueWork {
             SkyridersNetwork.register()
             RacingDispenserBehaviors.register()
-            vsApi.collisionStartEvent.on(VehicleImpactDamageHandler::onCollisionStart)
             vsApi.physTickEvent.on { physTickEvent ->
                 VehicleManager.physTick(physTickEvent.world, physTickEvent.delta)
                 VehicleInteractionHandler.physTick(physTickEvent.world, physTickEvent.delta)

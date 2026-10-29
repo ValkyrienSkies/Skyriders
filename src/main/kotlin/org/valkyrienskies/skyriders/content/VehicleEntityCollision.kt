@@ -9,6 +9,7 @@ import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.common.util.EntityShipCollisionUtils
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
+import org.valkyrienskies.skyriders.util.VehicleMovementSubsteps
 
 object VehicleEntityCollision {
     private const val CANDIDATE_INFLATION = 0.6
@@ -23,33 +24,34 @@ object VehicleEntityCollision {
     ): Vec3 {
         if (movement.lengthSqr() <= COLLISION_EPSILON) return movement
         if (shouldSkip(entity)) return movement
+        if (!VehicleManager.hasVehicles(level)) return movement
 
         val shipWorld = level.shipWorld ?: return movement
         val stepHeight = entity.maxUpStep().toDouble()
-        val queryBox = entityBoundingBox
-            .expandTowards(movement)
-            .inflate(CANDIDATE_INFLATION, CANDIDATE_INFLATION + stepHeight, CANDIDATE_INFLATION)
-            .toAabbd()
 
-        var adjustedMovement = movement
-        val vehicleBodies = shipWorld.allBodies
-            .getIntersecting(queryBox, level.dimensionId)
-            .filter { body -> VehicleManager.getVehicle(level, body.id) != null }
-            .sortedBy { body -> body.id }
-
-        for (body in vehicleBodies) {
-            val shape = body.collisionShape ?: continue
-            adjustedMovement = EntityShipCollisionUtils.adjustEntityMovementForPrimitiveShapeCollision(
-                entity,
-                adjustedMovement,
-                entityBoundingBox,
-                shape,
-                body.kinematics.transform.toWorld
-            )
-            if (adjustedMovement.lengthSqr() <= COLLISION_EPSILON) break
+        return VehicleMovementSubsteps.resolve(movement) { offset, step ->
+            val box = entityBoundingBox.move(offset)
+            val queryBox = box.expandTowards(step)
+                .inflate(CANDIDATE_INFLATION, CANDIDATE_INFLATION + stepHeight, CANDIDATE_INFLATION)
+                .toAabbd()
+            val vehicleBodies = shipWorld.allBodies
+                .getIntersecting(queryBox, level.dimensionId)
+                .filter { body -> VehicleManager.getVehicle(level, body.id) != null }
+                .sortedBy { body -> body.id }
+            var adjustedMovement = step
+            for (body in vehicleBodies) {
+                val shape = body.collisionShape ?: continue
+                adjustedMovement = EntityShipCollisionUtils.adjustEntityMovementForPrimitiveShapeCollision(
+                    entity,
+                    adjustedMovement,
+                    box,
+                    shape,
+                    body.kinematics.transform.toWorld
+                )
+                if (adjustedMovement.lengthSqr() <= COLLISION_EPSILON) break
+            }
+            adjustedMovement
         }
-
-        return adjustedMovement
     }
 
     private fun shouldSkip(entity: Entity): Boolean {

@@ -11,10 +11,8 @@ import kotlin.math.max
 
 object VehicleInteractionPicker {
     fun findVehicleOnRay(level: Level, start: Vec3, end: Vec3): VehicleRayHit? {
-        val visibleEnd = unobstructedEnd(level, start, end)
-        return VehicleManager.getVehicles(level)
+        return visibleVehicleHits(level, start, end)
             .asSequence()
-            .flatMap { vehicle -> hitVehicleInteractionZones(vehicle, start, visibleEnd).asSequence() }
             .groupBy { it.vehicle.bodyId }
             .values
             .asSequence()
@@ -23,6 +21,22 @@ object VehicleInteractionPicker {
                 compareBy<VehicleRayHit> { it.vehicleDistanceSqr }
                     .thenBy { it.distanceSqr }
             )
+    }
+
+    fun visibleVehicleHits(
+        level: Level,
+        start: Vec3,
+        end: Vec3,
+        vehicles: Iterable<IVehicle> = VehicleManager.getVehicles(level)
+    ): List<VehicleRayHit> {
+        val hits = vehicles.flatMap { hitVehicleInteractionZones(it, start, end) }
+        if (hits.isEmpty()) return emptyList()
+        val length = start.distanceTo(end)
+        if (!length.isFinite() || length <= 1.0e-6) return emptyList()
+        val furthestHit = kotlin.math.sqrt(hits.maxOf { it.distanceSqr })
+        val candidateEnd = start.add(end.subtract(start).scale((furthestHit / length).coerceAtMost(1.0)))
+        val visibleDistanceSqr = start.distanceToSqr(unobstructedEnd(level, start, candidateEnd))
+        return hits.filter { it.distanceSqr <= visibleDistanceSqr + 1.0e-8 }
     }
 
     fun unobstructedEnd(level: Level, start: Vec3, end: Vec3): Vec3 = level.clipIncludeShips(

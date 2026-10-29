@@ -265,6 +265,12 @@ object VehicleManager {
         return BikeManager.getBikes(level) + (vehicleMap(level)[level.dimensionId]?.values?.sortedBy(IVehicle::bodyId) ?: emptyList())
     }
 
+    fun hasVehicles(level: Level): Boolean =
+        BikeManager.hasBikes(level) || vehicleMap(level)[level.dimensionId]?.isNotEmpty() == true
+
+    fun hasServerVehicles(): Boolean =
+        BikeManager.hasServerBikes() || serverVehiclesByDimension.values.any { it.isNotEmpty() }
+
     fun getInput(dimensionId: DimensionId, bodyId: BodyId): VehicleInput {
         return BikeManager.getBike(dimensionId, bodyId)
             ?.let { BikeManager.getInput(dimensionId, bodyId).toVehicleInput() }

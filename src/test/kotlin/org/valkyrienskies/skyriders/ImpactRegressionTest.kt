@@ -3,9 +3,25 @@ package org.valkyrienskies.skyriders
 import org.joml.Vector3d
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.valkyrienskies.core.api.events.CollisionEvent
+import org.valkyrienskies.core.api.physics.ContactPoint
+import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.skyriders.content.VehicleImpactDamageHandler
 import org.valkyrienskies.skyriders.util.VehicleImpactMath
 
 class ImpactRegressionTest {
+    @Test
+    fun ordinaryShipCollisionsDoNotReadPhysicsOrContactData() {
+        val event = object : CollisionEvent {
+            override val dimensionId = "minecraft:overworld"
+            override val shipIdA = 100L
+            override val shipIdB = 101L
+            override val physLevel: PhysLevel get() = error("Read physics for a non-vehicle collision")
+            override val contactPoints: Collection<ContactPoint> get() = error("Read non-vehicle contacts")
+        }
+        VehicleImpactDamageHandler.onCollisionStart(event)
+    }
+
     @Test
     fun tangentialMotionAndSharedCruisingSpeedDoNotCountAsImpact() {
         val normal = Vector3d(1.0, 0.0, 0.0)

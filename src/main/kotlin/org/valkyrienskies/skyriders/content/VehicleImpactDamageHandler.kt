@@ -6,9 +6,11 @@ import net.minecraft.world.phys.AABB
 import org.joml.Vector3d
 import org.joml.Vector3dc
 import org.valkyrienskies.core.api.events.CollisionEvent
+import org.valkyrienskies.core.api.event.RegisteredListener
 import org.valkyrienskies.core.api.world.properties.DimensionId
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
+import org.valkyrienskies.mod.api.vsApi
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.util.VehicleImpactMath
 import org.valkyrienskies.skyriders.util.VehicleCollisionSweep
@@ -33,6 +35,21 @@ object VehicleImpactDamageHandler {
     private val lastDamageTickByImpact = HashMap<ImpactKey, Long>()
     private val lastCrashDamageTickByVehicle = HashMap<VehicleKey, Long>()
     private val pendingCollisionCrashDamage = ConcurrentLinkedQueue<CollisionCrashDamage>()
+    private var collisionListener: RegisteredListener? = null
+
+    fun updateCollisionListener() {
+        if (VehicleManager.hasServerVehicles()) {
+            if (collisionListener == null) collisionListener = vsApi.collisionStartEvent.on(::onCollisionStart)
+        } else {
+            stopCollisionListener()
+        }
+    }
+
+    fun stopCollisionListener() {
+        collisionListener?.unregister()
+        collisionListener = null
+        pendingCollisionCrashDamage.clear()
+    }
 
     fun clear(level: ServerLevel) {
         lastDamageTickByImpact.keys.removeIf { it.dimensionId == level.dimensionId }
@@ -41,6 +58,10 @@ object VehicleImpactDamageHandler {
     }
 
     fun onCollisionStart(event: CollisionEvent) {
+        val vehicleA = VehicleManager.getVehicle(event.dimensionId, event.shipIdA) != null
+        val vehicleB = VehicleManager.getVehicle(event.dimensionId, event.shipIdB) != null
+        if (!vehicleA && !vehicleB) return
+
         val previousA = event.physLevel.getBodyById(event.shipIdA)?.prevTickKinematics
         val previousB = event.physLevel.getBodyById(event.shipIdB)?.prevTickKinematics
         val contactSpeed = event.contactPoints
@@ -54,8 +75,8 @@ object VehicleImpactDamageHandler {
             }
             ?: 0.0
 
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, event.shipIdB, contactSpeed))
-        pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, event.shipIdA, contactSpeed))
+        if (vehicleA) pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdA, event.shipIdB, contactSpeed))
+        if (vehicleB) pendingCollisionCrashDamage.add(CollisionCrashDamage(event.dimensionId, event.shipIdB, event.shipIdA, contactSpeed))
     }
 
     fun tick(level: ServerLevel, vehicles: Iterable<IVehicle>) {
