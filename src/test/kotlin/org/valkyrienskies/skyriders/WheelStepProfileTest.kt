@@ -6,9 +6,30 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.valkyrienskies.skyriders.util.VehicleWheelContact
 import org.valkyrienskies.skyriders.util.VehicleWheelPhysics
 
 class WheelStepProfileTest {
+    @ParameterizedTest
+    @CsvSource("-45", "-30", "30", "45")
+    fun turningAcrossTheSameStepDoesNotChangeSupportHeight(heading: Double) {
+        NativeVehicleWorld().use { world ->
+            world.box(Vector3d(40.0, 1.0, 80.0), Vector3d(0.0, -0.5, 0.0))
+            world.box(Vector3d(40.0, 1.0, 40.0), Vector3d(0.0, 0.5, 20.0))
+            val body = world.box(Vector3d(0.1), Vector3d(0.0, 0.6, -0.8), static = false)
+            fun sample(angle: Double): VehicleWheelContact {
+                val forward = Quaterniond().rotateY(Math.toRadians(angle)).transform(Vector3d(0.0, 0.0, 1.0))
+                body.velocity(Vector3d(forward).mul(12.0))
+                return VehicleWheelPhysics.sampleSphereWheel(body.api, world.level, body.current.position,
+                    0.82, 0.275, forward, step = VehicleWheelPhysics.StepSettings(1.15, 1.0) { true })
+            }
+            val straight = sample(0.0)
+            val diagonal = sample(heading)
+            assertEquals(straight.hitDistance, diagonal.hitDistance, 1e-6)
+            assertEquals(0.0, straight.contactNormalWorld.distance(diagonal.contactNormalWorld), 1e-6)
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("-45", "-30", "30", "45")
     fun diagonalContactRetainsCrossSlopeAndIndependentWheelHeight(heading: Double) {
