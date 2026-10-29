@@ -79,29 +79,32 @@ object VehicleWheelPhysics {
         val travel = if (velocity.lengthSquared() > 0.25) velocity.normalize() else Vector3d(forward).mul(if (step.direction < 0.0) -1.0 else 1.0)
         if (kotlin.math.abs(travel.dot(forward)) < 0.25) return contact
         val reach = radius + maxStep * 1.5
+        val probeReach = reach / 0.2
         var profileRise = 0.0
         val profileNormal = Vector3d(0.0, 1.0, 0.0)
         var bestHit: RayCastResult? = null
         var cursor = 0.0
         var height = floorPoint.y
         for (probe in 0 until 4) {
-            if (cursor >= reach) break
+            if (cursor >= probeReach) break
             val start = Vector3d(floorPoint).fma(cursor, travel).setComponent(1, height + radius * 0.4)
-            val face = level.rayCast(start, travel, reach - cursor, body.id) ?: break
+            val face = level.rayCast(start, travel, probeReach - cursor, body.id) ?: break
             if (!face.distance.isFinite() || face.distance <= 1.0e-5 || !face.hitNormal.isFinite ||
                 face.hitNormal.y() > 0.25 || face.hitNormal.dot(travel) > -0.2) break
             val edgeDistance = cursor + face.distance
+            val faceDistance = edgeDistance * -face.hitNormal.dot(travel)
+            if (faceDistance >= reach) break
             val topStart = Vector3d(floorPoint).fma(edgeDistance + 0.02, travel)
                 .setComponent(1, height + maxStep + 0.04)
             val top = level.rayCast(topStart, down, maxStep + 0.05, body.id) ?: break
             if (!isSupportHit(top, body.id, maxStep + 0.05, up)) break
             val topHeight = topStart.y - top.distance
             if (topHeight - height !in 0.05..maxStep) break
-            val t = (1.0 - edgeDistance / reach).coerceIn(0.0, 1.0)
+            val t = (1.0 - faceDistance / reach).coerceIn(0.0, 1.0)
             val rise = topHeight - height
             profileRise += rise * t * t * (3.0 - 2.0 * t)
             val slope = rise * 6.0 * t * (1.0 - t) / reach
-            profileNormal.fma(slope / -face.hitNormal.dot(travel), face.hitNormal)
+            profileNormal.fma(slope, face.hitNormal)
             bestHit = top
             cursor = edgeDistance + 0.04
             height = topHeight
