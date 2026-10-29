@@ -10,6 +10,22 @@ import java.lang.reflect.Proxy
 
 class WheelContactRegressionTest {
     @Test
+    fun wheelRecoversSupportAndTireFrameAfterSidewaysGroundNormal() {
+        NativeVehicleWorld().use { world ->
+            world.box(Vector3d(20.0, 1.0, 20.0), Vector3d(0.0, -0.5, 0.0))
+            val wheelBody = world.box(Vector3d(0.2), Vector3d(0.0, 0.6, 0.0), static = false)
+            wheelBody.velocity(Vector3d(0.0, 0.0, 24.0))
+            val contact = VehicleWheelPhysics.sampleSphereWheel(wheelBody.api, world.level,
+                Vector3d(0.0, 0.6, 0.0), Vector3d(0.0, 0.0, 1.0), 1.2, 0.3,
+                Vector3d(0.0, 1.0, 0.0), Vector3d(1.0, 0.0, 0.0))
+            assertTrue(contact.grounded)
+            assertEquals(-1.0, contact.suspensionDirWorld.y, 1e-5)
+            assertEquals(0.0, contact.wheelForwardWorld.y, 1e-5)
+            assertEquals(0.0, contact.wheelRightWorld.y, 1e-5)
+        }
+    }
+
+    @Test
     fun overlapsAndWallsCannotBecomeSuspensionSupport() {
         NativeVehicleWorld().use { world ->
             val ground = world.box(Vector3d(10.0, 2.0, 10.0), Vector3d())

@@ -33,7 +33,7 @@ data class WheeledVehiclePhysicsConfig(
     val suspensionDroopPreloadFraction: Double = 0.16,
     val parkingBrakeStrength: Double = 4.5,
     val maxStepHeight: Double = 0.85,
-    val stepAssistStrength: Double = mass * 45.0,
+    val stepAssistStrength: Double = 6500.0,
     val driftEnabled: Boolean = false,
     val driftMinSpeed: Double = 5.0,
     val driftStartSteer: Double = 0.2,
@@ -124,6 +124,7 @@ data class WheeledVehiclePhysicsConfig(
             yawAssistMinSpeed = 0.7,
             yawAssistMaxSpeed = 15.0,
             maxStepHeight = 1.5,
+            stepAssistStrength = 8200.0,
             driftEnabled = true,
             driftMinSpeed = 4.8,
             driftStartSteer = 0.22,
@@ -219,6 +220,7 @@ data class WheeledVehiclePhysicsConfig(
             groundNormalSmoothingTime = 0.16,
             parkingBrakeStrength = 5.2,
             maxStepHeight = 1.15,
+            stepAssistStrength = 8200.0,
             transmission = VehicleTransmissionConfig(
                 automatic = false,
                 manualClutch = false,
@@ -302,6 +304,7 @@ data class WheeledVehiclePhysicsConfig(
             groundNormalSmoothingTime = 0.18,
             parkingBrakeStrength = 6.0,
             maxStepHeight = 1.1,
+            stepAssistStrength = 10500.0,
             driftEnabled = true,
             driftMinSpeed = 5.4,
             driftStartSteer = 0.18,
@@ -441,7 +444,6 @@ data class WheelAxleConfig(
 )
 
 data class WheeledVehicleRuntimeState(
-    val stepTraversal: org.valkyrienskies.skyriders.util.VehicleStepState = org.valkyrienskies.skyriders.util.VehicleStepState(),
     var engineOn: Boolean = false,
     var fuelAmount: Double = Double.NaN,
     var raceParticipant: Boolean = false,

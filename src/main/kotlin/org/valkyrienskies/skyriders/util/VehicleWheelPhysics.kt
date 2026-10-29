@@ -34,20 +34,31 @@ object VehicleWheelPhysics {
         groundedMaxDistance: Double = maxLength
     ): VehicleWheelContact {
         val direction = VehiclePhysicsMath.safeNormalize(suspensionDirWorld, Vector3d(0.0, -1.0, 0.0))
+        if (direction.y > -MIN_GROUND_NORMAL_ALIGNMENT) direction.set(0.0, -1.0, 0.0)
         val originLift = (maxLength - radius).coerceAtLeast(radius)
-        val start = Vector3d(mountWorld).fma(-originLift, direction)
-        val hit = physLevel.castSphere(start, radius, direction, maxLength - radius + originLift, body.id)
-        val valid = hit != null && hit.geometrySupported && !hit.initialOverlap && hit.distance.isFinite() &&
-            hit.normal.isFinite && hit.velocity.isFinite && hit.normal.dot(direction) <= -MIN_GROUND_NORMAL_ALIGNMENT
+        fun cast() = physLevel.castSphere(Vector3d(mountWorld).fma(-originLift, direction), radius,
+            direction, maxLength - radius + originLift, body.id)
+        var hit = cast()
+        fun isValid() = hit?.let { it.geometrySupported && !it.initialOverlap && it.distance.isFinite() &&
+            it.normal.isFinite && it.velocity.isFinite && it.normal.y() >= MIN_GROUND_NORMAL_ALIGNMENT &&
+            it.normal.dot(direction) <= -MIN_GROUND_NORMAL_ALIGNMENT } == true
+        if (!isValid() && direction.y > -0.9999) {
+            direction.set(0.0, -1.0, 0.0)
+            hit = cast()
+        }
+        val valid = isValid()
         val point = if (valid) Vector3d(hit!!.point) else Vector3d(mountWorld)
         val normal = if (valid) Vector3d(hit!!.normal).normalize() else Vector3d(direction).negate()
         val surfaceVelocity = if (valid) Vector3d(hit!!.velocity) else Vector3d()
         val velocity = VehiclePhysicsMath.velocityAtPoint(body, point)
         val distance = if (valid) hit!!.distance + radius - originLift else maxLength
+        val up = Vector3d(direction).negate()
+        val forward = VehiclePhysicsMath.projectOntoPlane(wheelForwardWorld, up, Vector3d(0.0, 0.0, 1.0))
+        val right = Vector3d(up).cross(forward).normalize()
         return VehicleWheelContact(valid && distance <= groundedMaxDistance, if (valid) hit!!.hitBody else null,
             point, normal, direction, distance, (maxLength - distance).coerceAtLeast(0.0),
             if (valid) surfaceFrictionScale(hit!!.staticFriction, hit.dynamicFriction) else 1.0,
-            Vector3d(wheelForwardWorld), Vector3d(wheelRightWorld), velocity, surfaceVelocity,
+            forward, right, velocity, surfaceVelocity,
             Vector3d(velocity).sub(surfaceVelocity))
     }
 
