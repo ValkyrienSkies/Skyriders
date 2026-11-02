@@ -1,12 +1,17 @@
 package org.valkyrienskies.skyriders.client
 
 import net.minecraft.client.player.LocalPlayer
+import net.minecraft.client.Minecraft
+import net.minecraft.world.entity.Entity
 import org.joml.Quaterniond
 import org.joml.Vector3d
 
 object BikeClientHoistState {
     var hoisting: Boolean = false
     var bodyId: Long = -1L
+
+    fun carriedBodyId(entity: Entity): Long? =
+        bodyId.takeIf { hoisting && Minecraft.getInstance().player === entity }
 
     fun carriedPosition(player: LocalPlayer): Vector3d {
         val eye = player.eyePosition

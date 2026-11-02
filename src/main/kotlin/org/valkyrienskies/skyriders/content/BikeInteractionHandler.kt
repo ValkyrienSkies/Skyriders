@@ -44,6 +44,9 @@ object BikeInteractionHandler {
     private val pendingTosses = ConcurrentHashMap<BodyId, PendingToss>()
     private const val CARRY_STATIC_KEY = "carry_original_static"
 
+    fun carriedBodyId(playerId: UUID, dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId): BodyId? =
+        hoistedByPlayer[playerId]?.takeIf { it.dimensionId == dimensionId }?.bodyId
+
     fun saveCarryState(dimensionId: org.valkyrienskies.core.api.world.properties.DimensionId, record: VehicleSaveRecord): VehicleSaveRecord {
         val hoisted = hoistedPlayersByBody[record.bodyId]?.let(hoistedByPlayer::get)
             ?.takeIf { it.dimensionId == dimensionId }

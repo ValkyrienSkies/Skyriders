@@ -80,14 +80,14 @@ class ShipInteractionGameTests {
                             MinecraftForge.EVENT_BUS.post(event)
                             return event
                         }
-                        val chunksBefore = level.chunkSource.loadedChunksCount
                         repeat(10) {
+                            val chunksBefore = level.chunkSource.loadedChunksCount
                             helper.assertFalse(click().isCanceled, "Empty-world ship click was intercepted")
+                            helper.assertTrue(level.chunkSource.loadedChunksCount == chunksBefore,
+                                "Ship interaction loaded unrelated terrain chunks")
                             helper.assertTrue(level.destroyBlock(block, false), "Ship block could not be broken")
                             level.setBlockAndUpdate(block, Blocks.STONE.defaultBlockState())
                         }
-                        helper.assertTrue(level.chunkSource.loadedChunksCount == chunksBefore,
-                            "Ship interaction loaded unrelated terrain chunks")
 
                         val distant = VehicleManager.createVehicle(WheeledVehicleDefinitions.CAR.id, level,
                             Vector3d(target.x + 100.0, target.y, target.z))

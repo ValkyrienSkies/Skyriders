@@ -4,12 +4,15 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import net.minecraftforge.api.distmarker.Dist
+import net.minecraftforge.fml.DistExecutor
 import org.joml.primitives.AABBd
 import org.valkyrienskies.mod.api.dimensionId
 import org.valkyrienskies.mod.api.shipWorld
 import org.valkyrienskies.mod.common.util.EntityShipCollisionUtils
 import org.valkyrienskies.skyriders.content.entity.BikeSeatEntity
 import org.valkyrienskies.skyriders.util.VehicleMovementSubsteps
+import org.valkyrienskies.skyriders.client.BikeClientHoistState
 
 object VehicleEntityCollision {
     private const val CANDIDATE_INFLATION = 0.6
@@ -28,6 +31,9 @@ object VehicleEntityCollision {
 
         val shipWorld = level.shipWorld ?: return movement
         val stepHeight = entity.maxUpStep().toDouble()
+        val carriedBodyId = if (level.isClientSide) {
+            DistExecutor.unsafeCallWhenOn(Dist.CLIENT) { java.util.concurrent.Callable { BikeClientHoistState.carriedBodyId(entity) } }
+        } else BikeInteractionHandler.carriedBodyId(entity.uuid, level.dimensionId)
 
         return VehicleMovementSubsteps.resolve(movement) { offset, step ->
             val box = entityBoundingBox.move(offset)
@@ -36,7 +42,7 @@ object VehicleEntityCollision {
                 .toAabbd()
             val vehicleBodies = shipWorld.allBodies
                 .getIntersecting(queryBox, level.dimensionId)
-                .filter { body -> VehicleManager.getVehicle(level, body.id) != null }
+                .filter { body -> body.id != carriedBodyId && VehicleManager.getVehicle(level, body.id) != null }
                 .sortedBy { body -> body.id }
             var adjustedMovement = step
             for (body in vehicleBodies) {
