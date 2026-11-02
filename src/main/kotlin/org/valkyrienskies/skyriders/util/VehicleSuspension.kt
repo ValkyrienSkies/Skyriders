@@ -54,8 +54,16 @@ object VehicleSuspension {
             .distinctBy(PhysVsBody::id).associate { it.id to Response(it) }
         val matrix = Array(active.size) { DoubleArray(active.size) }
         val target = DoubleArray(active.size)
+        val reboundLimits = DoubleArray(active.size)
         for ((row, index) in active.withIndex()) {
             val spring = springs[index]!!
+            if (spring.allowRebound) {
+                val surfaceVelocity = VehiclePhysicsMath.velocityAtPoint(body, spring.point).sub(spring.relativeVelocity)
+                val reboundSpeed = (body.kinematics.velocity.y() - surfaceVelocity.y).coerceAtLeast(0.0)
+                reboundLimits[row] = (body.inertiaData.mass * reboundSpeed /
+                    (active.size * spring.normal.y().coerceAtLeast(0.28)))
+                    .coerceAtMost(VehiclePhysicsMath.MAX_FORCE_MAGNITUDE * dt)
+            }
             val alignment = -spring.normal.dot(spring.down).coerceAtMost(-0.28)
             val response = spring.damping + spring.stiffness * dt
             if (response <= 0.0) continue
@@ -78,7 +86,7 @@ object VehicleSuspension {
                 for (column in active.indices) if (column != row) residual -= matrix[row][column] * impulses[column]
                 val limit = VehiclePhysicsMath.MAX_FORCE_MAGNITUDE * dt
                 val spring = springs[active[row]]!!
-                impulses[row] = (residual / diagonal).coerceIn(if (spring.allowRebound) -limit else 0.0,
+                impulses[row] = (residual / diagonal).coerceIn(-reboundLimits[row],
                     if (spring.supported) limit else 0.0)
             }
         }
