@@ -1,4 +1,4 @@
-﻿{
+{
   "entries": [
     { "item": "skyriders:honey_canister", "weight": 8, "frontMultiplier": 0.2, "backMultiplier": 1.8 },
     { "item": "skyriders:royal_jelly_canister", "weight": 3, "frontMultiplier": 0.15, "backMultiplier": 1.65 },
