@@ -28,6 +28,7 @@ data class VehicleWheelContact(
 object VehicleWheelPhysics {
     data class StepSettings(val height: Double, val direction: Double, val canRise: (Double) -> Boolean)
     private const val MIN_GROUND_NORMAL_ALIGNMENT = 0.28
+    private const val STEP_HEIGHT_EPSILON = 1.0e-6
     private const val DEFAULT_SURFACE_FRICTION_COEFFICIENT = 0.6
     private const val MIN_SURFACE_FRICTION_SCALE = 0.12
     private const val MAX_SURFACE_FRICTION_SCALE = 1.65
@@ -99,9 +100,10 @@ object VehicleWheelPhysics {
             val top = level.rayCast(topStart, down, maxStep + 0.05, body.id) ?: break
             if (!isSupportHit(top, body.id, maxStep + 0.05, up)) break
             val topHeight = topStart.y - top.distance
-            if (topHeight - height !in 0.05..maxStep) break
+            val measuredRise = topHeight - height
+            if (measuredRise !in 0.05..(maxStep + STEP_HEIGHT_EPSILON)) break
             val t = (1.0 - faceDistance / reach).coerceIn(0.0, 1.0)
-            val rise = topHeight - height
+            val rise = measuredRise.coerceAtMost(maxStep)
             profileRise += rise * t * t * (3.0 - 2.0 * t)
             val slope = rise * 6.0 * t * (1.0 - t) / reach
             profileNormal.fma(slope, face.hitNormal)

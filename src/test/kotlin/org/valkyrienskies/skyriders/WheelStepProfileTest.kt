@@ -11,6 +11,20 @@ import org.valkyrienskies.skyriders.util.VehicleWheelPhysics
 
 class WheelStepProfileTest {
     @ParameterizedTest
+    @CsvSource("1.0,true", "1.0000000000000002,true", "1.0001,false")
+    fun stepHeightLimitToleratesRaycastRoundoff(height: Double, climbable: Boolean) {
+        NativeVehicleWorld().use { world ->
+            world.box(Vector3d(20.0, 1.0, 20.0), Vector3d(0.0, -0.5, 0.0))
+            world.box(Vector3d(10.0, height, 10.0), Vector3d(0.0, height * 0.5, 5.0))
+            val mount = Vector3d(0.0, 0.6, -0.8)
+            val body = world.box(Vector3d(0.1), mount, static = false)
+            val contact = VehicleWheelPhysics.sampleSphereWheel(body.api, world.level, mount, 0.82, 0.28,
+                Vector3d(0.0, 0.0, 1.0), step = VehicleWheelPhysics.StepSettings(1.0, 1.0) { true })
+            assertEquals(climbable, contact.stepRise > 0.0)
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("-45", "-30", "30", "45")
     fun turningAcrossTheSameStepDoesNotChangeSupportHeight(heading: Double) {
         NativeVehicleWorld().use { world ->
